@@ -3,6 +3,7 @@ import re
 from typing import List
 from app.scanners.base import BaseScanner, RawFinding
 from app.scanners.parsers.python_parser import parse_python_file
+from app.scanners.parsers.javascript_parser import parse_javascript_file
 from app.models.enums import AssetType, CryptoPurpose, EvidenceType
 
 KNOWN_PATTERNS = [
@@ -11,6 +12,7 @@ KNOWN_PATTERNS = [
     (r"(?i)\bECDH\b", "ECDH", CryptoPurpose.KEY_ESTABLISHMENT, AssetType.ALGORITHM),
     (r"(?i)\bAES(-128|-192|-256)?\b", "AES", CryptoPurpose.ENCRYPTION, AssetType.ALGORITHM),
     (r"(?i)\bSHA-?256\b", "SHA-256", CryptoPurpose.HASHING, AssetType.ALGORITHM),
+    (r"(?i)\bSHA-?512\b", "SHA-512", CryptoPurpose.HASHING, AssetType.ALGORITHM),
     (r"(?i)\bMD5\b", "MD5", CryptoPurpose.HASHING, AssetType.ALGORITHM),
     (r"(?i)\bDES\b", "DES", CryptoPurpose.ENCRYPTION, AssetType.ALGORITHM),
     (r"-----BEGIN (RPC|RSA|EC|PRIVATE) KEY-----", "RSA", CryptoPurpose.KEY_ESTABLISHMENT, AssetType.CERTIFICATE),
@@ -29,11 +31,11 @@ class SourceScanner(BaseScanner):
 
         for root, _, files in os.walk(target_path):
             for file in files:
-                if file.endswith((".py", ".pem", ".key", ".crt", ".json", ".yaml", ".yml")):
+                if file.endswith((".py", ".js", ".jsx", ".ts", ".tsx", ".pem", ".key", ".crt", ".json", ".yaml", ".yml")):
                     full_path = os.path.join(root, file)
                     rel_path = os.path.relpath(full_path, target_path)
 
-                    # Run AST parser on Python files
+                    # 1. Run AST parser on Python files
                     if file.endswith(".py"):
                         ast_results = parse_python_file(full_path)
                         for item in ast_results:
@@ -48,12 +50,35 @@ class SourceScanner(BaseScanner):
                                 algorithm_name=alg if alg != "HASHING" else "SHA-256",
                                 purpose=purpose,
                                 matched_text=item["matched_text"],
-                                context=f"AST detected {item['matched_text']} at line {item['line']}",
+                                context=f"Python AST detected {item['matched_text']} at line {item['line']}",
                                 confidence=0.95,
                                 evidence_type=EvidenceType.OBSERVED
                             ))
 
-                    # Run Regex scanner for known & unknown patterns
+                    # 2. Run JS/TS parser on JavaScript and TypeScript files
+                    elif file.endswith((".js", ".jsx", ".ts", ".tsx")):
+                        js_results = parse_javascript_file(full_path)
+                        for item in js_results:
+                            alg = item["algorithm"]
+                            purpose_str = item["purpose"]
+                            purpose = CryptoPurpose[purpose_str] if purpose_str in CryptoPurpose.__members__ else CryptoPurpose.UNKNOWN
+                            asset_type = AssetType.DEPENDENCY if item["type"] == "IMPORT" else AssetType.API_CALL
+
+                            findings.append(RawFinding(
+                                detector_name="JavaScriptParser",
+                                target_path=target_path,
+                                file_path=rel_path,
+                                line_number=item["line"],
+                                asset_type=asset_type,
+                                algorithm_name=alg,
+                                purpose=purpose,
+                                matched_text=item["matched_text"],
+                                context=f"{item['description']} at line {item['line']}",
+                                confidence=0.95,
+                                evidence_type=EvidenceType.OBSERVED
+                            ))
+
+                    # 3. Run Regex scanner for known & unknown patterns
                     try:
                         with open(full_path, "r", encoding="utf-8", errors="ignore") as f:
                             lines = f.readlines()
