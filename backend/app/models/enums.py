@@ -1,0 +1,61 @@
+from enum import Enum
+
+class ScanStatus(str, Enum):
+    QUEUED = "QUEUED"
+    RUNNING = "RUNNING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
+
+class AssetType(str, Enum):
+    ALGORITHM = "ALGORITHM"
+    API_CALL = "API_CALL"
+    CERTIFICATE = "CERTIFICATE"
+    CONTAINER = "CONTAINER"
+    DEPENDENCY = "DEPENDENCY"
+    PROTOCOL = "PROTOCOL"
+    BINARY = "BINARY"
+
+class CryptoPurpose(str, Enum):
+    SIGNATURE = "SIGNATURE"
+    KEY_ESTABLISHMENT = "KEY_ESTABLISHMENT"
+    ENCRYPTION = "ENCRYPTION"
+    HASHING = "HASHING"
+    MAC = "MAC"
+    AUTHENTICATION = "AUTHENTICATION"
+    UNKNOWN = "UNKNOWN"
+
+class RiskLevel(str, Enum):
+    CRITICAL = "CRITICAL"
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
+
+class EvidenceType(str, Enum):
+    OBSERVED = "OBSERVED"
+    INFERRED = "INFERRED"
+    ASSUMED = "ASSUMED"
+    EXTERNAL = "EXTERNAL"
+
+class StandardStatus(str, Enum):
+    FINAL_STANDARD = "FINAL_STANDARD"
+    STANDARDIZATION_IN_PROGRESS = "STANDARDIZATION_IN_PROGRESS"
+    RESEARCH_NON_STANDARD = "RESEARCH_NON_STANDARD"
+
+class ThreatScenarioType(str, Enum):
+    CONSERVATIVE = "CONSERVATIVE"
+    MODERATE = "MODERATE"
+    AGGRESSIVE = "AGGRESSIVE"
+    CUSTOM = "CUSTOM"
+
+class ValidationStatus(str, Enum):
+    PENDING = "PENDING"
+    PASSED = "PASSED"
+    FAILED = "FAILED"
+    INCONCLUSIVE = "INCONCLUSIVE"
+
+class QuantumSafety(str, Enum):
+    QUANTUM_VULNERABLE = "QUANTUM_VULNERABLE"
+    QUANTUM_SAFE = "QUANTUM_SAFE"
+    HYBRID = "HYBRID"
+    UNKNOWN = "UNKNOWN"

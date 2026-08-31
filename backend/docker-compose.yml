@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ecdat_backend
+    ports:
+      - "8000:8000"
+    environment:
+      - PROJECT_NAME=ECDAT Backend
+      - ENVIRONMENT=development
+      - DEBUG=True
+      - DATABASE_URL=sqlite:///./ecdat.db
+      - SECRET_KEY=dev-secret-key-change-in-production-do-not-use-hardcoded
+    volumes:
+      - ./data_storage:/app/data_storage
+      - ./sandbox_storage:/app/sandbox_storage
+    restart: unless-stopped
