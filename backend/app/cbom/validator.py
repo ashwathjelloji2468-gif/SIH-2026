@@ -5,6 +5,6 @@ class CBOMValidator:
         return (
             isinstance(cbom_json, dict) and
             cbom_json.get("bomFormat") == "CycloneDX" and
-            cbom_json.get("specVersion") == "1.5" and
+            cbom_json.get("specVersion") in ["1.5", "1.6"] and
             "components" in cbom_json
         )

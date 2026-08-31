@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from typing import List, Dict, Any
 from app.models.db_models import CryptoAsset, Scan
+from app.core.versioning import SYSTEM_VERSIONS
 
 def generate_cbom_json(scan: Scan, assets: List[CryptoAsset]) -> Dict[str, Any]:
     components = []
@@ -18,7 +19,7 @@ def generate_cbom_json(scan: Scan, assets: List[CryptoAsset]) -> Dict[str, Any]:
                     "cryptoFunctions": [asset.purpose.value if hasattr(asset.purpose, "value") else str(asset.purpose)]
                 },
                 "classicalSecurityLevel": asset.key_size or 128,
-                "nistQuantumSecurityLevel": 1 if asset.quantum_safety.value == "QUANTUM_SAFE" else 0
+                "nistQuantumSecurityLevel": 1 if (hasattr(asset.quantum_safety, "value") and asset.quantum_safety.value == "QUANTUM_SAFE") else 0
             },
             "evidence": {
                 "occurrences": [
@@ -33,7 +34,7 @@ def generate_cbom_json(scan: Scan, assets: List[CryptoAsset]) -> Dict[str, Any]:
 
     cbom = {
         "bomFormat": "CycloneDX",
-        "specVersion": "1.5",
+        "specVersion": "1.6",
         "serialNumber": f"urn:uuid:{scan.id}",
         "version": 1,
         "metadata": {
@@ -42,14 +43,18 @@ def generate_cbom_json(scan: Scan, assets: List[CryptoAsset]) -> Dict[str, Any]:
                 {
                     "vendor": "ECDAT",
                     "name": "SIH26164 Cryptographic Discovery Engine",
-                    "version": "1.0.0"
+                    "version": SYSTEM_VERSIONS["ecdat_software_version"]
                 }
             ],
             "component": {
                 "type": "application",
                 "name": f"Scan-{scan.id}",
-                "version": scan.cbom_version
-            }
+                "version": "1.6"
+            },
+            "properties": [
+                {"name": "ecdat:scanner_rule_version", "value": SYSTEM_VERSIONS["scanner_rule_version"]},
+                {"name": "ecdat:kb_version", "value": SYSTEM_VERSIONS["crypto_knowledge_base_version"]}
+            ]
         },
         "components": components
     }

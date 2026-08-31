@@ -8,7 +8,7 @@ from app.scanners.certificate_scanner import CertificateScanner
 from app.discovery.deduplication import deduplicate_findings
 from app.normalization.crypto_asset_normalizer import determine_quantum_safety
 from app.cbom.cyclonedx_adapter import generate_cbom_json
-from app.models.enums import ScanStatus
+from app.models.enums import ScanStatus, ReviewStatus
 from app.core.logging import logger
 
 class ScanOrchestrator:
@@ -25,19 +25,20 @@ class ScanOrchestrator:
         try:
             scan_repo.update_status(scan_id, ScanStatus.RUNNING)
 
-            # Collect raw findings from scanners
             scanners = [SourceScanner(), DependencyScanner(), CertificateScanner()]
             raw_findings = []
             for scanner in scanners:
                 raw_findings.extend(scanner.scan(scan.target_path))
 
-            # Deduplicate findings
             unique_findings = deduplicate_findings(raw_findings)
 
             created_assets = []
             for raw in unique_findings:
                 q_safety = determine_quantum_safety(raw.algorithm_name, raw.key_size)
-                
+                is_unk = raw.extra_metadata.get("is_unknown", False)
+                unk_reason = raw.extra_metadata.get("unknown_reason", None)
+                rev_status = ReviewStatus.PENDING_REVIEW if is_unk else ReviewStatus.RESOLVED
+
                 asset = asset_repo.create(
                     scan_id=scan.id,
                     name=f"{raw.algorithm_name}-{raw.file_path}:{raw.line_number or 1}",
@@ -47,7 +48,10 @@ class ScanOrchestrator:
                     purpose=raw.purpose,
                     location=raw.file_path,
                     line_number=raw.line_number,
-                    quantum_safety=q_safety
+                    quantum_safety=q_safety,
+                    is_unknown=is_unk,
+                    unknown_reason=unk_reason,
+                    review_status=rev_status
                 )
                 created_assets.append(asset)
 
@@ -61,7 +65,6 @@ class ScanOrchestrator:
                     confidence_score=raw.confidence
                 )
 
-            # Generate CBOM
             cbom_json = generate_cbom_json(scan, created_assets)
             scan_repo.update_status(scan_id, ScanStatus.COMPLETED, cbom_json=cbom_json)
             logger.info(f"Scan {scan_id} completed successfully with {len(created_assets)} assets detected.")

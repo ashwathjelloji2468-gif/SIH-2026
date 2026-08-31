@@ -7,7 +7,7 @@ from sqlalchemy.orm import relationship
 from app.core.database import Base
 from app.models.enums import (
     ScanStatus, AssetType, CryptoPurpose, RiskLevel, EvidenceType,
-    StandardStatus, ThreatScenarioType, ValidationStatus, QuantumSafety
+    StandardStatus, ThreatScenarioType, ValidationStatus, QuantumSafety, ReviewStatus
 )
 
 def generate_uuid() -> str:
@@ -40,7 +40,8 @@ class Scan(Base):
     completed_at = Column(DateTime, nullable=True)
     error_message = Column(Text, nullable=True)
     cbom_json = Column(JSON, nullable=True)
-    cbom_version = Column(String, default="1.5", nullable=False)
+    cbom_version = Column(String, default="1.6", nullable=False)
+    scanner_rule_version = Column(String, default="2026.1.0", nullable=False)
 
     # Relationships
     project = relationship("Project", back_populates="scans")
@@ -59,6 +60,11 @@ class CryptoAsset(Base):
     location = Column(String, nullable=False)  # File path or reference
     line_number = Column(Integer, nullable=True)
     quantum_safety = Column(SQLEnum(QuantumSafety), default=QuantumSafety.UNKNOWN, nullable=False)
+
+    # Unknown / Needs Review Fields
+    is_unknown = Column(Boolean, default=False, nullable=False)
+    unknown_reason = Column(Text, nullable=True)
+    review_status = Column(SQLEnum(ReviewStatus), default=ReviewStatus.RESOLVED, nullable=False)
 
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
@@ -101,6 +107,7 @@ class RiskAssessment(Base):
     migration_complexity_score = Column(Float, default=0.0)
     explanation = Column(Text, nullable=True)
     confidence_score = Column(Float, default=1.0)
+    risk_model_version = Column(String, default="2.0-MOSCA", nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
@@ -118,6 +125,7 @@ class Recommendation(Base):
     performance_notes = Column(Text, nullable=True)
     migration_complexity = Column(String, default="MEDIUM")
     confidence = Column(Float, default=1.0)
+    kb_version = Column(String, default="2026.3.0-NIST-PQC", nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
@@ -133,6 +141,7 @@ class ThreatScenario(Base):
     data_lifetime_years = Column(Integer, default=10, nullable=False)  # X
     migration_time_years = Column(Integer, default=3, nullable=False)  # Y
     description = Column(Text, nullable=True)
+    threat_scenario_version = Column(String, default="1.1", nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 class MigrationPlan(Base):

@@ -3,21 +3,22 @@ from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field, ConfigDict
 from app.models.enums import (
     ScanStatus, AssetType, CryptoPurpose, RiskLevel, EvidenceType,
-    StandardStatus, ThreatScenarioType, ValidationStatus, QuantumSafety
+    StandardStatus, ThreatScenarioType, ValidationStatus, QuantumSafety, ReviewStatus, TestingRequirement
 )
 
 # Health Schema
 class HealthResponse(BaseModel):
     status: str = "ok"
-    version: str = "1.0.0"
+    version: str = "1.2.0"
     database: str = "connected"
+    versions: Dict[str, str] = Field(default_factory=dict)
     timestamp: datetime
 
 # Project Schemas
 class ProjectBase(BaseModel):
-    name: str = Field(..., example="Enterprise Payments Service")
-    description: Optional[str] = Field(None, example="Core transaction processing backend")
-    repository_url: Optional[str] = Field(None, example="https://github.com/org/repo.git")
+    name: str = Field(..., json_schema_extra={"example": "Enterprise Payments Service"})
+    description: Optional[str] = Field(None, json_schema_extra={"example": "Core transaction processing backend"})
+    repository_url: Optional[str] = Field(None, json_schema_extra={"example": "https://github.com/org/repo.git"})
 
 class ProjectCreate(ProjectBase):
     pass
@@ -36,8 +37,8 @@ class ProjectResponse(ProjectBase):
 
 # Scan Schemas
 class ScanCreate(BaseModel):
-    target_path: str = Field(..., example="/app/source")
-    scan_type: str = Field("source", example="source")
+    target_path: str = Field(..., json_schema_extra={"example": "/app/source"})
+    scan_type: str = Field("source", json_schema_extra={"example": "source"})
 
 class ScanResponse(BaseModel):
     id: str
@@ -49,6 +50,7 @@ class ScanResponse(BaseModel):
     completed_at: Optional[datetime] = None
     error_message: Optional[str] = None
     cbom_version: str
+    scanner_rule_version: str = "2026.1.0"
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -80,10 +82,33 @@ class CryptoAssetResponse(BaseModel):
     location: str
     line_number: Optional[int] = None
     quantum_safety: QuantumSafety
+    is_unknown: bool = False
+    unknown_reason: Optional[str] = None
+    review_status: ReviewStatus = ReviewStatus.RESOLVED
     created_at: datetime
     evidence_items: List[EvidenceResponse] = []
 
     model_config = ConfigDict(from_attributes=True)
+
+class ReviewAssetRequest(BaseModel):
+    algorithm_name: Optional[str] = None
+    purpose: Optional[CryptoPurpose] = None
+    action: str = Field("RESOLVE", json_schema_extra={"example": "RESOLVE"})  # RESOLVE or REJECT
+
+# Coverage Schemas
+class CategoryCoverage(BaseModel):
+    category_name: str
+    scanned_count: int
+    coverage_percentage: float
+    notes: str
+
+class CoverageReportResponse(BaseModel):
+    project_id: str
+    overall_coverage_percentage: float
+    categories: List[CategoryCoverage]
+    total_assets_discovered: int
+    unknown_needs_review_count: int
+    disclaimer: str = "ECDAT explicitly communicates limitations and coverage. 100% cryptographic discovery is never claimed."
 
 # Risk Assessment Schemas
 class RiskAssessRequest(BaseModel):
@@ -105,6 +130,7 @@ class RiskAssessmentResponse(BaseModel):
     migration_complexity_score: float
     explanation: Optional[str] = None
     confidence_score: float
+    risk_model_version: str = "2.0-MOSCA"
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -120,6 +146,7 @@ class RecommendationResponse(BaseModel):
     performance_notes: Optional[str] = None
     migration_complexity: str
     confidence: float
+    kb_version: str = "2026.3.0-NIST-PQC"
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -138,13 +165,19 @@ class ThreatScenarioCreate(ThreatScenarioBase):
 
 class ThreatScenarioResponse(ThreatScenarioBase):
     id: str
+    threat_scenario_version: str = "1.1"
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
 # Migration Plan Schemas
 class MigrationPlanCreate(BaseModel):
-    name: str = Field(..., example="PQC Upgrade Phase 1")
+    name: str = Field(..., json_schema_extra={"example": "PQC Upgrade Phase 1"})
+    vendor_dependency_count: Optional[int] = 1
+    pki_cert_dependency_count: Optional[int] = 1
+    crypto_agility_score: Optional[float] = 0.6
+    testing_requirement_level: Optional[TestingRequirement] = TestingRequirement.HIGH
+    engineering_capacity_developers: Optional[int] = 3
 
 class MigrationTaskResponse(BaseModel):
     id: str
@@ -200,10 +233,10 @@ class AuditEventResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-# CBOM Schema
+# CBOM Schema (Updated to CycloneDX 1.6 per user request)
 class CBOMResponse(BaseModel):
     bomFormat: str = "CycloneDX"
-    specVersion: str = "1.5"
+    specVersion: str = "1.6"
     version: int = 1
     metadata: Dict[str, Any]
     components: List[Dict[str, Any]] = []

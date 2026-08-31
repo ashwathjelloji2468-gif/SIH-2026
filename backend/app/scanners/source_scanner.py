@@ -5,7 +5,7 @@ from app.scanners.base import BaseScanner, RawFinding
 from app.scanners.parsers.python_parser import parse_python_file
 from app.models.enums import AssetType, CryptoPurpose, EvidenceType
 
-REGEX_PATTERNS = [
+KNOWN_PATTERNS = [
     (r"(?i)\bRSA\b", "RSA", CryptoPurpose.SIGNATURE, AssetType.ALGORITHM),
     (r"(?i)\bECDSA\b", "ECDSA", CryptoPurpose.SIGNATURE, AssetType.ALGORITHM),
     (r"(?i)\bECDH\b", "ECDH", CryptoPurpose.KEY_ESTABLISHMENT, AssetType.ALGORITHM),
@@ -14,6 +14,10 @@ REGEX_PATTERNS = [
     (r"(?i)\bMD5\b", "MD5", CryptoPurpose.HASHING, AssetType.ALGORITHM),
     (r"(?i)\bDES\b", "DES", CryptoPurpose.ENCRYPTION, AssetType.ALGORITHM),
     (r"-----BEGIN (RPC|RSA|EC|PRIVATE) KEY-----", "RSA", CryptoPurpose.KEY_ESTABLISHMENT, AssetType.CERTIFICATE),
+]
+
+UNKNOWN_PATTERNS = [
+    (r"(?i)\b(cipher|crypto|encrypt|decrypt|private_key|public_key|sign_data)\b", "UNKNOWN_ALGORITHM", CryptoPurpose.UNKNOWN, AssetType.ALGORITHM)
 ]
 
 class SourceScanner(BaseScanner):
@@ -49,13 +53,15 @@ class SourceScanner(BaseScanner):
                                 evidence_type=EvidenceType.OBSERVED
                             ))
 
-                    # Run Regex scanner
+                    # Run Regex scanner for known & unknown patterns
                     try:
                         with open(full_path, "r", encoding="utf-8", errors="ignore") as f:
                             lines = f.readlines()
                         for idx, line in enumerate(lines, start=1):
-                            for pattern, alg, purpose, asset_type in REGEX_PATTERNS:
+                            matched_known = False
+                            for pattern, alg, purpose, asset_type in KNOWN_PATTERNS:
                                 if re.search(pattern, line):
+                                    matched_known = True
                                     findings.append(RawFinding(
                                         detector_name="RegexScanner",
                                         target_path=target_path,
@@ -69,6 +75,24 @@ class SourceScanner(BaseScanner):
                                         confidence=0.85,
                                         evidence_type=EvidenceType.OBSERVED
                                     ))
+
+                            if not matched_known:
+                                for pattern, alg, purpose, asset_type in UNKNOWN_PATTERNS:
+                                    if re.search(pattern, line):
+                                        findings.append(RawFinding(
+                                            detector_name="RegexUnknownDetector",
+                                            target_path=target_path,
+                                            file_path=rel_path,
+                                            line_number=idx,
+                                            asset_type=asset_type,
+                                            algorithm_name="UNKNOWN_ALGORITHM",
+                                            purpose=CryptoPurpose.UNKNOWN,
+                                            matched_text=line.strip(),
+                                            context=f"Potential cryptographic operation detected but algorithm could not be conclusively identified at line {idx}",
+                                            confidence=0.50,
+                                            evidence_type=EvidenceType.INFERRED,
+                                            extra_metadata={"is_unknown": True, "unknown_reason": "Potential cryptographic keyword detected without explicit algorithm identifier."}
+                                        ))
                     except Exception:
                         continue
 

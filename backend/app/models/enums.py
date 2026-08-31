@@ -15,6 +15,7 @@ class AssetType(str, Enum):
     DEPENDENCY = "DEPENDENCY"
     PROTOCOL = "PROTOCOL"
     BINARY = "BINARY"
+    VENDOR_MANAGED = "VENDOR_MANAGED"
 
 class CryptoPurpose(str, Enum):
     SIGNATURE = "SIGNATURE"
@@ -59,3 +60,15 @@ class QuantumSafety(str, Enum):
     QUANTUM_SAFE = "QUANTUM_SAFE"
     HYBRID = "HYBRID"
     UNKNOWN = "UNKNOWN"
+
+class ReviewStatus(str, Enum):
+    PENDING_REVIEW = "PENDING_REVIEW"
+    RESOLVED = "RESOLVED"
+    REJECTED = "REJECTED"
+
+class TestingRequirement(str, Enum):
+    __test__ = False
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+    REGULATED = "REGULATED"
