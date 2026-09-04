@@ -1,0 +1,118 @@
+import React, { useState, useEffect } from 'react';
+import { useProject } from '../context/ProjectContext';
+import { migrationService } from '../services/migrationService';
+import { MigrationPlan } from '../types';
+import { PlanBuilder } from '../components/Migration/PlanBuilder';
+import { TaskTimeline } from '../components/Migration/TaskTimeline';
+import { SandboxSimulator } from '../components/Migration/SandboxSimulator';
+import { ValidationRunner } from '../components/Migration/ValidationRunner';
+import { GitFork, Layers, RefreshCw, CheckCircle2 } from 'lucide-react';
+
+export const Migration: React.FC = () => {
+  const { currentProject } = useProject();
+  const [plans, setPlans] = useState<MigrationPlan[]>([]);
+  const [selectedPlan, setSelectedPlan] = useState<MigrationPlan | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  const fetchPlans = async () => {
+    if (!currentProject) {
+      setPlans([]);
+      setSelectedPlan(null);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const data = await migrationService.listPlans(currentProject.id);
+      setPlans(data);
+      if (data.length > 0) {
+        setSelectedPlan(data[0]);
+      } else {
+        setSelectedPlan(null);
+      }
+    } catch (err) {
+      console.error('Failed to load migration plans:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPlans();
+  }, [currentProject]);
+
+  return (
+    <div className="space-y-8 pb-12">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+        <div>
+          <div className="flex items-center gap-2 text-cyan-400 font-mono text-xs uppercase tracking-wider font-semibold mb-1">
+            <GitFork className="w-4 h-4" />
+            <span>Post-Quantum Transition Lifecycle</span>
+          </div>
+          <h1 className="text-2xl font-bold font-mono text-slate-100">Migration Planning, Sandbox & Validation</h1>
+          <p className="text-xs text-slate-400 mt-1">
+            Quantify transition effort, simulate AST refactoring, and execute automated regression verification.
+          </p>
+        </div>
+
+        <button
+          onClick={fetchPlans}
+          className="p-2 rounded-xl border border-slate-800 hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer self-start sm:self-auto"
+          title="Refresh plans"
+        >
+          <RefreshCw className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Plan Builder */}
+      <PlanBuilder
+        onPlanCreated={(newPlan) => {
+          setPlans([newPlan, ...plans]);
+          setSelectedPlan(newPlan);
+        }}
+      />
+
+      {/* Existing Plans Selector Tabs */}
+      {plans.length > 0 && (
+        <div className="space-y-6">
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-slate-800 text-xs font-mono">
+            <span className="text-slate-500 uppercase tracking-wider text-[11px] shrink-0 mr-2">
+              Generated Plans:
+            </span>
+            {plans.map((p) => {
+              const isSelected = selectedPlan?.id === p.id;
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => setSelectedPlan(p)}
+                  className={`px-3 py-1.5 rounded-lg border shrink-0 transition-colors cursor-pointer ${
+                    isSelected
+                      ? 'bg-cyan-950/70 border-cyan-500 text-cyan-300 font-semibold'
+                      : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {p.name} ({p.total_person_days}d)
+                </button>
+              );
+            })}
+          </div>
+
+          {selectedPlan && (
+            <>
+              {/* Sequenced Task Roadmap */}
+              <TaskTimeline plan={selectedPlan} />
+
+              {/* Sandbox Code Transformation Simulator */}
+              <SandboxSimulator planId={selectedPlan.id} />
+
+              {/* Automated Validation & Test Suite Runner */}
+              <ValidationRunner planId={selectedPlan.id} />
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
