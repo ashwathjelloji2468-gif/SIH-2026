@@ -1,90 +1,130 @@
-import React, { useState } from 'react';
-import { AlertTriangle, ShieldCheck, Sliders, Info, RotateCcw, Bookmark } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { AlertTriangle, ShieldCheck, Sliders, Info, RotateCcw, Plus, Loader2, Sparkles } from 'lucide-react';
 import { ThreatScenario } from '../../types';
+import { riskService } from '../../services/riskService';
 
 interface MoscaSimulatorProps {
   scenarios?: ThreatScenario[];
   onScenarioSelect?: (scenario: ThreatScenario) => void;
 }
 
-export const MoscaSimulator: React.FC<MoscaSimulatorProps> = ({ scenarios = [] }) => {
+export const MoscaSimulator: React.FC<MoscaSimulatorProps> = ({ scenarios: initialScenarios = [] }) => {
   const currentYear = new Date().getFullYear();
 
   // State for Mosca inputs
   const [xLifetime, setXLifetime] = useState<number>(10); // Data shelf-life in years
   const [yMigration, setYMigration] = useState<number>(3); // Migration duration in years
   const [zHorizonYear, setZHorizonYear] = useState<number>(2033); // CRQC arrival year
-  const [selectedScenarioId, setSelectedScenarioId] = useState<string>('MODERATE');
+  const [selectedScenarioId, setSelectedScenarioId] = useState<string>('moderate');
+  const [scenarios, setScenarios] = useState<ThreatScenario[]>(initialScenarios);
+  const [backendImpact, setBackendImpact] = useState<string | null>(null);
+  const [impactLoading, setImpactLoading] = useState<boolean>(false);
+
+  // Custom scenario creation state
+  const [customModalOpen, setCustomModalOpen] = useState<boolean>(false);
+  const [customName, setCustomName] = useState<string>('Enterprise Banking Confidentiality Horizon');
+  const [customZ, setCustomZ] = useState<number>(2031);
+  const [customX, setCustomX] = useState<number>(12);
+  const [customY, setCustomY] = useState<number>(4);
+
+  // Load backend scenarios if not provided
+  useEffect(() => {
+    if (scenarios.length === 0) {
+      riskService.listThreatScenarios().then((data) => {
+        if (data && data.length > 0) {
+          setScenarios(data);
+          handleSelectScenario(data[0]);
+        }
+      }).catch(console.error);
+    }
+  }, []);
+
+  const handleSelectScenario = async (scen: ThreatScenario) => {
+    setSelectedScenarioId(scen.id);
+    if (scen.data_lifetime_years) setXLifetime(scen.data_lifetime_years);
+    if (scen.migration_time_years) setYMigration(scen.migration_time_years);
+    if (scen.quantum_threat_horizon_year) setZHorizonYear(scen.quantum_threat_horizon_year);
+
+    setImpactLoading(true);
+    try {
+      const imp = await riskService.getScenarioImpact(scen.id);
+      setBackendImpact(imp.impact_summary);
+    } catch {
+      setBackendImpact(null);
+    } finally {
+      setImpactLoading(false);
+    }
+  };
+
+  const handleCreateCustom = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const created = await riskService.createThreatScenario({
+        name: customName,
+        scenario_type: 'CUSTOM',
+        quantum_threat_horizon_year: customZ,
+        data_lifetime_years: customX,
+        migration_time_years: customY,
+        description: 'User-defined organizational threat scenario',
+      });
+      setScenarios([...scenarios, created]);
+      setSelectedScenarioId(created.id);
+      setXLifetime(customX);
+      setYMigration(customY);
+      setZHorizonYear(customZ);
+      setCustomModalOpen(false);
+    } catch (err) {
+      console.error('Failed to create custom scenario:', err);
+    }
+  };
 
   const yearsUntilZ = Math.max(0, zHorizonYear - currentYear);
   const totalRequiredYears = xLifetime + yMigration;
   const isBreached = totalRequiredYears > yearsUntilZ;
   const gapYears = Math.abs(totalRequiredYears - yearsUntilZ);
 
-  // Scenario presets
-  const applyPreset = (type: 'CONSERVATIVE' | 'MODERATE' | 'AGGRESSIVE') => {
-    setSelectedScenarioId(type);
-    if (type === 'CONSERVATIVE') {
-      setZHorizonYear(2029);
-      setXLifetime(12);
-      setYMigration(4);
-    } else if (type === 'MODERATE') {
-      setZHorizonYear(2033);
-      setXLifetime(10);
-      setYMigration(3);
-    } else if (type === 'AGGRESSIVE') {
-      setZHorizonYear(2038);
-      setXLifetime(7);
-      setYMigration(2);
-    }
-  };
-
   return (
-    <div className="rounded-2xl border border-slate-800 bg-[#0B0F19] p-6 md:p-8 shadow-2xl space-y-8">
-      {/* Header & Scenario Presets */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-800">
+    <div className="rounded-3xl border border-slate-800 bg-[#0B0F19] p-6 sm:p-8 lg:p-10 shadow-2xl space-y-8">
+      {/* Header & Threat Scenario Presets */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-6 border-b border-slate-800/80">
         <div>
           <div className="flex items-center gap-2 text-cyan-400 font-mono text-xs font-semibold uppercase tracking-wider mb-1">
             <Sliders className="w-4 h-4" />
-            <span>Interactive Mosca Theorem Model</span>
+            <span>Interactive Mosca Theorem Engine</span>
           </div>
-          <h2 className="text-xl font-bold text-slate-100">Quantum Urgency & Shelf-Life Gap Simulator</h2>
+          <h2 className="text-2xl font-bold font-mono text-slate-100">Quantum Urgency & Shelf-Life Gap Simulator</h2>
           <p className="text-xs text-slate-400 mt-1 max-w-xl">
-            Evaluate whether your cryptographic data protection timeline will be compromised prior to completed post-quantum migration.
+            Evaluate whether your cryptographic data protection timeline will be breached prior to completed post-quantum migration.
           </p>
         </div>
 
-        {/* Preset Selector Buttons */}
-        <div className="flex items-center gap-2 bg-slate-900/80 p-1 rounded-xl border border-slate-800 shrink-0 font-mono text-xs">
+        {/* Backend Scenarios Selector */}
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 bg-slate-900 p-1 rounded-xl border border-slate-800 font-mono text-xs">
+            {scenarios.map((scen) => {
+              const isSelected = selectedScenarioId.toLowerCase() === scen.id.toLowerCase();
+              return (
+                <button
+                  key={scen.id}
+                  onClick={() => handleSelectScenario(scen)}
+                  className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer capitalize ${
+                    isSelected
+                      ? 'bg-cyan-950/80 text-cyan-300 font-bold border border-cyan-800/80 shadow-xs'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {scen.name || scen.id}
+                </button>
+              );
+            })}
+          </div>
+
           <button
-            onClick={() => applyPreset('CONSERVATIVE')}
-            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
-              selectedScenarioId === 'CONSERVATIVE'
-                ? 'bg-rose-950/80 text-rose-300 font-semibold border border-rose-800/80'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
+            onClick={() => setCustomModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-800 text-slate-300 text-xs font-mono font-medium transition-colors cursor-pointer"
           >
-            Conservative (2029)
-          </button>
-          <button
-            onClick={() => applyPreset('MODERATE')}
-            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
-              selectedScenarioId === 'MODERATE'
-                ? 'bg-cyan-950/80 text-cyan-300 font-semibold border border-cyan-800/80'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Moderate (2033)
-          </button>
-          <button
-            onClick={() => applyPreset('AGGRESSIVE')}
-            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
-              selectedScenarioId === 'AGGRESSIVE'
-                ? 'bg-purple-950/80 text-purple-300 font-semibold border border-purple-800/80'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Aggressive (2038)
+            <Plus className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Custom</span>
           </button>
         </div>
       </div>
@@ -94,18 +134,18 @@ export const MoscaSimulator: React.FC<MoscaSimulatorProps> = ({ scenarios = [] }
         {/* Sliders (7 cols) */}
         <div className="lg:col-span-7 space-y-6">
           {/* Slider X: Data Protection Lifetime */}
-          <div className="space-y-2 rounded-xl bg-slate-900/40 border border-slate-800/80 p-4">
+          <div className="space-y-2 rounded-2xl bg-[#080C16] border border-slate-800/90 p-4.5">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-cyan-400" />
-                <span>X: Data Protection Lifetime (Shelf-Life)</span>
+              <label className="text-xs font-semibold text-slate-200 flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-cyan-400" />
+                <span>X: Data Protection Lifetime (Confidentiality Shelf-Life)</span>
               </label>
-              <span className="font-mono text-sm font-bold text-cyan-400 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800/50">
+              <span className="font-mono text-sm font-bold text-cyan-400 bg-cyan-950/70 px-2.5 py-0.5 rounded-full border border-cyan-800/60">
                 {xLifetime} Years
               </span>
             </div>
             <p className="text-[11px] text-slate-400">
-              How many years must sensitive customer, banking, or medical records remain confidential?
+              Years that customer records, financial ledgers, or secrets must remain confidential.
             </p>
             <input
               type="range"
@@ -113,28 +153,28 @@ export const MoscaSimulator: React.FC<MoscaSimulatorProps> = ({ scenarios = [] }
               max={30}
               value={xLifetime}
               onChange={(e) => setXLifetime(Number(e.target.value))}
-              className="w-full accent-cyan-400 cursor-pointer"
+              className="w-full accent-cyan-400 cursor-pointer h-1.5 bg-slate-900 rounded-lg"
             />
             <div className="flex justify-between text-[10px] text-slate-500 font-mono">
-              <span>1 Year (Transient)</span>
-              <span>15 Years (Financial)</span>
-              <span>30 Years (Gov / Health)</span>
+              <span>1 Year (Transient Tokens)</span>
+              <span>15 Years (Financial / PII)</span>
+              <span>30 Years (Defense / Health)</span>
             </div>
           </div>
 
           {/* Slider Y: Migration Time */}
-          <div className="space-y-2 rounded-xl bg-slate-900/40 border border-slate-800/80 p-4">
+          <div className="space-y-2 rounded-2xl bg-[#080C16] border border-slate-800/90 p-4.5">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-blue-400" />
-                <span>Y: Migration Time (Upgrade Execution)</span>
+              <label className="text-xs font-semibold text-slate-200 flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-blue-400" />
+                <span>Y: Migration Time (Upgrade & Agility Execution)</span>
               </label>
-              <span className="font-mono text-sm font-bold text-blue-400 bg-blue-950/60 px-2 py-0.5 rounded border border-blue-800/50">
+              <span className="font-mono text-sm font-bold text-blue-400 bg-blue-950/70 px-2.5 py-0.5 rounded-full border border-blue-800/60">
                 {yMigration} Years
               </span>
             </div>
             <p className="text-[11px] text-slate-400">
-              Years required to refactor code, update PKI certificates, deploy PQC libraries, and achieve agility.
+              Time to refactor code, reissue PKI certs, update protocol dependencies, and test.
             </p>
             <input
               type="range"
@@ -142,28 +182,28 @@ export const MoscaSimulator: React.FC<MoscaSimulatorProps> = ({ scenarios = [] }
               max={10}
               value={yMigration}
               onChange={(e) => setYMigration(Number(e.target.value))}
-              className="w-full accent-blue-400 cursor-pointer"
+              className="w-full accent-blue-400 cursor-pointer h-1.5 bg-slate-900 rounded-lg"
             />
             <div className="flex justify-between text-[10px] text-slate-500 font-mono">
-              <span>1 Year (Agile Microservice)</span>
-              <span>5 Years (Complex System)</span>
-              <span>10 Years (Legacy Mainframe)</span>
+              <span>1 Year (Agile Service)</span>
+              <span>5 Years (Multi-Tier Enterprise)</span>
+              <span>10 Years (Legacy Infrastructure)</span>
             </div>
           </div>
 
           {/* Slider Z: Quantum Threat Horizon Year */}
-          <div className="space-y-2 rounded-xl bg-slate-900/40 border border-slate-800/80 p-4">
+          <div className="space-y-2 rounded-2xl bg-[#080C16] border border-slate-800/90 p-4.5">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-purple-400" />
-                <span>Z: Quantum Threat Horizon (CRQC Arrival)</span>
+              <label className="text-xs font-semibold text-slate-200 flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-purple-400" />
+                <span>Z: Quantum Threat Horizon (CRQC Realization Year)</span>
               </label>
-              <span className="font-mono text-sm font-bold text-purple-400 bg-purple-950/60 px-2 py-0.5 rounded border border-purple-800/50">
+              <span className="font-mono text-sm font-bold text-purple-400 bg-purple-950/70 px-2.5 py-0.5 rounded-full border border-purple-800/60">
                 Year {zHorizonYear} ({yearsUntilZ}y remaining)
               </span>
             </div>
             <p className="text-[11px] text-slate-400">
-              Projected year a quantum computer breaks RSA-2048 and ECC via Shor's Algorithm.
+              Projected arrival year of a Cryptanalytically Relevant Quantum Computer running Shor's Algorithm.
             </p>
             <input
               type="range"
@@ -171,74 +211,82 @@ export const MoscaSimulator: React.FC<MoscaSimulatorProps> = ({ scenarios = [] }
               max={2045}
               value={zHorizonYear}
               onChange={(e) => setZHorizonYear(Number(e.target.value))}
-              className="w-full accent-purple-400 cursor-pointer"
+              className="w-full accent-purple-400 cursor-pointer h-1.5 bg-slate-900 rounded-lg"
             />
             <div className="flex justify-between text-[10px] text-slate-500 font-mono">
               <span>{currentYear} (Immediate)</span>
-              <span>2033 (NIST Target)</span>
-              <span>2045 (Distant)</span>
+              <span>2033 (NIST Recommended Target)</span>
+              <span>2045 (Distal Horizon)</span>
             </div>
           </div>
         </div>
 
         {/* Outcome Display Gauge (5 cols) */}
-        <div className="lg:col-span-5 flex flex-col justify-between rounded-xl border border-slate-800 bg-slate-950/70 p-6 space-y-6">
-          <div className="space-y-3">
+        <div className="lg:col-span-5 flex flex-col justify-between rounded-2xl border border-slate-800 bg-[#080C16] p-6 space-y-6">
+          <div className="space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-xs font-mono uppercase tracking-wider text-slate-400">Inequality Outcome</span>
               <span
-                className={`text-xs px-2.5 py-0.5 rounded-full border font-mono font-bold uppercase ${
+                className={`text-xs px-3 py-0.5 rounded-full border font-mono font-bold uppercase ${
                   isBreached
                     ? 'bg-rose-950 text-rose-300 border-rose-700 animate-pulse'
                     : 'bg-emerald-950 text-emerald-300 border-emerald-700'
                 }`}
               >
-                {isBreached ? 'CRITICAL EXPOSURE' : 'SAFE TIMELINE'}
+                {isBreached ? 'DEADLINE BREACH' : 'CONTROLLED HORIZON'}
               </span>
             </div>
 
             {/* Formula Status */}
-            <div className="rounded-lg bg-slate-900 border border-slate-800 p-4 font-mono text-center">
-              <div className="text-xs text-slate-400 mb-1 font-sans">Condition: X + Y &gt; Z</div>
-              <div className="text-xl font-extrabold">
-                <span className="text-cyan-400">{xLifetime}</span> + <span className="text-blue-400">{yMigration}</span>{' '}
-                <span className={isBreached ? 'text-rose-400 font-black' : 'text-emerald-400'}>
+            <div className="rounded-xl bg-[#0B0F19] border border-slate-800/90 p-4 font-mono text-center shadow-inner">
+              <div className="text-[11px] text-slate-400 mb-1 font-sans">Condition: X + Y &gt; Z</div>
+              <div className="text-2xl font-extrabold tracking-wide">
+                <span className="text-cyan-400">{xLifetime}y</span> + <span className="text-blue-400">{yMigration}y</span>{' '}
+                <span className={isBreached ? 'text-rose-400 font-black text-2xl' : 'text-emerald-400'}>
                   {isBreached ? '>' : '≤'}
                 </span>{' '}
-                <span className="text-purple-400">{yearsUntilZ}</span>
+                <span className="text-purple-400">{yearsUntilZ}y</span>
               </div>
-              <div className="text-xs text-slate-400 mt-1">
-                {totalRequiredYears} Total Years vs {yearsUntilZ} Years Available
+              <div className="text-[11px] text-slate-400 mt-1">
+                {totalRequiredYears} Total Years Required vs {yearsUntilZ} Years Until CRQC
               </div>
             </div>
 
-            <div className="p-4 rounded-lg bg-slate-900/60 border border-slate-800 space-y-2">
-              <div className="text-xs font-semibold text-slate-200">
-                {isBreached ? 'Harvest Now, Decrypt Later (HNDL) Risk:' : 'Protection Status:'}
+            {/* Impact Explanation */}
+            <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-2">
+              <div className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                {isBreached ? <AlertTriangle className="w-4 h-4 text-rose-400" /> : <ShieldCheck className="w-4 h-4 text-emerald-400" />}
+                <span>{isBreached ? 'Harvest Now, Decrypt Later (HNDL) Exposure:' : 'Protection Margin:'}</span>
               </div>
-              <p className="text-xs text-slate-300 leading-relaxed">
+              <p className="text-xs text-slate-300 leading-relaxed font-sans">
                 {isBreached ? (
                   <>
-                    Your security requirements exceed the threat horizon by{' '}
-                    <strong className="text-rose-400 font-mono">{gapYears} year(s)</strong>. Adversarial eavesdropping today will yield decrypted cleartext upon CRQC realization in {zHorizonYear}.
+                    Your data protection shelf-life exceeds the quantum threat horizon by{' '}
+                    <strong className="text-rose-400 font-mono font-bold">{gapYears} year(s)</strong>. Adversaries recording ciphertext today can decrypt customer data upon CRQC arrival in {zHorizonYear}.
                   </>
                 ) : (
                   <>
-                    Your system maintains a safety margin of{' '}
-                    <strong className="text-emerald-400 font-mono">{gapYears} year(s)</strong> before data confidentiality is compromised.
+                    Your infrastructure maintains a safety buffer of{' '}
+                    <strong className="text-emerald-400 font-mono font-bold">{gapYears} year(s)</strong> before sensitive data becomes exposed. Continue active PQC migration planning.
                   </>
                 )}
               </p>
             </div>
+
+            {backendImpact && (
+              <div className="text-[11px] font-mono text-cyan-300 bg-cyan-950/40 p-2.5 rounded-xl border border-cyan-800/50">
+                <strong>Backend Impact Engine:</strong> {backendImpact}
+              </div>
+            )}
           </div>
 
           {/* Timeline Visual Bar */}
-          <div className="space-y-2">
+          <div className="space-y-2 pt-2 border-t border-slate-800/80">
             <div className="flex justify-between text-[11px] font-mono text-slate-400">
               <span>Required: {totalRequiredYears}y</span>
               <span>Available: {yearsUntilZ}y</span>
             </div>
-            <div className="w-full bg-slate-900 h-3 rounded-full overflow-hidden p-0.5 border border-slate-800">
+            <div className="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden p-0.5 border border-slate-800">
               <div
                 className={`h-full rounded-full transition-all duration-300 ${
                   isBreached
@@ -252,16 +300,91 @@ export const MoscaSimulator: React.FC<MoscaSimulatorProps> = ({ scenarios = [] }
         </div>
       </div>
 
-      {/* Assumptions & Sources Disclaimer */}
-      <div className="rounded-xl border border-slate-800/80 bg-slate-900/30 p-4 flex items-start gap-3 text-xs text-slate-400">
+      {/* Assumptions & Scientific Sources */}
+      <div className="rounded-2xl border border-slate-800/80 bg-slate-900/30 p-4.5 flex items-start gap-3.5 text-xs text-slate-400">
         <Info className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
         <div className="space-y-1">
-          <span className="font-semibold text-slate-200">Scientific Methodology & Limitations:</span>
+          <span className="font-semibold text-slate-200">Scientific Modeling Disclosure:</span>
           <p className="leading-relaxed">
-            The Mosca Theorem (formulated by Dr. Michele Mosca, Institute for Quantum Computing) does not predict an exact quantum arrival date. Rather, it calculates risk boundaries based on engineering estimates, key size, and cryptographic agility. Quantum threat horizon estimates are derived from NIST IR 8413 and Cloud Security Alliance (CSA) Quantum-Safe working groups.
+            The Mosca Theorem (formulated by Dr. Michele Mosca, University of Waterloo) models risk boundaries rather than predicting an exact quantum arrival date. Estimates are harmonized with NIST IR 8413 and Cloud Security Alliance (CSA) Quantum-Safe working groups.
           </p>
         </div>
       </div>
+
+      {/* Custom Threat Scenario Modal */}
+      {customModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-[#0B0F19] p-6 shadow-2xl space-y-4">
+            <h3 className="text-base font-bold font-mono text-slate-100">Create Custom Threat Scenario</h3>
+            <p className="text-xs text-slate-400">Define an organizational threat horizon for compliance modeling</p>
+
+            <form onSubmit={handleCreateCustom} className="space-y-4 font-mono text-xs">
+              <div>
+                <label className="block text-slate-300 mb-1">Scenario Name</label>
+                <input
+                  type="text"
+                  required
+                  value={customName}
+                  onChange={(e) => setCustomName(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-200 focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 mb-1">Data Lifetime (X years): {customX}y</label>
+                <input
+                  type="range"
+                  min={1}
+                  max={30}
+                  value={customX}
+                  onChange={(e) => setCustomX(Number(e.target.value))}
+                  className="w-full accent-cyan-400 cursor-pointer"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 mb-1">Migration Duration (Y years): {customY}y</label>
+                <input
+                  type="range"
+                  min={1}
+                  max={10}
+                  value={customY}
+                  onChange={(e) => setCustomY(Number(e.target.value))}
+                  className="w-full accent-blue-400 cursor-pointer"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 mb-1">Threat Horizon Year (Z): {customZ}</label>
+                <input
+                  type="range"
+                  min={currentYear}
+                  max={2045}
+                  value={customZ}
+                  onChange={(e) => setCustomZ(Number(e.target.value))}
+                  className="w-full accent-purple-400 cursor-pointer"
+                />
+              </div>
+
+              <div className="pt-3 flex justify-end gap-3 border-t border-slate-800 font-sans">
+                <button
+                  type="button"
+                  onClick={() => setCustomModalOpen(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-800 text-slate-300 text-xs hover:bg-slate-900 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs shadow-md shadow-cyan-950/50 cursor-pointer"
+                >
+                  Save Scenario
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
