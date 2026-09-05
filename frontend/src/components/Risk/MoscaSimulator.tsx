@@ -300,14 +300,34 @@ export const MoscaSimulator: React.FC<MoscaSimulatorProps> = ({ scenarios: initi
         </div>
       </div>
 
-      {/* Assumptions & Scientific Sources */}
-      <div className="rounded-2xl border border-slate-800/80 bg-slate-900/30 p-4.5 flex items-start gap-3.5 text-xs text-slate-400">
-        <Info className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
-        <div className="space-y-1">
-          <span className="font-semibold text-slate-200">Scientific Modeling Disclosure:</span>
-          <p className="leading-relaxed">
-            The Mosca Theorem (formulated by Dr. Michele Mosca, University of Waterloo) models risk boundaries rather than predicting an exact quantum arrival date. Estimates are harmonized with NIST IR 8413 and Cloud Security Alliance (CSA) Quantum-Safe working groups.
-          </p>
+      {/* Assumptions & Scientific Sources Disclosure */}
+      <div className="rounded-2xl border border-[#22D3EE]/30 bg-[#1E293B] p-6 space-y-4 shadow-xl">
+        <div className="flex items-center gap-2 text-xs font-mono font-bold text-[#22D3EE] uppercase tracking-wider">
+          <Info className="w-4 h-4 text-[#22D3EE]" />
+          <span>Scientific Modeling & Variable Assumptions (Dr. Michele Mosca Theorem)</span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-mono">
+          <div className="p-3.5 rounded-xl bg-[#0B1120] border border-slate-700/60 space-y-1">
+            <span className="text-[#22D3EE] font-bold block">X: Data Protection Lifetime</span>
+            <p className="text-[#94A3B8] text-[11px] font-sans">
+              <strong>Source:</strong> Enterprise Data Retention Policy & NIST Special Publication 800-88. Defines how long confidential data remains sensitive.
+            </p>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-[#0B1120] border border-slate-700/60 space-y-1">
+            <span className="text-blue-400 font-bold block">Y: Estimated Migration Time</span>
+            <p className="text-[#94A3B8] text-[11px] font-sans">
+              <strong>Source:</strong> NIST PQC Agility & Transition Guidelines. Duration required to refactor AST code, reissue PKI certs, and test dependencies.
+            </p>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-[#0B1120] border border-slate-700/60 space-y-1">
+            <span className="text-purple-400 font-bold block">Z: Quantum Threat Horizon</span>
+            <p className="text-[#94A3B8] text-[11px] font-sans">
+              <strong>Source:</strong> Dr. Michele Mosca (University of Waterloo) & NIST IR 8413. Projected arrival year of Cryptanalytically Relevant Quantum Computers (CRQC).
+            </p>
+          </div>
         </div>
       </div>
 
