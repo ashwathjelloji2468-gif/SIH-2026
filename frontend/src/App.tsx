@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ProjectProvider } from './context/ProjectContext';
 import { Navbar } from './components/Common/Navbar';
 import { Sidebar } from './components/Common/Sidebar';
 import { ScanModal } from './components/Common/ScanModal';
+import { SentriqLoader } from './components/Common/SentriqLoader';
 import LandingPage from './pages/LandingPage';
 import { Home } from './pages/Home';
 import { Project } from './pages/Project';
@@ -33,8 +34,21 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 );
 
 export const App: React.FC = () => {
+  const [initializing, setInitializing] = useState<boolean>(true);
+
+  useEffect(() => {
+    // Smooth 1.4s startup initialization sequence
+    const timer = setTimeout(() => {
+      setInitializing(false);
+    }, 1400);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <ProjectProvider>
+      {/* Full-Screen Premium Startup Loader */}
+      <SentriqLoader isLoading={initializing} />
+
       <BrowserRouter>
         <Routes>
           {/* Public Landing Page — standalone layout, no sidebar */}
