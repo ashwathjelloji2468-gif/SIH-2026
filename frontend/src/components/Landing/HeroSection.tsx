@@ -4,6 +4,8 @@ import { motion } from 'framer-motion';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { ThreeShield } from './ThreeShield';
+import { useNavigate } from 'react-router-dom';
+import { useProject } from '../../context/ProjectContext';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -13,6 +15,8 @@ export const HeroSection: React.FC = () => {
   const h1Ref = useRef<HTMLHeadingElement>(null);
   const pRef = useRef<HTMLParagraphElement>(null);
   const buttonsRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+  const { setIsScanModalOpen } = useProject();
 
   useEffect(() => {
     const tl = gsap.timeline();
@@ -27,6 +31,13 @@ export const HeroSection: React.FC = () => {
       tl.kill();
     };
   }, []);
+
+  const handleBookDemo = () => {
+    const contactSection = document.getElementById('contact');
+    if (contactSection) {
+      contactSection.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
 
   return (
     <section id="hero" ref={containerRef} className="relative min-h-screen overflow-hidden flex items-center justify-center bg-[#06080F]">
@@ -70,7 +81,8 @@ export const HeroSection: React.FC = () => {
           <motion.button 
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="w-full sm:w-auto px-8 py-3 bg-cyan-500 hover:bg-cyan-400 text-black font-semibold rounded-lg shadow-[0_0_15px_rgba(6,182,212,0.4)] transition-colors"
+            onClick={() => navigate('/dashboard')}
+            className="w-full sm:w-auto px-8 py-3 bg-cyan-500 hover:bg-cyan-400 text-black font-semibold rounded-lg shadow-[0_0_15px_rgba(6,182,212,0.4)] transition-colors cursor-pointer"
           >
             Get Started
           </motion.button>
@@ -78,7 +90,8 @@ export const HeroSection: React.FC = () => {
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="w-full sm:w-auto px-8 py-3 border border-white/20 bg-white/[0.04] backdrop-blur-sm hover:bg-white/[0.08] text-white font-medium rounded-lg transition-colors"
+            onClick={handleBookDemo}
+            className="w-full sm:w-auto px-8 py-3 border border-white/20 bg-white/[0.04] backdrop-blur-sm hover:bg-white/[0.08] text-white font-medium rounded-lg transition-colors cursor-pointer"
           >
             Book a Demo
           </motion.button>

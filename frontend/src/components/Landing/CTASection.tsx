@@ -1,7 +1,17 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { useProject } from '../../context/ProjectContext';
 
 export const CTASection: React.FC = () => {
+  const { setIsScanModalOpen } = useProject();
+
+  const handleScheduleDemo = () => {
+    const contactSection = document.getElementById('contact');
+    if (contactSection) {
+      contactSection.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   return (
     <section className="py-32 relative overflow-hidden">
       <motion.div 
@@ -9,7 +19,7 @@ export const CTASection: React.FC = () => {
         whileInView={{ opacity: 1, scale: 1 }}
         viewport={{ once: true }}
         transition={{ duration: 0.5 }}
-        className="max-w-4xl mx-auto mx-6 lg:mx-auto"
+        className="max-w-4xl mx-auto px-6 lg:mx-auto"
       >
         <div className="bg-gradient-to-br from-cyan-950/40 via-[#0B0F19] to-blue-950/40 border border-cyan-500/20 rounded-3xl p-16 text-center relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/5 rounded-full blur-3xl" />
@@ -27,6 +37,7 @@ export const CTASection: React.FC = () => {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
+                onClick={() => setIsScanModalOpen(true)}
                 className="w-full sm:w-auto bg-cyan-500 hover:bg-cyan-400 text-black font-semibold px-8 py-4 rounded-xl text-lg shadow-[0_0_20px_rgba(6,182,212,0.3)] transition-colors"
               >
                 Start Free Scan
@@ -34,6 +45,7 @@ export const CTASection: React.FC = () => {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
+                onClick={handleScheduleDemo}
                 className="w-full sm:w-auto border border-white/20 bg-white/[0.05] hover:bg-white/[0.1] text-white px-8 py-4 rounded-xl text-lg transition-colors"
               >
                 Schedule Demo

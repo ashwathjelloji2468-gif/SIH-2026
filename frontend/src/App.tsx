@@ -16,46 +16,46 @@ import { Settings } from './pages/Settings';
 
 /** Internal app layout with Navbar + Sidebar */
 const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <ProjectProvider>
-    <div className="min-h-screen bg-[#070A12] text-slate-100 flex flex-col selection:bg-cyan-500/20 selection:text-cyan-300">
-      {/* Top Global Navigation */}
-      <Navbar />
+  <div className="min-h-screen bg-[#070A12] text-slate-100 flex flex-col selection:bg-cyan-500/20 selection:text-cyan-300">
+    {/* Top Global Navigation */}
+    <Navbar />
 
-      <div className="flex-1 flex w-full">
-        {/* Left Sidebar */}
-        <Sidebar />
+    <div className="flex-1 flex w-full">
+      {/* Left Sidebar */}
+      <Sidebar />
 
-        {/* Main Application Area */}
-        <main className="flex-1 overflow-x-hidden p-4 md:p-8 max-w-7xl mx-auto w-full">
-          {children}
-        </main>
-      </div>
-
-      {/* Quick Trigger Scan Modal */}
-      <ScanModal />
+      {/* Main Application Area */}
+      <main className="flex-1 overflow-x-hidden p-4 md:p-8 max-w-7xl mx-auto w-full">
+        {children}
+      </main>
     </div>
-  </ProjectProvider>
+  </div>
 );
 
 export const App: React.FC = () => {
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* Public Landing Page — standalone layout, no sidebar */}
-        <Route path="/" element={<LandingPage />} />
+    <ProjectProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* Public Landing Page — standalone layout, no sidebar */}
+          <Route path="/" element={<LandingPage />} />
 
-        {/* Internal Application Routes — with Navbar + Sidebar */}
-        <Route path="/dashboard" element={<AppLayout><Home /></AppLayout>} />
-        <Route path="/projects" element={<AppLayout><Project /></AppLayout>} />
-        <Route path="/scan" element={<AppLayout><Scan /></AppLayout>} />
-        <Route path="/inventory" element={<AppLayout><Inventory /></AppLayout>} />
-        <Route path="/risk" element={<AppLayout><Risk /></AppLayout>} />
-        <Route path="/migration" element={<AppLayout><Migration /></AppLayout>} />
-        <Route path="/reports" element={<AppLayout><Reports /></AppLayout>} />
-        <Route path="/settings" element={<AppLayout><Settings /></AppLayout>} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
+          {/* Internal Application Routes — with Navbar + Sidebar */}
+          <Route path="/dashboard" element={<AppLayout><Home /></AppLayout>} />
+          <Route path="/projects" element={<AppLayout><Project /></AppLayout>} />
+          <Route path="/scan" element={<AppLayout><Scan /></AppLayout>} />
+          <Route path="/inventory" element={<AppLayout><Inventory /></AppLayout>} />
+          <Route path="/risk" element={<AppLayout><Risk /></AppLayout>} />
+          <Route path="/migration" element={<AppLayout><Migration /></AppLayout>} />
+          <Route path="/reports" element={<AppLayout><Reports /></AppLayout>} />
+          <Route path="/settings" element={<AppLayout><Settings /></AppLayout>} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+
+        {/* Global Trigger Scan Modal (Available across all routes & landing page) */}
+        <ScanModal />
+      </BrowserRouter>
+    </ProjectProvider>
   );
 };
 
