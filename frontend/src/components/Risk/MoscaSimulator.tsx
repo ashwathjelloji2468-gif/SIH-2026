@@ -97,35 +97,71 @@ export const MoscaSimulator: React.FC<MoscaSimulatorProps> = ({ scenarios: initi
             Evaluate whether your cryptographic data protection timeline will be breached prior to completed post-quantum migration.
           </p>
         </div>
+      </div>
 
-        {/* Backend Scenarios Selector */}
-        <div className="flex flex-wrap items-center gap-2 shrink-0">
-          <div className="flex items-center gap-1.5 bg-slate-900 p-1 rounded-xl border border-slate-800 font-mono text-xs">
-            {scenarios.map((scen) => {
-              const isSelected = selectedScenarioId.toLowerCase() === scen.id.toLowerCase();
-              return (
-                <button
-                  key={scen.id}
-                  onClick={() => handleSelectScenario(scen)}
-                  className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer capitalize ${
-                    isSelected
-                      ? 'bg-cyan-950/80 text-cyan-300 font-bold border border-cyan-800/80 shadow-xs'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  {scen.name || scen.id}
-                </button>
-              );
-            })}
+      {/* First-Class Interactive Threat Scenario Manager Grid */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-xs font-mono font-bold text-[#22D3EE] uppercase tracking-wider">
+            <Sliders className="w-4 h-4 text-[#22D3EE]" />
+            <span>Threat Scenario Manager (Select Threat Horizon & Risk Profile)</span>
           </div>
-
           <button
             onClick={() => setCustomModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-800 text-slate-300 text-xs font-mono font-medium transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#22D3EE]/40 bg-[#22D3EE]/10 hover:bg-[#22D3EE]/20 text-[#22D3EE] text-xs font-mono font-bold transition-all cursor-pointer shadow-[0_0_12px_rgba(34,211,238,0.15)]"
           >
-            <Plus className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Custom</span>
+            <Plus className="w-3.5 h-3.5" />
+            <span>New Custom Scenario</span>
           </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {scenarios.map((scen) => {
+            const isSelected = selectedScenarioId.toLowerCase() === scen.id.toLowerCase() || (scen.scenario_type && selectedScenarioId.toLowerCase().includes(scen.scenario_type.toLowerCase()));
+            const horizonYear = scen.quantum_threat_horizon_year || 2033;
+            
+            return (
+              <div
+                key={scen.id}
+                onClick={() => handleSelectScenario(scen)}
+                className={`p-5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between space-y-3 relative overflow-hidden ${
+                  isSelected
+                    ? 'border-[#22D3EE] bg-gradient-to-br from-[#1E293B] via-[#0F172A] to-[#1E293B] shadow-[0_0_25px_rgba(34,211,238,0.3)] ring-1 ring-[#22D3EE]/50 -translate-y-1'
+                    : 'border-slate-800 bg-[#1E293B] hover:border-[#22D3EE]/40 hover:-translate-y-1'
+                }`}
+              >
+                {isSelected && (
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-[#22D3EE]/10 rounded-full blur-2xl pointer-events-none" />
+                )}
+                
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-mono text-sm font-bold text-[#F8FAFC]">
+                      {scen.name || scen.id}
+                    </span>
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase border ${
+                      isSelected
+                        ? 'bg-[#22D3EE]/20 text-[#22D3EE] border-[#22D3EE]/50'
+                        : 'bg-slate-900 text-slate-400 border-slate-700'
+                    }`}>
+                      {horizonYear} CRQC
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-[#94A3B8] leading-relaxed font-sans line-clamp-2">
+                    {scen.description || `Quantum threat horizon projected at year ${horizonYear}.`}
+                  </p>
+                </div>
+
+                <div className="pt-2 border-t border-slate-700/60 flex items-center justify-between text-[11px] font-mono text-[#94A3B8]">
+                  <span>Horizon Year Z: <strong className="text-[#22D3EE]">{horizonYear}</strong></span>
+                  <span className={`font-bold ${isSelected ? 'text-[#22D3EE]' : 'text-slate-500'}`}>
+                    {isSelected ? 'ACTIVE SCENARIO ✓' : 'Click to Apply →'}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
