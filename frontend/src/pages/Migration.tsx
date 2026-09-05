@@ -4,8 +4,7 @@ import { migrationService } from '../services/migrationService';
 import { MigrationPlan } from '../types';
 import { PlanBuilder } from '../components/Migration/PlanBuilder';
 import { TaskTimeline } from '../components/Migration/TaskTimeline';
-import { SandboxSimulator } from '../components/Migration/SandboxSimulator';
-import { ValidationRunner } from '../components/Migration/ValidationRunner';
+import { MigrationWizard } from '../components/Migration/MigrationWizard';
 import { Lock3D } from '../components/Three/Lock3D';
 import { GitFork, Layers, RefreshCw, CheckCircle2, ShieldCheck } from 'lucide-react';
 
@@ -109,11 +108,8 @@ export const Migration: React.FC = () => {
               {/* Sequenced Task Roadmap */}
               <TaskTimeline plan={selectedPlan} />
 
-              {/* Sandbox Code Transformation Simulator */}
-              <SandboxSimulator planId={selectedPlan.id} />
-
-              {/* Automated Validation & Test Suite Runner */}
-              <ValidationRunner planId={selectedPlan.id} />
+              {/* Step-by-Step Interactive Migration & Validation Wizard */}
+              <MigrationWizard planId={selectedPlan.id} />
             </>
           )}
         </div>

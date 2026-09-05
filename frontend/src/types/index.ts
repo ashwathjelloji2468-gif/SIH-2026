@@ -254,6 +254,8 @@ export interface SandboxSimulationResult {
     files_modified: string[];
     diff_summary: string;
     diff_details?: string;
+    original_snippet?: string;
+    transformed_snippet?: string;
   };
   status: string;
 }
