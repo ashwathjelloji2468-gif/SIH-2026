@@ -40,9 +40,9 @@ export const HeroSection: React.FC = () => {
   };
 
   return (
-    <section id="hero" ref={containerRef} className="relative min-h-screen overflow-hidden flex items-center justify-center bg-[#06080F]">
+    <section id="hero" ref={containerRef} className="relative min-h-screen overflow-hidden flex items-center justify-center bg-[#0B1120]">
       {/* Background Layers */}
-      <div className="absolute inset-0 bg-grid-cyber opacity-20 pointer-events-none" />
+      <div className="absolute inset-0 bg-grid-cyber bg-hex-pattern opacity-30 pointer-events-none" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,#06080F_100%)] pointer-events-none z-0" />
       
       {/* 3D Background */}

@@ -16,7 +16,7 @@ import { Settings } from './pages/Settings';
 
 /** Internal app layout with Navbar + Sidebar */
 const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div className="min-h-screen bg-[#070A12] text-slate-100 flex flex-col selection:bg-cyan-500/20 selection:text-cyan-300">
+  <div className="min-h-screen bg-[#0B1120] bg-hex-pattern bg-radial-subtle text-slate-100 flex flex-col selection:bg-cyan-500/20 selection:text-cyan-300">
     {/* Top Global Navigation */}
     <Navbar />
 
