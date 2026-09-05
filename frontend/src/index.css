@@ -1,6 +1,12 @@
+html, body, #root, #__next, main {
+  background-color: #0B1120 !important;
+  background: #0B1120 !important;
+  color-scheme: dark !important;
+}
+
 @import "tailwindcss";
 
-:root, html, body, #root {
+:root, html, body, #root, #__next, main {
   color-scheme: dark !important;
   background-color: #0B1120 !important;
   background: #0B1120 !important;

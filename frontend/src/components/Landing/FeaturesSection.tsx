@@ -81,7 +81,7 @@ export const FeaturesSection: React.FC = () => {
               <div
                 key={index}
                 ref={(el) => { cardsRef.current[index] = el; }}
-                className="bg-white/[0.03] backdrop-blur-md border border-white/[0.08] rounded-2xl p-8 hover:border-cyan-500/30 hover:-translate-y-1 hover:shadow-[0_0_20px_rgba(6,182,212,0.15)] transition-all duration-300 group"
+                className="bg-[#1E293B]/60 backdrop-blur-md border border-[#22D3EE]/20 rounded-2xl p-8 hover:border-cyan-500/40 hover:-translate-y-1 hover:shadow-[0_0_20px_rgba(34,211,238,0.2)] transition-all duration-300 group"
               >
                 <div className="bg-cyan-950/40 rounded-xl p-3 inline-block mb-4 group-hover:bg-cyan-900/50 transition-colors">
                   <Icon className="w-10 h-10 text-cyan-400" />

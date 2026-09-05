@@ -61,7 +61,7 @@ export const ContactSection: React.FC = () => {
           whileInView={{ opacity: 1, x: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
-          className="bg-white/[0.03] backdrop-blur-md border border-white/[0.08] rounded-2xl p-8"
+          className="bg-[#1E293B]/60 backdrop-blur-md border border-[#22D3EE]/20 rounded-2xl p-8"
         >
           <AnimatePresence mode="wait">
             {!submitted ? (
@@ -83,7 +83,7 @@ export const ContactSection: React.FC = () => {
                     required
                     value={formData.name}
                     onChange={handleChange}
-                    className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 outline-none transition-all"
+                    className="w-full bg-[#0B0F19] border border-[#22D3EE]/20 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 outline-none transition-all"
                     placeholder="John Doe"
                   />
                 </div>
@@ -98,7 +98,7 @@ export const ContactSection: React.FC = () => {
                     required
                     value={formData.email}
                     onChange={handleChange}
-                    className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 outline-none transition-all"
+                    className="w-full bg-[#0B0F19] border border-[#22D3EE]/20 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 outline-none transition-all"
                     placeholder="john@example.com"
                   />
                 </div>
@@ -112,7 +112,7 @@ export const ContactSection: React.FC = () => {
                     name="company"
                     value={formData.company}
                     onChange={handleChange}
-                    className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 outline-none transition-all"
+                    className="w-full bg-[#0B0F19] border border-[#22D3EE]/20 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 outline-none transition-all"
                     placeholder="Acme Corp"
                   />
                 </div>
@@ -127,7 +127,7 @@ export const ContactSection: React.FC = () => {
                     rows={4}
                     value={formData.message}
                     onChange={handleChange}
-                    className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 outline-none transition-all resize-none"
+                    className="w-full bg-[#0B0F19] border border-[#22D3EE]/20 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 outline-none transition-all resize-none"
                     placeholder="How can we help you?"
                   />
                 </div>
@@ -145,19 +145,13 @@ export const ContactSection: React.FC = () => {
                 key="success"
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="flex flex-col items-center justify-center h-full min-h-[400px] text-center"
+                className="text-center py-12"
               >
-                <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mb-6">
-                  <CheckCircle className="w-8 h-8 text-emerald-500" />
-                </div>
+                <CheckCircle className="w-16 h-16 text-cyan-400 mx-auto mb-4" />
                 <h3 className="text-2xl font-bold text-white mb-2">Message Sent!</h3>
-                <p className="text-emerald-400">Thank you! We'll be in touch soon.</p>
-                <button
-                  onClick={() => setSubmitted(false)}
-                  className="mt-8 text-sm text-slate-400 hover:text-white underline underline-offset-4"
-                >
-                  Send another message
-                </button>
+                <p className="text-slate-400">
+                  Thank you for reaching out. Our team will get back to you shortly.
+                </p>
               </motion.div>
             )}
           </AnimatePresence>
@@ -168,20 +162,22 @@ export const ContactSection: React.FC = () => {
           whileInView={{ opacity: 1, x: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
-          className="flex flex-col justify-center gap-8"
+          className="space-y-8 flex flex-col justify-between"
         >
-          <div className="flex items-center gap-4">
-            <div className="bg-cyan-950/40 p-3 rounded-xl text-cyan-400">
-              <Mail className="w-6 h-6" />
+          <div className="space-y-6">
+            <div className="flex items-center gap-4">
+              <div className="bg-cyan-950/40 p-3 rounded-xl text-cyan-400">
+                <Mail className="w-6 h-6" />
+              </div>
+              <div className="text-slate-300 text-lg">contact@sentriq.io</div>
             </div>
-            <div className="text-slate-300 text-lg">contact@sentriq.io</div>
-          </div>
-          
-          <div className="flex items-center gap-4">
-            <div className="bg-cyan-950/40 p-3 rounded-xl text-cyan-400">
-              <MapPin className="w-6 h-6" />
+            
+            <div className="flex items-center gap-4">
+              <div className="bg-cyan-950/40 p-3 rounded-xl text-cyan-400">
+                <MapPin className="w-6 h-6" />
+              </div>
+              <div className="text-slate-300 text-lg">San Francisco, CA</div>
             </div>
-            <div className="text-slate-300 text-lg">San Francisco, CA</div>
           </div>
           
           <div className="flex items-center gap-4">
@@ -192,13 +188,13 @@ export const ContactSection: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-4 mt-4">
-            <a href="#" className="w-10 h-10 rounded-xl bg-white/[0.03] border border-white/[0.08] flex items-center justify-center text-slate-400 hover:text-cyan-400 hover:border-cyan-500/30 transition-all">
+            <a href="#" className="w-10 h-10 rounded-xl bg-[#1E293B]/60 border border-[#22D3EE]/20 flex items-center justify-center text-slate-400 hover:text-cyan-400 hover:border-cyan-500/30 transition-all">
               <GithubIcon className="w-5 h-5" />
             </a>
-            <a href="#" className="w-10 h-10 rounded-xl bg-white/[0.03] border border-white/[0.08] flex items-center justify-center text-slate-400 hover:text-cyan-400 hover:border-cyan-500/30 transition-all">
+            <a href="#" className="w-10 h-10 rounded-xl bg-[#1E293B]/60 border border-[#22D3EE]/20 flex items-center justify-center text-slate-400 hover:text-cyan-400 hover:border-cyan-500/30 transition-all">
               <LinkedinIcon className="w-5 h-5" />
             </a>
-            <a href="#" className="w-10 h-10 rounded-xl bg-white/[0.03] border border-white/[0.08] flex items-center justify-center text-slate-400 hover:text-cyan-400 hover:border-cyan-500/30 transition-all">
+            <a href="#" className="w-10 h-10 rounded-xl bg-[#1E293B]/60 border border-[#22D3EE]/20 flex items-center justify-center text-slate-400 hover:text-cyan-400 hover:border-cyan-500/30 transition-all">
               <TwitterIcon className="w-5 h-5" />
             </a>
           </div>

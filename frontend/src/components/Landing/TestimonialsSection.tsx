@@ -52,7 +52,7 @@ export const TestimonialsSection: React.FC = () => {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: index * 0.15 }}
-            className="bg-white/[0.03] backdrop-blur-md border border-white/[0.08] rounded-2xl p-8 hover:border-cyan-500/20 hover:-translate-y-[2px] transition-all duration-300 flex flex-col justify-between"
+            className="bg-[#1E293B]/60 backdrop-blur-md border border-[#22D3EE]/20 rounded-2xl p-8 hover:border-cyan-500/40 hover:-translate-y-[2px] transition-all duration-300 flex flex-col justify-between"
           >
             <div>
               <Quote className="text-cyan-500/30 mb-4 w-8 h-8" />
