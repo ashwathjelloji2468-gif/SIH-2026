@@ -23,7 +23,7 @@ export const Sidebar: React.FC = () => {
     {
       title: 'Discovery & Inventory',
       items: [
-        { name: 'Dashboard', path: '/', icon: LayoutDashboard },
+        { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
         { name: 'Repositories', path: '/projects', icon: FolderGit2 },
         { name: 'Scan Console', path: '/scan', icon: ScanSearch },
         { name: 'Inventory & Evidence', path: '/inventory', icon: Binary },
