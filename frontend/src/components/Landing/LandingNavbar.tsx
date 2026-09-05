@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Menu, X } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Sentriq3DLogo } from '../Three/Sentriq3DLogo';
 
 export const LandingNavbar: React.FC = () => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -54,12 +55,9 @@ export const LandingNavbar: React.FC = () => {
       }`}
     >
       <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-        {/* Logo Left */}
+        {/* 3D Moving Logo Left */}
         <div className="flex items-center gap-3">
-          <div className="p-1.5 bg-gradient-to-br from-cyan-500/20 to-transparent rounded-lg border border-cyan-500/30">
-            <Shield className="w-6 h-6 text-cyan-400" />
-          </div>
-          <span className="text-xl font-bold tracking-widest text-white">SENTRIQ</span>
+          <Sentriq3DLogo size="sm" showText={true} />
           <span className="hidden md:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold tracking-widest bg-cyan-950/40 text-cyan-400 border border-cyan-800/50 ml-2">
             QUANTUM INTELLIGENCE
           </span>
