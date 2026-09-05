@@ -3,17 +3,19 @@ import { useProject } from '../context/ProjectContext';
 import { inventoryService } from '../services/inventoryService';
 import { CryptoAsset, CoverageReport } from '../types';
 import { AssetTable } from '../components/Inventory/AssetTable';
-import { DisclaimerBanner } from '../components/Common/DisclaimerBanner';
+import { CoveragePanel } from '../components/Inventory/CoveragePanel';
+import { UnknownReviewModal } from '../components/Inventory/UnknownReviewModal';
 import { NetworkNodes3D } from '../components/Three/NetworkNodes3D';
-import { Binary, AlertTriangle, RefreshCw, Layers, Box, Table } from 'lucide-react';
+import { Binary, AlertTriangle, RefreshCw, Layers, Box, Table, ShieldCheck } from 'lucide-react';
 
 export const Inventory: React.FC = () => {
   const { currentProject } = useProject();
   const [assets, setAssets] = useState<CryptoAsset[]>([]);
   const [coverage, setCoverage] = useState<CoverageReport | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [activeTab, setActiveTab] = useState<'all' | 'unknowns'>('all');
+  const [activeTab, setActiveTab] = useState<'coverage' | 'all' | 'unknowns'>('coverage');
   const [viewMode, setViewMode] = useState<'table' | '3d'>('table');
+  const [reviewAsset, setReviewAsset] = useState<CryptoAsset | null>(null);
 
   const fetchInventory = useCallback(async () => {
     if (!currentProject) {
@@ -44,7 +46,7 @@ export const Inventory: React.FC = () => {
   }, [fetchInventory]);
 
   const unknownAssets = assets.filter((a) => a.is_unknown);
-  const displayAssets = activeTab === 'all' ? assets : unknownAssets;
+  const displayAssets = activeTab === 'unknowns' ? unknownAssets : assets;
 
   return (
     <div className="space-y-6 pb-12">
@@ -62,27 +64,29 @@ export const Inventory: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* View Mode Switcher */}
-          <div className="flex items-center p-1 rounded-xl border border-slate-800 bg-[#0B0F19]">
-            <button
-              onClick={() => setViewMode('table')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all ${
-                viewMode === 'table' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Table className="w-3.5 h-3.5" />
-              <span>Table</span>
-            </button>
-            <button
-              onClick={() => setViewMode('3d')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all ${
-                viewMode === '3d' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Box className="w-3.5 h-3.5" />
-              <span>3D Graph</span>
-            </button>
-          </div>
+          {/* View Mode Switcher (only relevant in asset views) */}
+          {(activeTab === 'all' || activeTab === 'unknowns') && (
+            <div className="flex items-center p-1 rounded-xl border border-slate-800 bg-[#0B0F19]">
+              <button
+                onClick={() => setViewMode('table')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all ${
+                  viewMode === 'table' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Table className="w-3.5 h-3.5" />
+                <span>Table</span>
+              </button>
+              <button
+                onClick={() => setViewMode('3d')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all ${
+                  viewMode === '3d' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Box className="w-3.5 h-3.5" />
+                <span>3D Graph</span>
+              </button>
+            </div>
+          )}
 
           <button
             onClick={fetchInventory}
@@ -94,14 +98,52 @@ export const Inventory: React.FC = () => {
         </div>
       </div>
 
-      {/* Discovery Limits Disclaimer */}
-      <DisclaimerBanner
-        coveragePercentage={coverage?.overall_coverage_percentage}
-        unknownCount={coverage?.unknown_needs_review_count}
-      />
+      {/* Tab Navigation */}
+      <div className="flex items-center gap-4 border-b border-slate-800">
+        <button
+          onClick={() => setActiveTab('coverage')}
+          className={`pb-3 px-1 text-xs font-mono font-semibold transition-colors relative cursor-pointer flex items-center gap-1.5 ${
+            activeTab === 'coverage'
+              ? 'text-cyan-300 border-b-2 border-cyan-400'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
+          <span>Coverage & Scope</span>
+        </button>
 
-      {/* 3D Graph View OR Table View */}
-      {viewMode === '3d' ? (
+        <button
+          onClick={() => setActiveTab('all')}
+          className={`pb-3 px-1 text-xs font-mono font-semibold transition-colors relative cursor-pointer ${
+            activeTab === 'all'
+              ? 'text-cyan-300 border-b-2 border-cyan-400'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          All Cryptographic Assets ({assets.length})
+        </button>
+
+        <button
+          onClick={() => setActiveTab('unknowns')}
+          className={`pb-3 px-1 text-xs font-mono font-semibold transition-colors relative cursor-pointer flex items-center gap-1.5 ${
+            activeTab === 'unknowns'
+              ? 'text-amber-300 border-b-2 border-amber-400'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+          <span>Needs Review ({unknownAssets.length})</span>
+        </button>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'coverage' ? (
+        <CoveragePanel
+          coverage={coverage}
+          unknownAssets={unknownAssets}
+          onReviewAsset={(asset) => setReviewAsset(asset)}
+        />
+      ) : viewMode === '3d' ? (
         <div className="rounded-2xl border border-slate-800/80 bg-[#0B0F19] p-6 shadow-2xl space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-slate-800">
             <div>
@@ -118,40 +160,23 @@ export const Inventory: React.FC = () => {
           </div>
         </div>
       ) : (
-        <>
-          {/* Tabs */}
-          <div className="flex items-center gap-3 border-b border-slate-800">
-            <button
-              onClick={() => setActiveTab('all')}
-              className={`pb-3 px-1 text-xs font-mono font-semibold transition-colors relative cursor-pointer ${
-                activeTab === 'all'
-                  ? 'text-cyan-300 border-b-2 border-cyan-400'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              All Cryptographic Assets ({assets.length})
-            </button>
+        <AssetTable
+          assets={displayAssets}
+          loading={loading}
+          onRefresh={fetchInventory}
+        />
+      )}
 
-            <button
-              onClick={() => setActiveTab('unknowns')}
-              className={`pb-3 px-1 text-xs font-mono font-semibold transition-colors relative cursor-pointer flex items-center gap-1.5 ${
-                activeTab === 'unknowns'
-                  ? 'text-amber-300 border-b-2 border-amber-400'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-              <span>Needs Review ({unknownAssets.length})</span>
-            </button>
-          </div>
-
-          {/* Main Asset Table */}
-          <AssetTable
-            assets={displayAssets}
-            loading={loading}
-            onRefresh={fetchInventory}
-          />
-        </>
+      {/* Unknown Asset Review Modal */}
+      {reviewAsset && (
+        <UnknownReviewModal
+          asset={reviewAsset}
+          onClose={() => setReviewAsset(null)}
+          onReviewed={() => {
+            setReviewAsset(null);
+            fetchInventory();
+          }}
+        />
       )}
     </div>
   );

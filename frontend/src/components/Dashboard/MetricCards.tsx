@@ -66,12 +66,12 @@ export const MetricCards: React.FC<MetricCardsProps> = ({
     },
     {
       title: 'Discovery Coverage',
-      value: `${coveragePercent}%`,
-      subtitle: `${coverage?.unknown_needs_review_count || 0} heuristic items flagged for review`,
+      value: `≤${coveragePercent}%`,
+      subtitle: `${coverage?.unknown_needs_review_count || 0} unknowns require human review`,
       icon: Layers,
       borderColor: 'border-emerald-500/25',
       iconBg: 'bg-emerald-950/50 text-emerald-400 border-emerald-800/50',
-      trend: 'Audited',
+      trend: 'Never 100%',
     },
   ];
 
