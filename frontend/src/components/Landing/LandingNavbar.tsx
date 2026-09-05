@@ -50,7 +50,7 @@ export const LandingNavbar: React.FC = () => {
         isVisible ? 'translate-y-0' : '-translate-y-full'
       } ${
         isScrolled 
-          ? 'bg-[#06080F]/60 backdrop-blur-xl border-b border-white/[0.06]' 
+          ? 'bg-[#0B1120]/80 backdrop-blur-xl border-b border-white/[0.06]' 
           : 'bg-transparent border-transparent'
       }`}
     >
@@ -103,7 +103,7 @@ export const LandingNavbar: React.FC = () => {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="absolute top-full left-0 right-0 bg-[#070A12] border-b border-white/[0.06] shadow-2xl py-4 md:hidden flex flex-col"
+            className="absolute top-full left-0 right-0 bg-[#0B1120] border-b border-white/[0.06] shadow-2xl py-4 md:hidden flex flex-col"
           >
             {navLinks.map((link) => (
               <button

@@ -47,7 +47,7 @@ export const HeroSection: React.FC = () => {
     >
       {/* 1. Background Patterns & Dark Contrast Overlays */}
       <div className="absolute inset-0 bg-grid-cyber bg-hex-pattern opacity-25 pointer-events-none z-0" />
-      <div className="absolute inset-0 bg-gradient-to-b from-[#070B14]/80 via-transparent to-[#0B1120] pointer-events-none z-0" />
+      <div className="absolute inset-0 bg-gradient-to-b from-[#0B1120]/80 via-transparent to-[#0B1120] pointer-events-none z-0" />
       
       {/* 2. Soft Cyan Radial Glow Centered Behind Sphere */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[550px] md:w-[700px] md:h-[700px] rounded-full bg-[radial-gradient(circle,rgba(34,211,238,0.22)_0%,rgba(6,182,212,0.07)_50%,transparent_70%)] blur-3xl pointer-events-none z-0" />

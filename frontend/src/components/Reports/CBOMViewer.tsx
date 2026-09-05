@@ -112,7 +112,7 @@ export const CBOMViewer: React.FC<CBOMViewerProps> = ({ scanId, cbom }) => {
       </div>
 
       {/* JSON Viewer */}
-      <div className="p-4 max-h-[500px] overflow-y-auto bg-[#070A12] text-xs font-mono text-cyan-200/90 leading-relaxed">
+      <div className="p-4 max-h-[500px] overflow-y-auto bg-[#0B0F19] text-xs font-mono text-cyan-200/90 leading-relaxed">
         <pre className="whitespace-pre-wrap">{jsonString}</pre>
       </div>
     </div>

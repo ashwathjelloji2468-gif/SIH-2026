@@ -122,7 +122,7 @@ export const ValidationRunner: React.FC<ValidationRunnerProps> = ({ planId }) =>
 
           {/* Validation Logs Console */}
           {validationRun.logs && (
-            <div className="rounded-xl border border-slate-800 bg-[#070A12] overflow-hidden">
+            <div className="rounded-xl border border-slate-800 bg-[#0B0F19] overflow-hidden">
               <div className="flex items-center gap-2 px-3.5 py-2 bg-slate-900/80 border-b border-slate-800 text-xs text-slate-400 font-mono">
                 <Terminal className="w-3.5 h-3.5 text-cyan-400" />
                 <span>Test Execution Stream</span>

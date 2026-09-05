@@ -22,7 +22,7 @@ export const LandingFooter: React.FC = () => {
   ];
 
   return (
-    <footer className="relative border-t border-white/[0.06] bg-[#06080F]">
+    <footer className="relative border-t border-cyan-500/15 bg-[#0B1120]">
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-px bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
       
       <div className="max-w-6xl mx-auto px-6 py-16">
