@@ -189,7 +189,13 @@ export const AssetDetailDrawer: React.FC<AssetDetailDrawerProps> = ({ asset, onC
                 </span>
                 <span className="text-slate-500 text-[11px]">Deterministic AST & regex provenance</span>
               </div>
-              <EvidenceViewer evidence={evidenceList} />
+              <EvidenceViewer
+                evidence={evidenceList}
+                asset={asset}
+                recommendation={primaryRec}
+                riskAssessment={riskAssessment}
+                riskExplanation={riskExplanation}
+              />
             </div>
           </div>
 
