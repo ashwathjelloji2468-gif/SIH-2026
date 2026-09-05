@@ -6,7 +6,8 @@ import { PlanBuilder } from '../components/Migration/PlanBuilder';
 import { TaskTimeline } from '../components/Migration/TaskTimeline';
 import { SandboxSimulator } from '../components/Migration/SandboxSimulator';
 import { ValidationRunner } from '../components/Migration/ValidationRunner';
-import { GitFork, Layers, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { Lock3D } from '../components/Three/Lock3D';
+import { GitFork, Layers, RefreshCw, CheckCircle2, ShieldCheck } from 'lucide-react';
 
 export const Migration: React.FC = () => {
   const { currentProject } = useProject();
@@ -44,26 +45,30 @@ export const Migration: React.FC = () => {
 
   return (
     <div className="space-y-8 pb-12">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
-        <div>
-          <div className="flex items-center gap-2 text-cyan-400 font-mono text-xs uppercase tracking-wider font-semibold mb-1">
+      {/* Header with 3D Lock Visual */}
+      <div className="rounded-2xl border border-slate-800 bg-[#0B0F19] p-6 shadow-2xl flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="space-y-2 max-w-xl">
+          <div className="flex items-center gap-2 text-cyan-400 font-mono text-xs uppercase tracking-wider font-semibold">
             <GitFork className="w-4 h-4" />
             <span>Post-Quantum Transition Lifecycle</span>
           </div>
-          <h1 className="text-2xl font-bold font-mono text-slate-100">Migration Planning, Sandbox & Validation</h1>
-          <p className="text-xs text-slate-400 mt-1">
-            Quantify transition effort, simulate AST refactoring, and execute automated regression verification.
+          <h1 className="text-2xl font-bold font-mono text-slate-100">Migration Planning & Sandbox Simulation</h1>
+          <p className="text-xs text-slate-400 leading-relaxed">
+            Quantify transition person-days, execute side-by-side AST code transformation simulations from classical RSA/ECDSA to NIST FIPS 203/204 ML-KEM candidates, and run validation.
           </p>
+          <div className="flex items-center gap-3 pt-2 text-xs font-mono">
+            <span className="bg-emerald-950/60 border border-emerald-800/60 text-emerald-300 px-2.5 py-1 rounded-full flex items-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5" /> NIST FIPS 203 Ready
+            </span>
+            <span className="bg-cyan-950/60 border border-cyan-800/60 text-cyan-300 px-2.5 py-1 rounded-full">
+              Automated Refactoring Active
+            </span>
+          </div>
         </div>
 
-        <button
-          onClick={fetchPlans}
-          className="p-2 rounded-xl border border-slate-800 hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer self-start sm:self-auto"
-          title="Refresh plans"
-        >
-          <RefreshCw className="w-4 h-4" />
-        </button>
+        <div className="w-48 h-48 rounded-2xl bg-[#06080F]/90 border border-slate-800/80 overflow-hidden relative flex-shrink-0">
+          <Lock3D status="safe" className="w-full h-full" />
+        </div>
       </div>
 
       {/* Plan Builder */}

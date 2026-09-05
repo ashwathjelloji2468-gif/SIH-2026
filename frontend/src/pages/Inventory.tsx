@@ -4,7 +4,8 @@ import { inventoryService } from '../services/inventoryService';
 import { CryptoAsset, CoverageReport } from '../types';
 import { AssetTable } from '../components/Inventory/AssetTable';
 import { DisclaimerBanner } from '../components/Common/DisclaimerBanner';
-import { Binary, AlertTriangle, RefreshCw, Layers } from 'lucide-react';
+import { NetworkNodes3D } from '../components/Three/NetworkNodes3D';
+import { Binary, AlertTriangle, RefreshCw, Layers, Box, Table } from 'lucide-react';
 
 export const Inventory: React.FC = () => {
   const { currentProject } = useProject();
@@ -12,6 +13,7 @@ export const Inventory: React.FC = () => {
   const [coverage, setCoverage] = useState<CoverageReport | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<'all' | 'unknowns'>('all');
+  const [viewMode, setViewMode] = useState<'table' | '3d'>('table');
 
   const fetchInventory = useCallback(async () => {
     if (!currentProject) {
@@ -60,6 +62,28 @@ export const Inventory: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* View Mode Switcher */}
+          <div className="flex items-center p-1 rounded-xl border border-slate-800 bg-[#0B0F19]">
+            <button
+              onClick={() => setViewMode('table')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all ${
+                viewMode === 'table' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Table className="w-3.5 h-3.5" />
+              <span>Table</span>
+            </button>
+            <button
+              onClick={() => setViewMode('3d')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all ${
+                viewMode === '3d' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Box className="w-3.5 h-3.5" />
+              <span>3D Graph</span>
+            </button>
+          </div>
+
           <button
             onClick={fetchInventory}
             className="p-2 rounded-xl border border-slate-800 hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
@@ -76,38 +100,59 @@ export const Inventory: React.FC = () => {
         unknownCount={coverage?.unknown_needs_review_count}
       />
 
-      {/* Tabs */}
-      <div className="flex items-center gap-3 border-b border-slate-800">
-        <button
-          onClick={() => setActiveTab('all')}
-          className={`pb-3 px-1 text-xs font-mono font-semibold transition-colors relative cursor-pointer ${
-            activeTab === 'all'
-              ? 'text-cyan-300 border-b-2 border-cyan-400'
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          All Cryptographic Assets ({assets.length})
-        </button>
+      {/* 3D Graph View OR Table View */}
+      {viewMode === '3d' ? (
+        <div className="rounded-2xl border border-slate-800/80 bg-[#0B0F19] p-6 shadow-2xl space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-100 font-mono">3D Cryptographic Dependency Mesh</h3>
+              <p className="text-xs text-slate-400">Interactive node network map of detected primitives and cryptographic call graph</p>
+            </div>
+            <div className="flex items-center gap-4 text-xs font-mono">
+              <span className="flex items-center gap-1.5 text-rose-400"><span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span>Vulnerable (RSA/ECC)</span>
+              <span className="flex items-center gap-1.5 text-emerald-400"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>Quantum Safe (AES/ML-KEM)</span>
+            </div>
+          </div>
+          <div className="h-[500px] w-full rounded-xl overflow-hidden bg-[#06080F]/80 border border-slate-800/60 relative">
+            <NetworkNodes3D className="w-full h-full" />
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Tabs */}
+          <div className="flex items-center gap-3 border-b border-slate-800">
+            <button
+              onClick={() => setActiveTab('all')}
+              className={`pb-3 px-1 text-xs font-mono font-semibold transition-colors relative cursor-pointer ${
+                activeTab === 'all'
+                  ? 'text-cyan-300 border-b-2 border-cyan-400'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              All Cryptographic Assets ({assets.length})
+            </button>
 
-        <button
-          onClick={() => setActiveTab('unknowns')}
-          className={`pb-3 px-1 text-xs font-mono font-semibold transition-colors relative cursor-pointer flex items-center gap-1.5 ${
-            activeTab === 'unknowns'
-              ? 'text-amber-300 border-b-2 border-amber-400'
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-          <span>Needs Review ({unknownAssets.length})</span>
-        </button>
-      </div>
+            <button
+              onClick={() => setActiveTab('unknowns')}
+              className={`pb-3 px-1 text-xs font-mono font-semibold transition-colors relative cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'unknowns'
+                  ? 'text-amber-300 border-b-2 border-amber-400'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+              <span>Needs Review ({unknownAssets.length})</span>
+            </button>
+          </div>
 
-      {/* Main Asset Table */}
-      <AssetTable
-        assets={displayAssets}
-        loading={loading}
-        onRefresh={fetchInventory}
-      />
+          {/* Main Asset Table */}
+          <AssetTable
+            assets={displayAssets}
+            loading={loading}
+            onRefresh={fetchInventory}
+          />
+        </>
+      )}
     </div>
   );
 };

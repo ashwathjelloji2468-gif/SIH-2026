@@ -7,7 +7,8 @@ import { CryptoAsset, RiskSummary, RiskAssessment, ThreatScenario, ProjectGraph 
 import { RiskMatrix } from '../components/Risk/RiskMatrix';
 import { MoscaSimulator } from '../components/Risk/MoscaSimulator';
 import { DependencyGraph } from '../components/Graph/DependencyGraph';
-import { ShieldAlert, RefreshCw, Cpu, Network } from 'lucide-react';
+import { MoscaGraph3D } from '../components/Three/MoscaGraph3D';
+import { ShieldAlert, RefreshCw, Cpu, Network, Box } from 'lucide-react';
 
 export const Risk: React.FC = () => {
   const { currentProject } = useProject();
@@ -74,6 +75,22 @@ export const Risk: React.FC = () => {
         >
           <RefreshCw className="w-4 h-4" />
         </button>
+      </div>
+
+      {/* 3D Mosca Threat Horizon Visualization Card */}
+      <div className="rounded-2xl border border-slate-800 bg-[#0B0F19] p-6 shadow-2xl space-y-4">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+          <div className="flex items-center gap-2">
+            <Box className="w-4 h-4 text-cyan-400" />
+            <h3 className="text-sm font-semibold text-slate-100 font-mono">3D Threat Horizon & Risk Exposure Space</h3>
+          </div>
+          <span className="text-xs font-mono text-cyan-300 bg-cyan-950/60 border border-cyan-800/60 px-2.5 py-1 rounded-full">
+            Theorem: X (10y) + Y (3y) &gt; Z (2033)
+          </span>
+        </div>
+        <div className="h-[380px] w-full rounded-xl overflow-hidden bg-[#06080F]/90 border border-slate-800/60 relative">
+          <MoscaGraph3D dataLifetime={10} migrationTime={3} threatHorizon={2033} className="w-full h-full" />
+        </div>
       </div>
 
       {/* Interactive Mosca Theorem Simulator */}

@@ -3,6 +3,7 @@ import { ArrowRight, Cpu, Binary, Sparkles, ShieldCheck, ChevronRight } from 'lu
 import { useProject } from '../../context/ProjectContext';
 import { useNavigate } from 'react-router-dom';
 import { CyberVisual } from '../Common/CyberVisual';
+import { Globe3D } from '../Three/Globe3D';
 
 export const ExecutiveHero: React.FC = () => {
   const { currentProject, setIsScanModalOpen } = useProject();
@@ -23,8 +24,8 @@ export const ExecutiveHero: React.FC = () => {
 
   return (
     <div className="relative overflow-hidden rounded-3xl border border-slate-800/90 bg-gradient-to-r from-[#0B0F19] via-[#0D1322] to-[#0B0F19] p-6 sm:p-8 lg:p-10 shadow-2xl mb-8">
-      {/* Background Cyber Lattice Particle Visual (Non-blocking, graceful fallback) */}
-      <div className="absolute inset-0 z-0">
+      {/* Background Cyber Lattice Particle Visual */}
+      <div className="absolute inset-0 z-0 opacity-40 pointer-events-none">
         <CyberVisual className="w-full h-full" />
       </div>
 
@@ -46,18 +47,24 @@ export const ExecutiveHero: React.FC = () => {
           </div>
         </div>
 
-        {/* Hero Title & Mission Pitch */}
-        <div className="max-w-3xl space-y-3">
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-white leading-tight">
-            Quantum Cryptographic Discovery & <br />
-            <span className="bg-gradient-to-r from-cyan-400 via-teal-300 to-indigo-400 bg-clip-text text-transparent">
-              Post-Quantum Migration Architecture
-            </span>
-          </h1>
+        {/* Split Grid: Title & 3D Globe */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+          <div className="lg:col-span-8 space-y-4">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-white leading-tight">
+              Quantum Cryptographic Discovery & <br />
+              <span className="bg-gradient-to-r from-cyan-400 via-teal-300 to-indigo-400 bg-clip-text text-transparent">
+                Post-Quantum Migration Architecture
+              </span>
+            </h1>
 
-          <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-2xl">
-            Continuous discovery, Mosca exposure modeling, and automated PQC upgrade simulation across code repositories, TLS sessions, and cryptographic dependencies.
-          </p>
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-2xl">
+              Continuous discovery, Mosca exposure modeling, and automated PQC upgrade simulation across code repositories, TLS sessions, and cryptographic dependencies.
+            </p>
+          </div>
+
+          <div className="lg:col-span-4 h-48 lg:h-56 relative rounded-2xl bg-[#06080F]/60 border border-slate-800/80 overflow-hidden hidden sm:block">
+            <Globe3D className="w-full h-full" />
+          </div>
         </div>
 
         {/* Action CTAs */}
