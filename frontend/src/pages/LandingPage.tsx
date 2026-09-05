@@ -29,7 +29,7 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#0B1120] bg-hex-pattern bg-radial-subtle text-slate-100 overflow-x-hidden">
+    <div className="min-h-screen bg-[#0B1120] text-slate-100 overflow-x-hidden" style={{ backgroundColor: '#0B1120', minHeight: '100vh' }}>
       <LandingNavbar />
       <main>
         <HeroSection />
