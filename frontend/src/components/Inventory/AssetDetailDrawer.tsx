@@ -93,88 +93,88 @@ export const AssetDetailDrawer: React.FC<AssetDetailDrawerProps> = ({ asset, onC
           {/* Drawer Scrollable Content */}
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
             {/* 4-Step Explainability Framework: WHAT -> WHERE -> WHY -> WHAT NEXT */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* WHAT */}
-              <div className="rounded-2xl border border-slate-800 bg-[#0B0F19] p-4 space-y-1">
-                <div className="text-[10px] uppercase tracking-wider font-mono text-cyan-400 font-bold mb-1">
+              <div className="rounded-2xl border border-[#22D3EE]/20 bg-[#1E293B] p-5 space-y-1.5 shadow-lg hover:-translate-y-1 hover:border-[#22D3EE]/40 transition-all">
+                <div className="text-[10px] uppercase tracking-wider font-mono text-[#22D3EE] font-bold mb-1">
                   1. WHAT (Primitive Specification)
                 </div>
-                <div className="text-base font-bold font-mono text-slate-100">{asset.algorithm_name}</div>
-                <div className="text-xs text-slate-400">
-                  Purpose: <strong className="text-slate-200 font-mono">{asset.purpose}</strong>
+                <div className="text-lg font-bold font-mono text-[#F8FAFC]">{asset.algorithm_name}</div>
+                <div className="text-xs text-[#94A3B8]">
+                  Purpose: <strong className="text-[#F8FAFC] font-mono">{asset.purpose}</strong>
                 </div>
                 {asset.key_size && (
-                  <div className="text-xs text-slate-400">
-                    Key Size: <strong className="text-slate-200 font-mono">{asset.key_size} bits</strong>
+                  <div className="text-xs text-[#94A3B8]">
+                    Key Size: <strong className="text-[#F8FAFC] font-mono">{asset.key_size} bits</strong>
                   </div>
                 )}
               </div>
 
               {/* WHERE */}
-              <div className="rounded-2xl border border-slate-800 bg-[#0B0F19] p-4 space-y-1">
-                <div className="text-[10px] uppercase tracking-wider font-mono text-blue-400 font-bold mb-1">
+              <div className="rounded-2xl border border-[#22D3EE]/20 bg-[#1E293B] p-5 space-y-1.5 shadow-lg hover:-translate-y-1 hover:border-[#22D3EE]/40 transition-all">
+                <div className="text-[10px] uppercase tracking-wider font-mono text-cyan-300 font-bold mb-1">
                   2. WHERE (Source Coordinates)
                 </div>
-                <div className="text-xs font-mono text-slate-200 truncate">{asset.location}</div>
-                <div className="text-xs text-slate-400">
-                  Line Number: <strong className="text-cyan-300 font-mono">{asset.line_number || 'Global'}</strong>
+                <div className="text-xs font-mono text-[#F8FAFC] truncate">{asset.location}</div>
+                <div className="text-xs text-[#94A3B8]">
+                  Line Number: <strong className="text-[#22D3EE] font-mono">{asset.line_number || 'Global'}</strong>
                 </div>
-                <div className="text-[11px] text-slate-500 font-mono">
+                <div className="text-[11px] text-[#94A3B8] font-mono">
                   Asset Classification: {asset.asset_type}
                 </div>
               </div>
 
               {/* WHY */}
-              <div className="rounded-2xl border border-slate-800 bg-[#0B0F19] p-4 sm:col-span-2 space-y-2">
+              <div className="rounded-2xl border border-rose-500/30 bg-[#1E293B] p-5 sm:col-span-2 space-y-3 shadow-lg hover:-translate-y-1 hover:border-rose-500/50 transition-all">
                 <div className="flex items-center justify-between">
                   <div className="text-[10px] uppercase tracking-wider font-mono text-rose-400 font-bold">
                     3. WHY (Quantum Risk Rationale)
                   </div>
                   {riskAssessment && (
-                    <span className="text-xs font-mono font-bold text-rose-300 bg-rose-950/80 px-2.5 py-0.5 rounded-full border border-rose-800/80">
+                    <span className="text-xs font-mono font-bold text-rose-300 bg-rose-950/80 px-3 py-1 rounded-full border border-rose-800/80 shadow-[0_0_10px_rgba(244,63,94,0.3)]">
                       Risk Score: {riskAssessment.risk_score} / 100
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-slate-300 leading-relaxed font-sans">
+                <p className="text-xs text-[#F8FAFC] leading-relaxed font-sans">
                   {riskExplanation || (isVulnerable
                     ? `Algorithm ${asset.algorithm_name} relies on classical discrete logarithm or integer factorization problems solved in polynomial time by Shor's Algorithm on a cryptanalytically relevant quantum computer (CRQC).`
                     : `Symmetric algorithm ${asset.algorithm_name} with sufficient key strength maintains quantum resistance against Grover's quantum search algorithm.`
                   )}
                 </p>
-                <div className="flex items-center gap-4 text-[11px] font-mono text-slate-400 pt-1 border-t border-slate-800/80">
-                  <span>Quantum Safety: <strong className={isVulnerable ? 'text-rose-400' : 'text-emerald-400'}>{asset.quantum_safety}</strong></span>
+                <div className="flex items-center gap-4 text-[11px] font-mono text-[#94A3B8] pt-2 border-t border-slate-700/60">
+                  <span>Quantum Safety: <strong className={isVulnerable ? 'text-rose-400 font-bold' : 'text-emerald-400 font-bold'}>{asset.quantum_safety}</strong></span>
                   <span>•</span>
-                  <span>Confidence: <strong className="text-cyan-300">{Math.round((primaryEvidence?.confidence_score || 0.95) * 100)}% (Deterministic)</strong></span>
+                  <span>Confidence: <strong className="text-[#22D3EE]">{Math.round((primaryEvidence?.confidence_score || 0.95) * 100)}% (Deterministic)</strong></span>
                 </div>
               </div>
 
               {/* WHAT NEXT */}
-              <div className="rounded-2xl border border-cyan-900/60 bg-gradient-to-br from-cyan-950/30 via-slate-900/50 to-slate-900/30 p-5 sm:col-span-2 space-y-2.5">
-                <div className="text-[10px] uppercase tracking-wider font-mono text-cyan-300 font-bold">
+              <div className="rounded-2xl border border-[#22D3EE]/40 bg-gradient-to-br from-[#1E293B] via-[#0F172A] to-[#1E293B] p-5 sm:col-span-2 space-y-3 shadow-xl hover:-translate-y-1 transition-all">
+                <div className="text-[10px] uppercase tracking-wider font-mono text-[#22D3EE] font-bold">
                   4. WHAT NEXT (NIST PQC Migration Pathway)
                 </div>
                 {primaryRec ? (
-                  <div className="space-y-2">
+                  <div className="space-y-2.5">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-bold font-mono text-cyan-300">
-                        Target: {primaryRec.target_pqc_candidate}
+                      <span className="text-sm font-bold font-mono text-[#22D3EE]">
+                        Target Candidate: {primaryRec.target_pqc_candidate}
                       </span>
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800/80 font-bold uppercase">
+                      <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-[#22D3EE]/20 text-[#22D3EE] border border-[#22D3EE]/40 font-bold uppercase">
                         {primaryRec.standard_status}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-300 leading-relaxed font-sans">
+                    <p className="text-xs text-[#F8FAFC] leading-relaxed font-sans">
                       {primaryRec.rationale}
                     </p>
                     {primaryRec.performance_notes && (
-                      <div className="text-[11px] text-slate-400 font-mono bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
-                        <strong className="text-slate-300">Footprint Overhead:</strong> {primaryRec.performance_notes}
+                      <div className="text-[11px] text-[#94A3B8] font-mono bg-[#0B1120] p-3 rounded-xl border border-slate-700/80">
+                        <strong className="text-[#F8FAFC]">Footprint Overhead:</strong> {primaryRec.performance_notes}
                       </div>
                     )}
                   </div>
                 ) : (
-                  <p className="text-xs text-slate-400 font-sans">
+                  <p className="text-xs text-[#94A3B8] font-sans">
                     Symmetric primitive has sufficient quantum resistance. Monitor key lifecycle and cryptographic agility.
                   </p>
                 )}
