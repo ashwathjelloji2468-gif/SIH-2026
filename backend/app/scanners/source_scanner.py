@@ -16,6 +16,11 @@ KNOWN_PATTERNS = [
     (r"(?i)\bMD5\b", "MD5", CryptoPurpose.HASHING, AssetType.ALGORITHM),
     (r"(?i)\bDES\b", "DES", CryptoPurpose.ENCRYPTION, AssetType.ALGORITHM),
     (r"-----BEGIN (RPC|RSA|EC|PRIVATE) KEY-----", "RSA", CryptoPurpose.KEY_ESTABLISHMENT, AssetType.CERTIFICATE),
+    # Java, Go, Rust simple patterns
+    (r"(?i)Cipher.getInstance\s*\(\s*\"AES\"\s*\)", "AES", CryptoPurpose.ENCRYPTION, AssetType.ALGORITHM),
+    (r"(?i)crypto/rsa", "RSA", CryptoPurpose.SIGNATURE, AssetType.ALGORITHM),
+    (r"(?i)crypto/ecdsa", "ECDSA", CryptoPurpose.SIGNATURE, AssetType.ALGORITHM),
+    (r"(?i)crypto/sha256", "SHA-256", CryptoPurpose.HASHING, AssetType.ALGORITHM),
 ]
 
 UNKNOWN_PATTERNS = [
@@ -31,7 +36,7 @@ class SourceScanner(BaseScanner):
 
         for root, _, files in os.walk(target_path):
             for file in files:
-                if file.endswith((".py", ".js", ".jsx", ".ts", ".tsx", ".pem", ".key", ".crt", ".json", ".yaml", ".yml")):
+                if file.endswith((".py", ".js", ".jsx", ".ts", ".tsx", ".java", ".go", ".rs", ".pem", ".key", ".crt", ".json", ".yaml", ".yml")):
                     full_path = os.path.join(root, file)
                     rel_path = os.path.relpath(full_path, target_path)
 
