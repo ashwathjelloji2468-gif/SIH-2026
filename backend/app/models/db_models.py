@@ -85,7 +85,11 @@ class Evidence(Base):
     detector_name = Column(String, nullable=False)
     detector_version = Column(String, default="1.0.0", nullable=False)
     excerpt = Column(Text, nullable=True)
-    confidence_score = Column(Float, default=1.0, nullable=False)  # 0.0 to 1.0
+    confidence_score = Column(Float, default=1.0, nullable=False)
+    algorithm_name = Column(String, nullable=False)
+    purpose = Column(SQLEnum(CryptoPurpose), nullable=False)
+    asset_type = Column(SQLEnum(AssetType), nullable=False)
+    matched_text = Column(Text, nullable=True)
     provenance = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 

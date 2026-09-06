@@ -21,6 +21,9 @@ class ProjectRepository:
     def get(self, project_id: str) -> Optional[Project]:
         return self.db.query(Project).filter(Project.id == project_id).first()
 
+    def get_by_name(self, name: str) -> Optional[Project]:
+        return self.db.query(Project).filter(Project.name == name).first()
+
     def get_multi(self, skip: int = 0, limit: int = 100) -> List[Project]:
         return self.db.query(Project).offset(skip).limit(limit).all()
 

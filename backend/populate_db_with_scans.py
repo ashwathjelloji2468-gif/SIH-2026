@@ -6,6 +6,7 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 from sqlalchemy.orm import Session
 from app.core.database import engine, Base, SessionLocal
+from app.models.enums import AssetType, CryptoPurpose, EvidenceType, QuantumSafety, ReviewStatus
 from app.knowledge.knowledge_loader import init_knowledge_base
 from app.repositories.project_repository import ProjectRepository
 from app.repositories.scan_repository import ScanRepository
@@ -34,13 +35,13 @@ def run_seed():
                 "name": "pyca/cryptography",
                 "description": "Python core cryptographic primitives library",
                 "repo": "https://github.com/pyca/cryptography",
-                "path": "/Users/jashwath/.gemini/antigravity/scratch/cloned_repos/cryptography/src/cryptography"
+                "path": "/Users/jashwath/.gemini/antigravity/scratch/cloned_repos/cryptography"
             },
             {
                 "name": "paramiko/paramiko",
                 "description": "Python SSHv2 protocol implementation",
                 "repo": "https://github.com/paramiko/paramiko",
-                "path": "/Users/jashwath/.gemini/antigravity/scratch/cloned_repos/paramiko/paramiko"
+                "path": "/Users/jashwath/.gemini/antigravity/scratch/cloned_repos/paramiko"
             }
         ]
 
@@ -49,11 +50,16 @@ def run_seed():
         for item in targets:
             print(f"\n--- Scanning Project: {item['name']} ---")
             # Create Project
-            proj = project_repo.create(type("Obj", (), {
-                "name": item["name"],
-                "description": item["description"],
-                "repository_url": item["repo"]
-            }))
+            # Upsert Project: reuse existing if present
+            existing_proj = project_repo.get_by_name(item["name"])
+            if existing_proj:
+                proj = existing_proj
+            else:
+                proj = project_repo.create(type("Obj", (), {
+                    "name": item["name"],
+                    "description": item["description"],
+                    "repository_url": item["repo"]
+                }))
 
             # Create Scan
             scan = scan_repo.create(project_id=proj.id, target_path=item["path"], scan_type="source")
@@ -64,10 +70,12 @@ def run_seed():
             # Query discovered assets
             assets = asset_repo.get_by_project(proj.id)
 
+
+
             # Run Risk & Recommendation Engine
             for asset in assets:
                 risk_engine.evaluate_asset_risk(asset.algorithm_name, asset.quantum_safety)
-                recommendation_engine.evaluate_recommendations(asset)
+
 
             # Collect summary statistics
             alg_counts = {}

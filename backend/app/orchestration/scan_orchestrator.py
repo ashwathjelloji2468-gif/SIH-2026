@@ -2,13 +2,18 @@ from sqlalchemy.orm import Session
 from app.repositories.scan_repository import ScanRepository
 from app.repositories.asset_repository import AssetRepository
 from app.repositories.finding_repository import FindingRepository
+from app.repositories.risk_repository import RiskRepository
+from app.repositories.recommendation_repository import RecommendationRepository
+from app.repositories.migration_plan_repository import MigrationPlanRepository
 from app.scanners.source_scanner import SourceScanner
+from app.scanners.container_scanner import ContainerScanner
+from app.scanners.binary_scanner import BinaryScanner
 from app.scanners.dependency_scanner import DependencyScanner
 from app.scanners.certificate_scanner import CertificateScanner
 from app.discovery.deduplication import deduplicate_findings
 from app.normalization.crypto_asset_normalizer import determine_quantum_safety
 from app.cbom.cyclonedx_adapter import generate_cbom_json
-from app.models.enums import ScanStatus, ReviewStatus
+from app.models.enums import ScanStatus, ReviewStatus, RiskLevel
 from app.core.logging import logger
 
 class ScanOrchestrator:
@@ -16,6 +21,9 @@ class ScanOrchestrator:
         scan_repo = ScanRepository(db)
         asset_repo = AssetRepository(db)
         finding_repo = FindingRepository(db)
+        risk_repo = RiskRepository(db)
+        rec_repo = RecommendationRepository(db)
+        mig_repo = MigrationPlanRepository(db)
 
         scan = scan_repo.get(scan_id)
         if not scan:
@@ -25,7 +33,7 @@ class ScanOrchestrator:
         try:
             scan_repo.update_status(scan_id, ScanStatus.RUNNING)
 
-            scanners = [SourceScanner(), DependencyScanner(), CertificateScanner()]
+            scanners = [SourceScanner(), DependencyScanner(), CertificateScanner(), ContainerScanner(), BinaryScanner()]
             raw_findings = []
             for scanner in scanners:
                 raw_findings.extend(scanner.scan(scan.target_path))
@@ -64,6 +72,15 @@ class ScanOrchestrator:
                     excerpt=raw.matched_text,
                     confidence_score=raw.confidence
                 )
+
+                risk_score = 90.0 if q_safety.name == "VULNERABLE" else 10.0
+                risk_level = RiskLevel.HIGH if q_safety.name == "VULNERABLE" else RiskLevel.LOW
+                risk_repo.store_assessment(asset.id, risk_score, risk_level)
+
+                rec_repo.store_recommendation(asset.id, "ML-KEM", "Suggested replacement due to quantum vulnerability")
+
+            migration_plan = {"assets": [a.id for a in created_assets], "recommendations": {"ML-KEM": "Replace vulnerable algorithms"}}
+            mig_repo.store_plan(project_id=scan.project_id, name="Default Migration Plan", plan_data=migration_plan)
 
             cbom_json = generate_cbom_json(scan, created_assets)
             scan_repo.update_status(scan_id, ScanStatus.COMPLETED, cbom_json=cbom_json)
