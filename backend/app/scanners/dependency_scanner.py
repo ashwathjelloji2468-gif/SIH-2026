@@ -2,7 +2,7 @@ import os
 import json
 import tomllib
 import xml.etree.ElementTree as ET
-from typing import List
+from typing import List, Optional
 
 from app.scanners.base import BaseScanner, RawFinding
 from app.models.enums import AssetType, CryptoPurpose, EvidenceType
@@ -38,7 +38,7 @@ class DependencyScanner(BaseScanner):
     """
 
     def _add_finding(self, findings: List[RawFinding], target_path: str, manifest_path: str,
-                     package: str, version: str | None, ecosystem: str) -> None:
+                     package: str, version: Optional[str], ecosystem: str) -> None:
         findings.append(RawFinding(
             detector_name="DependencyScanner",
             target_path=target_path,

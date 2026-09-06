@@ -2,7 +2,7 @@ import os
 import subprocess
 import json
 import shutil
-from typing import List
+from typing import List, Optional
 
 from app.scanners.base import BaseScanner, RawFinding
 from app.models.enums import AssetType, CryptoPurpose, EvidenceType
@@ -29,7 +29,7 @@ class ContainerScanner(BaseScanner):
 
     def _add_finding(self, findings: List[RawFinding], target_path: str, manifest: str,
                      name: str, purpose: CryptoPurpose, evidence_type: EvidenceType,
-                     confidence: float, extra: dict | None = None) -> None:
+                     confidence: float, extra: Optional[dict] = None) -> None:
         findings.append(RawFinding(
             detector_name="ContainerScanner",
             target_path=target_path,
