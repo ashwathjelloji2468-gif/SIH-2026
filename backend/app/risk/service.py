@@ -175,6 +175,7 @@ class RiskService:
             "unassessed_assets": unassessed_count,
             "average_risk_score": avg_score,
             "risk_counts": risk_counts,
+            "high_or_critical_risk_assets": risk_counts.get("high", 0) + risk_counts.get("critical", 0),
             "quantum_vulnerable_count": q_vulnerable,
             "quantum_resistant_count": q_resistant,
             "unknown_count": unknown_q,
