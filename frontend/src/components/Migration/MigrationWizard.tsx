@@ -366,8 +366,27 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
             </div>
 
             {simError && (
-              <div className="p-4 rounded-xl bg-rose-950/50 border border-rose-800/60 text-xs text-rose-300">
-                {simError}
+              <div className="p-4 rounded-xl bg-rose-950/50 border border-rose-800/60 text-xs text-rose-300 space-y-3 font-mono">
+                <div className="flex items-center gap-2 font-bold text-rose-200">
+                  <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0" />
+                  <span>{simError}</span>
+                </div>
+                {(simError.toLowerCase().includes('not found') || simError.toLowerCase().includes('plan')) && (
+                  <div className="pt-2 border-t border-rose-900/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px]">
+                    <span className="text-slate-300">
+                      Migration plan required. Return to Stage 1 and synthesize a migration roadmap.
+                    </span>
+                    <button
+                      onClick={() => {
+                        setCurrentStep(1);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-rose-900/80 hover:bg-rose-800 text-rose-100 font-bold cursor-pointer transition-colors shrink-0"
+                    >
+                      Return to Stage 1 ↑
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 

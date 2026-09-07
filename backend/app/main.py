@@ -17,6 +17,8 @@ from app.api import (
 async def lifespan(app: FastAPI):
     logger.info("Initializing Database tables...")
     Base.metadata.create_all(bind=engine)
+    from app.core.database import sync_schema
+    sync_schema()
     
     logger.info("Loading Cryptographic & PQC Knowledge Base...")
     db = SessionLocal()
