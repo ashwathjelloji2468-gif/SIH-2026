@@ -1,6 +1,12 @@
 import os
 import json
-import tomllib
+try:
+    import tomllib
+except ImportError:
+    try:
+        import tomli as tomllib
+    except ImportError:
+        tomllib = None
 import xml.etree.ElementTree as ET
 from typing import List, Optional
 
@@ -72,6 +78,8 @@ class DependencyScanner(BaseScanner):
             pass
 
     def _scan_pyproject_toml(self, path: str, target_path: str, findings: List[RawFinding]):
+        if tomllib is None:
+            return
         try:
             with open(path, "rb") as f:
                 data = tomllib.load(f)

@@ -219,20 +219,52 @@ class MigrationPlanResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-# Validation Schemas
+# Validation & Simulation Schemas
+class MigrationSimulationResponse(BaseModel):
+    id: str
+    project_id: Optional[str] = None
+    asset_id: str
+    recommendation_id: Optional[str] = None
+    migration_plan_id: Optional[str] = None
+    status: str
+    sandbox_path: Optional[str] = None
+    transformation_type: Optional[str] = None
+    files_changed: List[str] = []
+    changes_summary: Optional[Dict[str, Any]] = None
+    before_fingerprint: Optional[str] = None
+    after_fingerprint: Optional[str] = None
+    build_result: Optional[Dict[str, Any]] = None
+    test_result: Optional[Dict[str, Any]] = None
+    validation_result: Optional[Dict[str, Any]] = None
+    failure_reason: Optional[str] = None
+    blocker_reason: Optional[str] = None
+    confidence: float = 1.0
+    created_at: datetime
+    completed_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
 class ValidationRunResponse(BaseModel):
     id: str
-    plan_id: str
-    status: ValidationStatus
-    build_passed: bool
-    unit_tests_passed: bool
-    crypto_tests_passed: bool
-    integration_tests_passed: bool
-    regression_passed: bool
-    api_compatible: bool
+    simulation_id: Optional[str] = None
+    plan_id: Optional[str] = None
+    asset_id: Optional[str] = None
+    check_type: str = "BUILD"
+    status: str = "PENDING"
+    command: Optional[str] = None
+    exit_code: Optional[int] = None
+    output_summary: Optional[str] = None
+    evidence: Optional[Dict[str, Any]] = None
+    duration: float = 0.0
+    build_passed: bool = False
+    unit_tests_passed: bool = False
+    crypto_tests_passed: bool = False
+    integration_tests_passed: bool = False
+    regression_passed: bool = False
+    api_compatible: bool = False
     logs: Optional[str] = None
-    residual_risk_score: float
-    confidence: float
+    residual_risk_score: float = 0.0
+    confidence: float = 1.0
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

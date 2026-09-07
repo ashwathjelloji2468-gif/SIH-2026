@@ -8,7 +8,7 @@ from app.core.database import Base
 from app.models.enums import (
     ScanStatus, AssetType, CryptoPurpose, RiskLevel, EvidenceType,
     StandardStatus, ThreatScenarioType, ValidationStatus, QuantumSafety, ReviewStatus,
-    RecommendationCategory
+    RecommendationCategory, SimulationStatus, ValidationCheckType, ValidationCheckStatus
 )
 
 def generate_uuid() -> str:
@@ -218,12 +218,47 @@ class MigrationTask(Base):
     # Relationships
     plan = relationship("MigrationPlan", back_populates="tasks")
 
+class MigrationSimulation(Base):
+    __tablename__ = "migration_simulations"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    project_id = Column(String, nullable=True)
+    asset_id = Column(String, nullable=False)
+    recommendation_id = Column(String, nullable=True)
+    migration_plan_id = Column(String, nullable=True)
+    status = Column(SQLEnum(SimulationStatus), default=SimulationStatus.CREATED, nullable=False)
+    sandbox_path = Column(String, nullable=True)
+    transformation_type = Column(String, nullable=True)
+    files_changed = Column(JSON, nullable=True)
+    changes_summary = Column(JSON, nullable=True)
+    before_fingerprint = Column(String, nullable=True)
+    after_fingerprint = Column(String, nullable=True)
+    build_result = Column(JSON, nullable=True)
+    test_result = Column(JSON, nullable=True)
+    validation_result = Column(JSON, nullable=True)
+    failure_reason = Column(Text, nullable=True)
+    blocker_reason = Column(Text, nullable=True)
+    confidence = Column(Float, default=1.0)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    completed_at = Column(DateTime, nullable=True)
+
+    # Relationships
+    validations = relationship("ValidationRun", back_populates="simulation", cascade="all, delete-orphan")
+
 class ValidationRun(Base):
     __tablename__ = "validation_runs"
 
     id = Column(String, primary_key=True, default=generate_uuid)
-    plan_id = Column(String, ForeignKey("migration_plans.id", ondelete="CASCADE"), nullable=False)
+    simulation_id = Column(String, ForeignKey("migration_simulations.id", ondelete="CASCADE"), nullable=True)
+    plan_id = Column(String, ForeignKey("migration_plans.id", ondelete="CASCADE"), nullable=True)
+    asset_id = Column(String, nullable=True)
+    check_type = Column(String, default="BUILD")
     status = Column(SQLEnum(ValidationStatus), default=ValidationStatus.PENDING, nullable=False)
+    command = Column(String, nullable=True)
+    exit_code = Column(Integer, nullable=True)
+    output_summary = Column(Text, nullable=True)
+    evidence = Column(JSON, nullable=True)
+    duration = Column(Float, default=0.0)
     build_passed = Column(Boolean, default=False)
     unit_tests_passed = Column(Boolean, default=False)
     crypto_tests_passed = Column(Boolean, default=False)
@@ -237,6 +272,7 @@ class ValidationRun(Base):
 
     # Relationships
     plan = relationship("MigrationPlan", back_populates="validations")
+    simulation = relationship("MigrationSimulation", back_populates="validations")
 
 class AuditEvent(Base):
     __tablename__ = "audit_events"

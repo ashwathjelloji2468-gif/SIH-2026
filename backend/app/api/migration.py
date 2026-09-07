@@ -4,14 +4,41 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.repositories.asset_repository import AssetRepository
 from app.repositories.migration_repository import MigrationRepository
-from app.repositories.risk_repository import RiskRepository
-from app.repositories.recommendation_repository import RecommendationRepository
+from app.repositories.migration_simulation_repository import MigrationSimulationRepository
 from app.migration.planner import MigrationPlanner
+from app.migration.simulator import MigrationSimulator
 from app.migration.sandbox import SandboxEnvironment, SandboxConfig, DEMO_PATTERNS
-from app.models.schemas import MigrationPlanCreate, MigrationPlanResponse
+from app.models.schemas import MigrationPlanCreate, MigrationPlanResponse, MigrationSimulationResponse
 from app.models.db_models import MigrationPlan, CryptoAsset
 
 router = APIRouter(tags=["Migration"])
+
+@router.post("/migration/simulate")
+def simulate_asset_migration(
+    asset_id: str,
+    source_directory: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    simulator = MigrationSimulator()
+    try:
+        return simulator.run_simulation(db, asset_id=asset_id, source_directory_override=source_directory)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Simulation error: {str(e)}")
+
+@router.get("/migration/simulations")
+def list_simulations(project_id: Optional[str] = Query(None), db: Session = Depends(get_db)):
+    repo = MigrationSimulationRepository(db)
+    return repo.list_simulations(project_id=project_id)
+
+@router.get("/migration/simulations/{simulation_id}")
+def get_simulation(simulation_id: str, db: Session = Depends(get_db)):
+    repo = MigrationSimulationRepository(db)
+    sim = repo.get(simulation_id)
+    if not sim:
+        raise HTTPException(status_code=404, detail=f"Migration simulation '{simulation_id}' not found.")
+    return sim
 
 @router.get("/migration")
 def list_all_migration_plans(project_id: Optional[str] = Query(None), db: Session = Depends(get_db)):
