@@ -150,15 +150,14 @@ class RiskService:
                 qs = str(getattr(asset, "quantum_safety", "") or "").upper()
                 if "VULNERABLE" in qs:
                     q_vulnerable += 1
-                    risk_counts["high"] += 1
                 elif "SAFE" in qs or "RESISTANT" in qs:
                     q_resistant += 1
-                    risk_counts["low"] += 1
                 else:
                     unknown_q += 1
 
-        avg_score = round(total_score / assessed_count, 1) if assessed_count > 0 else (75.0 if q_vulnerable > 0 else 0.0)
-        avg_conf = round(total_conf / assessed_count, 2) if assessed_count > 0 else 1.0
+        avg_score = round(total_score / assessed_count, 1) if assessed_count > 0 else 0.0
+        avg_conf = round(total_conf / assessed_count, 2) if assessed_count > 0 else 0.0
+
 
 
         # Deterministic Priority Ranking:

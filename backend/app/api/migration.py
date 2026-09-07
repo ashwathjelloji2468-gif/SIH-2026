@@ -111,13 +111,16 @@ def get_asset_migration_plan(asset_id: str, db: Session = Depends(get_db)):
 
 @router.post("/migration/plan")
 def create_or_generate_migration_plan(plan_in: MigrationPlanCreate, project_id: Optional[str] = Query(None), db: Session = Depends(get_db)):
-    target_project_id = project_id or "default_project"
+    target_project_id = project_id
+    if not target_project_id:
+        first_asset = db.query(CryptoAsset).first()
+        if first_asset and first_asset.scan:
+            target_project_id = first_asset.scan.project_id
+    if not target_project_id:
+        raise HTTPException(status_code=400, detail="project_id parameter required to generate migration plan.")
     asset_repo = AssetRepository(db)
     assets = asset_repo.get_by_project(target_project_id)
-    if not assets:
-        assets = db.query(CryptoAsset).all()
-        if assets:
-            target_project_id = assets[0].scan.project_id if assets[0].scan else "default_project"
+
 
     planner = MigrationPlanner()
     return planner.create_plan_for_project(
@@ -205,7 +208,8 @@ def simulate_migration_plan(plan_id: str, pattern: str = "RSA_TO_ML_KEM_HYBRID",
                 asset_id = first_asset.id
 
     if not asset_id:
-        asset_id = f"asset-{plan.project_id or 'target'}"
+        raise HTTPException(status_code=400, detail="No cryptographic assets associated with this plan to simulate.")
+
 
     result["status"] = "TRANSFORMED"
 

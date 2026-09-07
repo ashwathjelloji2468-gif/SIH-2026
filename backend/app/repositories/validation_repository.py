@@ -36,8 +36,6 @@ class ValidationRepository:
             if sim and sim.migration_plan_id:
                 plan_id = sim.migration_plan_id
 
-        if not plan_id:
-            plan_id = f"plan-{simulation_id or 'standalone'}"
 
 
         run = ValidationRun(

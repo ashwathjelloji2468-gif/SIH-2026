@@ -16,10 +16,9 @@ def get_overall_graph(project_id: Optional[str] = Query(None), db: Session = Dep
     if project_id:
         assets = asset_repo.get_by_project(project_id)
     else:
-        # Load all assets if no project_id specified
-        assets = db.query(AssetRepository(db).db.query(AssetRepository(db).get.__self__.db.models.db_models.CryptoAsset).first().__class__).all() if hasattr(asset_repo, "db") else []
-        if not assets:
-            assets = asset_repo.get_by_project("default_project")
+        from app.models.db_models import CryptoAsset
+        assets = db.query(CryptoAsset).all()
+
 
     risk_repo = RiskRepository(db)
     rec_repo = RecommendationRepository(db)

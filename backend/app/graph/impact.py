@@ -102,7 +102,8 @@ class ImpactAnalyzer:
         else:
             impact_level = ImpactLevel.LOW
 
-        project_id = getattr(getattr(asset, "scan", None), "project_id", "default_project")
+        project_id = getattr(getattr(asset, "scan", None), "project_id", None)
+
 
         return {
             "asset_id": asset_id,
