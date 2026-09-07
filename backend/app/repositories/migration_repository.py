@@ -84,6 +84,34 @@ class MigrationRepository:
         self.db.refresh(task)
         return task
 
+    def add_tasks_bulk(self, tasks_data: List[Dict[str, Any]]) -> List[MigrationTask]:
+        tasks = []
+        for tdata in tasks_data:
+            task = MigrationTask(
+                plan_id=tdata["plan_id"],
+                project_id=tdata.get("project_id"),
+                asset_id=tdata["asset_id"],
+                recommendation_id=tdata.get("recommendation_id"),
+                title=tdata["title"],
+                description=tdata.get("description"),
+                task_type=tdata.get("task_type", "ALGORITHM_REPLACEMENT"),
+                priority=tdata.get("priority", "P2"),
+                migration_complexity=tdata.get("migration_complexity", "MEDIUM"),
+                person_days=tdata.get("person_days", 1.0),
+                sequence_order=tdata.get("sequence_order", 1),
+                status=tdata.get("status", "NOT_STARTED"),
+                affected_components=tdata.get("affected_components") or [],
+                dependencies=tdata.get("dependencies") or [],
+                blockers=tdata.get("blockers") or [],
+                validation_requirements=tdata.get("validation_requirements") or [],
+                rationale=tdata.get("rationale")
+            )
+            tasks.append(task)
+        self.db.add_all(tasks)
+        self.db.commit()
+        return tasks
+
+
     def create_validation_run(
         self,
         plan_id: str,

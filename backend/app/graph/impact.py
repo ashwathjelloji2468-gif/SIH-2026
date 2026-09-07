@@ -13,7 +13,8 @@ class ImpactAnalyzer:
         asset: Any,
         all_project_assets: Optional[List[Any]] = None,
         risk_assessment: Optional[Any] = None,
-        recommendation: Optional[Any] = None
+        recommendation: Optional[Any] = None,
+        prebuilt_graph: Optional[Any] = None
     ) -> Dict[str, Any]:
 
         asset_id = getattr(asset, "id", "unknown_asset")
@@ -21,9 +22,10 @@ class ImpactAnalyzer:
         location = getattr(asset, "location", "unknown_file.py")
         asset_type_val = asset.asset_type.value if hasattr(asset, "asset_type") and hasattr(asset.asset_type, "value") else str(getattr(asset, "asset_type", "ALGORITHM"))
 
-        # Build local context graph
+        # Build local context graph or reuse prebuilt graph
         assets = all_project_assets or [asset]
-        graph = build_project_graph(assets)
+        graph = prebuilt_graph if prebuilt_graph is not None else build_project_graph(assets)
+
 
         asset_node_id = f"asset:{asset_id}"
         descendants = graph.analyze_impact(asset_node_id)

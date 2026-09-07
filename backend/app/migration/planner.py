@@ -6,11 +6,13 @@ from app.repositories.recommendation_repository import RecommendationRepository
 from app.repositories.asset_repository import AssetRepository
 from app.migration.effort_estimator import estimate_migration_effort
 from app.graph.impact import ImpactAnalyzer
-from app.models.db_models import CryptoAsset, MigrationPlan, MigrationTask
+from app.graph.graph_builder import build_project_graph
+from app.models.db_models import CryptoAsset, MigrationPlan, MigrationTask, RiskAssessment, Recommendation
 from app.models.enums import (
     CryptoPurpose, TaskType, TaskStatus, MigrationPriority,
     TestingRequirement, QuantumSafety
 )
+
 
 class MigrationPlanner:
     """
@@ -292,17 +294,32 @@ class MigrationPlanner:
     ) -> MigrationPlan:
 
         repo = MigrationRepository(db)
-        risk_repo = RiskRepository(db)
-        rec_repo = RecommendationRepository(db)
         impact_analyzer = ImpactAnalyzer()
 
+        # 1. Prebuild graph ONCE for all project assets
+        project_graph = build_project_graph(assets) if assets else None
+
+        # 2. Bulk fetch latest RiskAssessments and Recommendations
+        ra_map = {}
+        rec_map = {}
+        if assets:
+            asset_ids = [a.id for a in assets]
+            all_ras = db.query(RiskAssessment).filter(RiskAssessment.asset_id.in_(asset_ids)).order_by(RiskAssessment.created_at.desc()).all()
+            for ra in all_ras:
+                if ra.asset_id not in ra_map:
+                    ra_map[ra.asset_id] = ra
+
+            all_recs = db.query(Recommendation).filter(Recommendation.asset_id.in_(asset_ids)).order_by(Recommendation.created_at.desc()).all()
+            for rec in all_recs:
+                if rec.asset_id not in rec_map:
+                    rec_map[rec.asset_id] = rec
+
         all_tasks_data = []
-        total_days = 0.0
 
         for asset in assets:
-            ra = risk_repo.get_latest_for_asset(asset.id)
-            rec = rec_repo.get_latest_for_asset(asset.id)
-            impact_info = impact_analyzer.analyze_asset_impact(asset, assets, ra, rec)
+            ra = ra_map.get(asset.id)
+            rec = rec_map.get(asset.id)
+            impact_info = impact_analyzer.analyze_asset_impact(asset, assets, ra, rec, prebuilt_graph=project_graph)
 
             tasks = self.generate_tasks_for_asset(asset, ra, rec, impact_info)
             all_tasks_data.extend(tasks)
@@ -327,30 +344,34 @@ class MigrationPlanner:
             assumptions=effort["assumptions"]
         )
 
-        # Persist tasks
+        # 3. Bulk persist tasks in a single batch insert & commit
+        tasks_to_create = []
         for idx, tdata in enumerate(all_tasks_data, start=1):
-            repo.add_task(
-                plan_id=plan.id,
-                project_id=project_id,
-                asset_id=tdata["asset_id"],
-                recommendation_id=tdata.get("recommendation_id"),
-                title=tdata["title"],
-                description=tdata["description"],
-                task_type=tdata["task_type"],
-                priority=tdata["priority"],
-                migration_complexity=tdata["migration_complexity"],
-                person_days=tdata["person_days"],
-                sequence_order=idx,
-                status=tdata["status"],
-                affected_components=tdata["affected_components"],
-                dependencies=tdata["dependencies"],
-                blockers=tdata["blockers"],
-                validation_requirements=tdata["validation_requirements"],
-                rationale=tdata["rationale"]
-            )
+            tasks_to_create.append({
+                "plan_id": plan.id,
+                "project_id": project_id,
+                "asset_id": tdata["asset_id"],
+                "recommendation_id": tdata.get("recommendation_id"),
+                "title": tdata["title"],
+                "description": tdata["description"],
+                "task_type": tdata["task_type"],
+                "priority": tdata["priority"],
+                "migration_complexity": tdata["migration_complexity"],
+                "person_days": tdata["person_days"],
+                "sequence_order": idx,
+                "status": tdata["status"],
+                "affected_components": tdata["affected_components"],
+                "dependencies": tdata["dependencies"],
+                "blockers": tdata["blockers"],
+                "validation_requirements": tdata["validation_requirements"],
+                "rationale": tdata["rationale"]
+            })
+
+        repo.add_tasks_bulk(tasks_to_create)
 
         db.refresh(plan)
         return plan
+
 
     def get_asset_migration_summary(self, db: Any, asset_id: str) -> Dict[str, Any]:
         asset_repo = AssetRepository(db)
