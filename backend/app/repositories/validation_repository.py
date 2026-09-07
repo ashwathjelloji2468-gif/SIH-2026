@@ -30,9 +30,15 @@ class ValidationRepository:
         residual_risk_score: float = 0.0,
         confidence: float = 1.0
     ) -> ValidationRun:
+        if not plan_id and simulation_id:
+            from app.models.db_models import MigrationSimulation
+            sim = self.db.query(MigrationSimulation).filter(MigrationSimulation.id == simulation_id).first()
+            if sim and sim.migration_plan_id:
+                plan_id = sim.migration_plan_id
+
         run = ValidationRun(
             simulation_id=simulation_id,
-            plan_id=plan_id,
+            plan_id=plan_id or "plan-default",
             asset_id=asset_id,
             check_type=check_type,
             status=status,

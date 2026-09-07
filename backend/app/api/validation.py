@@ -39,6 +39,7 @@ def validate_simulation_run(simulation_id: str, db: Session = Depends(get_db)):
 
     val_run = val_repo.create_validation_run(
         simulation_id=simulation_id,
+        plan_id=getattr(sim, "migration_plan_id", None),
         asset_id=sim.asset_id,
         check_type="FULL_VALIDATION",
         status=val_result.get("status", "FAILED"),
