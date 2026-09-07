@@ -88,7 +88,7 @@ export const PipelineStatus: React.FC<PipelineStatusProps> = ({
       sublabel: 'Risk & Recommend',
       icon: ShieldCheck,
       status: decideStatus,
-      metric: riskSummary
+      metric: totalAssets > 0 && riskSummary
         ? `${riskSummary.high_or_critical_risk_assets} high/critical risk`
         : 'Not yet assessed',
     },

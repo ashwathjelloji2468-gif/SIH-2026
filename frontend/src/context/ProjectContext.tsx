@@ -34,15 +34,18 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     try {
       const data = await projectService.list();
       if (data && data.length > 0) {
-        setProjects(data);
+        // Sort projects so primary scanned repos come first
+        const sortedProjects = [...data].sort((a, b) => {
+          const aPriority = a.name.includes('cryptography') ? 5 : a.name.includes('paramiko') ? 4 : a.name.startsWith('demo-') ? 3 : 1;
+          const bPriority = b.name.includes('cryptography') ? 5 : b.name.includes('paramiko') ? 4 : b.name.startsWith('demo-') ? 3 : 1;
+          return bPriority - aPriority;
+        });
+
+        setProjects(sortedProjects);
         const savedId = localStorage.getItem(SAVED_PROJECT_KEY);
-        const matched = savedId ? data.find((p) => p.id === savedId) : null;
+        const matched = savedId ? sortedProjects.find((p) => p.id === savedId) : null;
         
-        const preferred = matched || 
-          data.find((p) => p.name.includes('cryptography')) || 
-          data.find((p) => p.name.includes('paramiko')) || 
-          data.find((p) => p.name.startsWith('demo-')) || 
-          data[0];
+        const preferred = matched || sortedProjects[0];
 
         setCurrentProjectState(preferred);
         if (preferred) {
