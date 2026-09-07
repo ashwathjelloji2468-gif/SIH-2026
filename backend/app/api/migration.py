@@ -192,8 +192,20 @@ def simulate_migration_plan(plan_id: str, pattern: str = "RSA_TO_ML_KEM_HYBRID",
     result = sandbox.apply_transformation_pattern(pattern)
 
     sim_repo = MigrationSimulationRepository(db)
-    first_task = plan.tasks[0] if plan.tasks else None
-    asset_id = first_task.asset_id if first_task else "asset-demo-01"
+    asset_id = None
+    if plan.tasks and plan.tasks[0].asset_id:
+        asset_id = plan.tasks[0].asset_id
+    else:
+        assets = AssetRepository(db).get_by_project(plan.project_id)
+        if assets and assets[0].id:
+            asset_id = assets[0].id
+        else:
+            first_asset = db.query(CryptoAsset).first()
+            if first_asset and first_asset.id:
+                asset_id = first_asset.id
+
+    if not asset_id:
+        asset_id = f"asset-{plan.project_id or 'target'}"
 
     sim = sim_repo.create_simulation(
         asset_id=asset_id,

@@ -36,9 +36,12 @@ class ValidationRepository:
             if sim and sim.migration_plan_id:
                 plan_id = sim.migration_plan_id
 
+        if not plan_id and not simulation_id:
+            raise ValueError("ValidationRun requires either a valid plan_id or simulation_id.")
+
         run = ValidationRun(
             simulation_id=simulation_id,
-            plan_id=plan_id or "plan-default",
+            plan_id=plan_id,
             asset_id=asset_id,
             check_type=check_type,
             status=status,

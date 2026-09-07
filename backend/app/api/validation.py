@@ -21,13 +21,19 @@ def validate_simulation_run(simulation_id: str, db: Session = Depends(get_db)):
     val_repo = ValidationRepository(db)
     asset_repo = AssetRepository(db)
     rec_repo = RecommendationRepository(db)
+    plan_repo = MigrationRepository(db)
 
     sim = sim_repo.get(simulation_id)
     if not sim:
         raise HTTPException(status_code=404, detail=f"Migration simulation '{simulation_id}' not found.")
 
-    asset = asset_repo.get(sim.asset_id)
-    rec = rec_repo.get_latest_for_asset(sim.asset_id)
+    if sim.migration_plan_id:
+        plan = plan_repo.get_plan(sim.migration_plan_id)
+        if not plan:
+            raise HTTPException(status_code=409, detail="Migration simulation references a migration plan that does not exist.")
+
+    asset = asset_repo.get(sim.asset_id) if sim.asset_id else None
+    rec = rec_repo.get_latest_for_asset(sim.asset_id) if sim.asset_id else None
 
     validator = MigrationValidator()
     val_result = validator.validate_simulation(
@@ -39,7 +45,7 @@ def validate_simulation_run(simulation_id: str, db: Session = Depends(get_db)):
 
     val_run = val_repo.create_validation_run(
         simulation_id=simulation_id,
-        plan_id=getattr(sim, "migration_plan_id", None),
+        plan_id=sim.migration_plan_id,
         asset_id=sim.asset_id,
         check_type="FULL_VALIDATION",
         status=val_result.get("status", "FAILED"),
