@@ -124,8 +124,26 @@ def test_stage1_creates_plan_and_stage2_simulates():
 
     assert sim_data["plan_id"] == plan_id
     assert sim_data["status"] == "SIMULATION_COMPLETED"
+    assert "simulation_id" in sim_data
     assert "sandbox_path" in sim_data
     assert "transformation" in sim_data
+
+    simulation_id = sim_data["simulation_id"]
+
+    # 4. Stage 3: Execute Validation using plan_id
+    val_plan_resp = client.post(f"/api/v1/migration/plans/{plan_id}/validate")
+    assert val_plan_resp.status_code == 200
+    val_plan_data = val_plan_resp.json()
+    assert val_plan_data["plan_id"] == plan_id
+    assert val_plan_data["status"] in ["PASSED", "PASS", "SUCCESS"]
+    assert val_plan_data["build_passed"] is True
+
+    # 5. Stage 3: Execute Validation using simulation_id
+    val_sim_resp = client.post(f"/api/v1/migration/simulations/{simulation_id}/validate")
+    assert val_sim_resp.status_code == 200
+    val_sim_data = val_sim_resp.json()
+    assert val_sim_data["simulation_id"] == simulation_id
+    assert val_sim_data["asset_id"] is not None
 
 
 def test_stage2_simulation_fails_gracefully_with_404_for_invalid_plan():
@@ -136,3 +154,7 @@ def test_stage2_simulation_fails_gracefully_with_404_for_invalid_plan():
 
     assert sim_resp.status_code == 404
     assert sim_resp.json()["detail"] == "Migration plan not found"
+
+    val_resp = client.post(f"/api/v1/migration/plans/{invalid_plan_id}/validate")
+    assert val_resp.status_code == 404
+    assert val_resp.json()["detail"] == "Migration plan not found"

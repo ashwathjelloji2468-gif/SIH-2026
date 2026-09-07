@@ -248,6 +248,7 @@ export interface MigrationPlanCreateInput {
 
 export interface SandboxSimulationResult {
   plan_id: string;
+  simulation_id?: string;
   sandbox_path: string;
   transformation: {
     pattern_applied: string;

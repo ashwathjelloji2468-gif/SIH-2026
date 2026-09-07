@@ -10,6 +10,7 @@ from app.migration.simulator import MigrationSimulator
 from app.migration.sandbox import SandboxEnvironment, SandboxConfig, DEMO_PATTERNS
 from app.models.schemas import MigrationPlanCreate, MigrationPlanResponse, MigrationSimulationResponse
 from app.models.db_models import MigrationPlan, CryptoAsset
+from app.models.enums import SimulationStatus
 
 router = APIRouter(tags=["Migration"])
 
@@ -190,7 +191,21 @@ def simulate_migration_plan(plan_id: str, pattern: str = "RSA_TO_ML_KEM_HYBRID",
     sandbox_dir = sandbox.prepare_sandbox("/tmp/source_demo")
     result = sandbox.apply_transformation_pattern(pattern)
 
+    sim_repo = MigrationSimulationRepository(db)
+    first_task = plan.tasks[0] if plan.tasks else None
+    asset_id = first_task.asset_id if first_task else "asset-demo-01"
+
+    sim = sim_repo.create_simulation(
+        asset_id=asset_id,
+        project_id=plan.project_id,
+        migration_plan_id=plan.id,
+        sandbox_path=sandbox_dir,
+        transformation_type=pattern,
+        status=SimulationStatus.TRANSFORMED
+    )
+
     return {
+        "simulation_id": sim.id,
         "plan_id": plan_id,
         "sandbox_path": sandbox_dir,
         "transformation": result,
