@@ -139,6 +139,15 @@ export interface RiskSummary {
   unassessed_assets?: number;
   high_or_critical_risk_assets: number;
   average_risk_score: number;
+  risk_counts?: {
+    low: number;
+    moderate: number;
+    high: number;
+    critical: number;
+  };
+  quantum_vulnerable_count?: number;
+  quantum_resistant_count?: number;
+  unknown_count?: number;
 }
 
 
