@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { X, ExternalLink, ShieldAlert, Cpu, ArrowRight, CheckCircle2, AlertTriangle, FileCode, GitFork } from 'lucide-react';
-import { CryptoAsset, Evidence, Recommendation, RiskAssessment } from '../../types';
+import { X, ExternalLink, ShieldAlert, Cpu, ArrowRight, CheckCircle2, AlertTriangle, FileCode, GitFork, Network } from 'lucide-react';
+import { CryptoAsset, Evidence, Recommendation, RiskAssessment, AssetImpact } from '../../types';
 import { inventoryService } from '../../services/inventoryService';
 import { recommendationService } from '../../services/recommendationService';
 import { riskService } from '../../services/riskService';
+import { graphService } from '../../services/graphService';
+import { migrationService } from '../../services/migrationService';
 import { StatusBadge } from '../Common/StatusBadge';
 import { ConfidenceBadge } from '../Common/ConfidenceBadge';
 import { EvidenceViewer } from './EvidenceViewer';
@@ -19,6 +21,8 @@ export const AssetDetailDrawer: React.FC<AssetDetailDrawerProps> = ({ asset, onC
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [riskAssessment, setRiskAssessment] = useState<RiskAssessment | null>(null);
   const [riskExplanation, setRiskExplanation] = useState<string | null>(null);
+  const [impact, setImpact] = useState<AssetImpact | null>(null);
+  const [migrationInfo, setMigrationInfo] = useState<Record<string, any> | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const navigate = useNavigate();
 
@@ -29,11 +33,13 @@ export const AssetDetailDrawer: React.FC<AssetDetailDrawerProps> = ({ asset, onC
     const fetchDetails = async () => {
       setLoading(true);
       try {
-        const [evs, recs, risk, expl] = await Promise.allSettled([
+        const [evs, recs, risk, expl, impactRes, migRes] = await Promise.allSettled([
           inventoryService.getAssetEvidence(asset.id),
           recommendationService.getAssetRecommendations(asset.id),
           riskService.getAssetRisk(asset.id),
           riskService.getAssetRiskExplanation(asset.id),
+          graphService.getAssetImpact(asset.id),
+          migrationService.getAssetMigration(asset.id),
         ]);
 
         if (isMounted) {
@@ -41,6 +47,8 @@ export const AssetDetailDrawer: React.FC<AssetDetailDrawerProps> = ({ asset, onC
           if (recs.status === 'fulfilled') setRecommendations(recs.value || []);
           if (risk.status === 'fulfilled') setRiskAssessment(risk.value || null);
           if (expl.status === 'fulfilled') setRiskExplanation(expl.value?.explanation || null);
+          if (impactRes.status === 'fulfilled') setImpact(impactRes.value || null);
+          if (migRes.status === 'fulfilled') setMigrationInfo(migRes.value || null);
         }
       } catch (err) {
         console.error('Failed to load asset details:', err);
@@ -180,6 +188,60 @@ export const AssetDetailDrawer: React.FC<AssetDetailDrawerProps> = ({ asset, onC
                 )}
               </div>
             </div>
+
+            {/* Impact Analysis Section */}
+            {impact && impact.affected_components_count > 0 && (
+              <div className="rounded-2xl border border-purple-500/30 bg-[#1E293B] p-5 space-y-2 shadow-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <Network className="w-4 h-4 text-purple-400" />
+                  <span className="text-[10px] uppercase tracking-wider font-mono text-purple-400 font-bold">
+                    Dependency Impact Analysis
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-xl bg-[#0B0F19] border border-slate-800 p-3">
+                    <div className="text-[10px] text-slate-500 font-mono uppercase">Affected Components</div>
+                    <div className="text-lg font-bold font-mono text-purple-300">{impact.affected_components_count}</div>
+                  </div>
+                  <div className="rounded-xl bg-[#0B0F19] border border-slate-800 p-3">
+                    <div className="text-[10px] text-slate-500 font-mono uppercase">Impacted Assets</div>
+                    <div className="text-lg font-bold font-mono text-cyan-300">{impact.impacted_asset_ids.length}</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Migration Status Section */}
+            {migrationInfo && (
+              <div className="rounded-2xl border border-cyan-500/20 bg-[#1E293B] p-5 space-y-2 shadow-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <GitFork className="w-4 h-4 text-cyan-400" />
+                  <span className="text-[10px] uppercase tracking-wider font-mono text-cyan-400 font-bold">
+                    Migration Status
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div className="rounded-xl bg-[#0B0F19] border border-slate-800 p-3">
+                    <div className="text-[10px] text-slate-500 font-mono uppercase">Priority</div>
+                    <div className="text-sm font-bold font-mono text-cyan-300">
+                      {migrationInfo.priority || 'N/A'}
+                    </div>
+                  </div>
+                  <div className="rounded-xl bg-[#0B0F19] border border-slate-800 p-3">
+                    <div className="text-[10px] text-slate-500 font-mono uppercase">Effort</div>
+                    <div className="text-sm font-bold font-mono text-amber-300">
+                      {migrationInfo.estimated_person_days ? `${migrationInfo.estimated_person_days}d` : 'N/A'}
+                    </div>
+                  </div>
+                  <div className="rounded-xl bg-[#0B0F19] border border-slate-800 p-3">
+                    <div className="text-[10px] text-slate-500 font-mono uppercase">Status</div>
+                    <div className="text-sm font-bold font-mono text-emerald-300">
+                      {migrationInfo.status || 'Not started'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Deterministic Evidence Section */}
             <div className="space-y-3">

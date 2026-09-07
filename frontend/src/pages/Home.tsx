@@ -3,15 +3,23 @@ import { useProject } from '../context/ProjectContext';
 import { inventoryService } from '../services/inventoryService';
 import { riskService } from '../services/riskService';
 import { scanService } from '../services/scanService';
-import { CryptoAsset, RiskSummary, CoverageReport, Scan } from '../types';
+import { migrationService } from '../services/migrationService';
+import { validationService } from '../services/validationService';
+import { recommendationService } from '../services/recommendationService';
+import { CryptoAsset, RiskSummary, CoverageReport, Scan, Recommendation } from '../types';
+import { MigrationSummary, SimulationRecord } from '../services/migrationService';
+import { ValidationSummary } from '../services/validationService';
 import { ExecutiveHero } from '../components/Dashboard/ExecutiveHero';
 import { MetricCards } from '../components/Dashboard/MetricCards';
 import { AlgorithmChart } from '../components/Dashboard/AlgorithmChart';
 import { MoscaUrgencyCard } from '../components/Dashboard/MoscaUrgencyCard';
+import { PipelineStatus } from '../components/Dashboard/PipelineStatus';
+import { MigrationSummaryCard } from '../components/Dashboard/MigrationSummaryCard';
+import { ValidationSummaryCard } from '../components/Dashboard/ValidationSummaryCard';
 import { DisclaimerBanner } from '../components/Common/DisclaimerBanner';
 import { StatusBadge } from '../components/Common/StatusBadge';
 import { Link } from 'react-router-dom';
-import { ArrowRight, ScanSearch, CheckCircle2, Clock } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 export const Home: React.FC = () => {
   const { currentProject, setIsScanModalOpen } = useProject();
@@ -19,6 +27,10 @@ export const Home: React.FC = () => {
   const [riskSummary, setRiskSummary] = useState<RiskSummary | null>(null);
   const [coverage, setCoverage] = useState<CoverageReport | null>(null);
   const [scans, setScans] = useState<Scan[]>([]);
+  const [migrationSummary, setMigrationSummary] = useState<MigrationSummary | null>(null);
+  const [validationSummary, setValidationSummary] = useState<ValidationSummary | null>(null);
+  const [simulations, setSimulations] = useState<SimulationRecord[]>([]);
+  const [recommendations, setRecommendations] = useState<Map<string, Recommendation[]>>(new Map());
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
@@ -27,6 +39,10 @@ export const Home: React.FC = () => {
       setRiskSummary(null);
       setCoverage(null);
       setScans([]);
+      setMigrationSummary(null);
+      setValidationSummary(null);
+      setSimulations([]);
+      setRecommendations(new Map());
       setLoading(false);
       return;
     }
@@ -35,18 +51,42 @@ export const Home: React.FC = () => {
     const loadDashboardData = async () => {
       setLoading(true);
       try {
-        const [invRes, riskRes, covRes, scansRes] = await Promise.allSettled([
+        const [invRes, riskRes, covRes, scansRes, migRes, valRes, simRes] = await Promise.allSettled([
           inventoryService.getProjectInventory(currentProject.id),
           riskService.getRiskSummary(currentProject.id),
           inventoryService.getProjectCoverage(currentProject.id),
           scanService.getProjectScans(currentProject.id),
+          migrationService.getMigrationSummary(),
+          validationService.getValidationSummary(),
+          migrationService.listSimulations(),
         ]);
 
         if (isMounted) {
-          if (invRes.status === 'fulfilled') setAssets(invRes.value || []);
+          const loadedAssets = invRes.status === 'fulfilled' ? (invRes.value || []) : [];
+          setAssets(loadedAssets);
           if (riskRes.status === 'fulfilled') setRiskSummary(riskRes.value || null);
           if (covRes.status === 'fulfilled') setCoverage(covRes.value || null);
           if (scansRes.status === 'fulfilled') setScans(scansRes.value || []);
+          if (migRes.status === 'fulfilled') setMigrationSummary(migRes.value || null);
+          if (valRes.status === 'fulfilled') setValidationSummary(valRes.value || null);
+          if (simRes.status === 'fulfilled') setSimulations(simRes.value || []);
+
+          // Fetch recommendations for vulnerable assets (batch, non-blocking)
+          const vulnerableAssets = loadedAssets.filter((a: CryptoAsset) => a.quantum_safety === 'VULNERABLE');
+          if (vulnerableAssets.length > 0) {
+            const recResults = await Promise.allSettled(
+              vulnerableAssets.slice(0, 10).map((a: CryptoAsset) =>
+                recommendationService.getAssetRecommendations(a.id)
+              )
+            );
+            const recMap = new Map<string, Recommendation[]>();
+            recResults.forEach((res, idx) => {
+              if (res.status === 'fulfilled' && res.value) {
+                recMap.set(vulnerableAssets[idx].id, res.value);
+              }
+            });
+            if (isMounted) setRecommendations(recMap);
+          }
         }
       } catch (err) {
         console.error('Failed to load dashboard data:', err);
@@ -72,6 +112,15 @@ export const Home: React.FC = () => {
         unknownCount={coverage?.unknown_needs_review_count}
       />
 
+      {/* PQC Transition Pipeline Status */}
+      <PipelineStatus
+        assets={assets}
+        riskSummary={riskSummary}
+        migrationSummary={migrationSummary}
+        validationSummary={validationSummary}
+        loading={loading}
+      />
+
       {/* Primary KPI Metric Cards */}
       <MetricCards
         assets={assets}
@@ -87,6 +136,24 @@ export const Home: React.FC = () => {
         </div>
         <div className="lg:col-span-6">
           <AlgorithmChart assets={assets} />
+        </div>
+      </div>
+
+      {/* Migration Priorities & Validation Status Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-7">
+          <MigrationSummaryCard
+            assets={assets}
+            recommendations={recommendations}
+            loading={loading}
+          />
+        </div>
+        <div className="lg:col-span-5">
+          <ValidationSummaryCard
+            validationSummary={validationSummary}
+            simulations={simulations}
+            loading={loading}
+          />
         </div>
       </div>
 
