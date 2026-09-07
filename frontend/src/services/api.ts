@@ -197,4 +197,6 @@ export const api = {
     clearApiCache();
     return request<T>(endpoint, { ...options, method: 'DELETE' });
   },
+
+  getBaseUrl: (): string => BASE_URL,
 };

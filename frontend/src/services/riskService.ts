@@ -43,9 +43,15 @@ export const riskService = {
     try {
       const data = await api.get<RiskSummary>(`/projects/${projectId}/risk/summary`);
       if (data) return data;
-      return DEMO_FALLBACK_RISK_SUMMARY;
-    } catch (_) {
-      return DEMO_FALLBACK_RISK_SUMMARY;
+      if (projectId.startsWith('proj-demo') || projectId.startsWith('demo-')) {
+        return DEMO_FALLBACK_RISK_SUMMARY;
+      }
+      throw new Error('Risk summary unavailable');
+    } catch (err) {
+      if (projectId.startsWith('proj-demo') || projectId.startsWith('demo-')) {
+        return DEMO_FALLBACK_RISK_SUMMARY;
+      }
+      throw err;
     }
   },
 
@@ -60,53 +66,62 @@ export const riskService = {
   ): Promise<RiskAssessment[]> => {
     try {
       return await api.post<RiskAssessment[]>(`/projects/${projectId}/risk/assess`, params || {});
-    } catch (_) {
-      return [
-        {
-          asset_id: 'ast-demo-01',
-          asset_name: 'Authentication JWT RSA Signer',
-          risk_score: 92.5,
-          risk_level: 'CRITICAL',
-          quantum_vulnerability_score: 95.0,
-          data_sensitivity_score: 90.0,
-          business_criticality_score: 92.0,
-          mosca_factor_score: 94.0,
-          exposure_score: 88.0,
-          migration_complexity_score: 45.0,
-          explanation: 'X=10y + Y=3y > Z=2033 (Deadline Breach). Harvest Now Decrypt Later vulnerability on long-lived auth credentials.',
-          confidence_score: 0.98,
-        },
-      ];
+    } catch (err) {
+      if (projectId.startsWith('proj-demo') || projectId.startsWith('demo-')) {
+        return [
+          {
+            asset_id: 'ast-demo-01',
+            asset_name: 'Authentication JWT RSA Signer',
+            risk_score: 92.5,
+            risk_level: 'CRITICAL',
+            quantum_vulnerability_score: 95.0,
+            data_sensitivity_score: 90.0,
+            business_criticality_score: 92.0,
+            mosca_factor_score: 94.0,
+            exposure_score: 88.0,
+            migration_complexity_score: 45.0,
+            explanation: 'X=10y + Y=3y > Z=2033 (Deadline Breach). Harvest Now Decrypt Later vulnerability on long-lived auth credentials.',
+            confidence_score: 0.98,
+          },
+        ];
+      }
+      throw err;
     }
   },
 
   getAssetRisk: async (assetId: string): Promise<RiskAssessment> => {
     try {
       return await api.get<RiskAssessment>(`/assets/${assetId}/risk`);
-    } catch (_) {
-      return {
-        asset_id: assetId,
-        risk_score: 88.0,
-        risk_level: 'HIGH',
-        quantum_vulnerability_score: 90.0,
-        data_sensitivity_score: 85.0,
-        business_criticality_score: 88.0,
-        mosca_factor_score: 90.0,
-        exposure_score: 82.0,
-        migration_complexity_score: 40.0,
-        confidence_score: 0.95,
-      };
+    } catch (err) {
+      if (assetId.startsWith('ast-demo')) {
+        return {
+          asset_id: assetId,
+          risk_score: 88.0,
+          risk_level: 'HIGH',
+          quantum_vulnerability_score: 90.0,
+          data_sensitivity_score: 85.0,
+          business_criticality_score: 88.0,
+          mosca_factor_score: 90.0,
+          exposure_score: 82.0,
+          migration_complexity_score: 40.0,
+          confidence_score: 0.95,
+        };
+      }
+      throw err;
     }
   },
 
   getAssetRiskExplanation: async (assetId: string): Promise<{ asset_id: string; explanation: string }> => {
     try {
       return await api.get<{ asset_id: string; explanation: string }>(`/assets/${assetId}/risk/explanation`);
-    } catch (_) {
-      return {
-        asset_id: assetId,
-        explanation: 'Michele Mosca theorem calculation: Data protection lifetime (10 years) + Estimated migration time (3 years) exceeds CRQC threat horizon (2033). Immediate transition to NIST FIPS 203 ML-KEM recommended.',
-      };
+    } catch (err) {
+      if (assetId.startsWith('ast-demo')) {
+        return {
+          asset_id: assetId,
+          explanation: 'Michele Mosca theorem calculation: Data protection lifetime (10 years) + Estimated migration time (3 years) exceeds CRQC threat horizon (2033). Immediate transition to NIST FIPS 203 ML-KEM recommended.',
+        };
+      }
+      throw err;
     }
   },
 
@@ -127,11 +142,14 @@ export const riskService = {
   getScenarioImpact: async (scenarioId: string): Promise<{ scenario_id: string; impact_summary: string }> => {
     try {
       return await api.get<{ scenario_id: string; impact_summary: string }>(`/scenarios/${scenarioId}/impact`);
-    } catch (_) {
-      return {
-        scenario_id: scenarioId,
-        impact_summary: 'Selected scenario triggers 48 critical cryptographic asset deadline breaches with high exposure vulnerability.',
-      };
+    } catch (err) {
+      if (scenarioId.startsWith('scen-')) {
+        return {
+          scenario_id: scenarioId,
+          impact_summary: 'Selected scenario triggers 48 critical cryptographic asset deadline breaches with high exposure vulnerability.',
+        };
+      }
+      throw err;
     }
   },
 };

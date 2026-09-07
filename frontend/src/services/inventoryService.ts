@@ -84,10 +84,16 @@ export const inventoryService = {
   getProjectInventory: async (projectId: string): Promise<CryptoAsset[]> => {
     try {
       const data = await api.get<CryptoAsset[]>(`/projects/${projectId}/inventory`);
-      if (data && data.length > 0) return data;
-      return DEMO_FALLBACK_ASSETS;
-    } catch (_) {
-      return DEMO_FALLBACK_ASSETS;
+      if (Array.isArray(data)) return data;
+      if (projectId.startsWith('proj-demo') || projectId.startsWith('demo-')) {
+        return DEMO_FALLBACK_ASSETS;
+      }
+      return [];
+    } catch (err) {
+      if (projectId.startsWith('proj-demo') || projectId.startsWith('demo-')) {
+        return DEMO_FALLBACK_ASSETS;
+      }
+      throw err;
     }
   },
 
@@ -95,48 +101,66 @@ export const inventoryService = {
     try {
       const data = await api.get<CoverageReport>(`/projects/${projectId}/coverage`);
       if (data) return data;
-      return DEMO_FALLBACK_COVERAGE;
-    } catch (_) {
-      return DEMO_FALLBACK_COVERAGE;
+      if (projectId.startsWith('proj-demo') || projectId.startsWith('demo-')) {
+        return DEMO_FALLBACK_COVERAGE;
+      }
+      throw new Error('Coverage data unavailable');
+    } catch (err) {
+      if (projectId.startsWith('proj-demo') || projectId.startsWith('demo-')) {
+        return DEMO_FALLBACK_COVERAGE;
+      }
+      throw err;
     }
   },
 
   getProjectUnknowns: async (projectId: string): Promise<CryptoAsset[]> => {
     try {
       const data = await api.get<CryptoAsset[]>(`/projects/${projectId}/unknowns`);
-      if (data) return data;
-      return DEMO_FALLBACK_ASSETS.filter((a) => a.is_unknown);
-    } catch (_) {
-      return DEMO_FALLBACK_ASSETS.filter((a) => a.is_unknown);
+      if (Array.isArray(data)) return data;
+      if (projectId.startsWith('proj-demo') || projectId.startsWith('demo-')) {
+        return DEMO_FALLBACK_ASSETS.filter((a) => a.is_unknown);
+      }
+      return [];
+    } catch (err) {
+      if (projectId.startsWith('proj-demo') || projectId.startsWith('demo-')) {
+        return DEMO_FALLBACK_ASSETS.filter((a) => a.is_unknown);
+      }
+      throw err;
     }
   },
 
   getAsset: async (assetId: string): Promise<CryptoAsset> => {
     try {
       return await api.get<CryptoAsset>(`/assets/${assetId}`);
-    } catch (_) {
-      return DEMO_FALLBACK_ASSETS.find((a) => a.id === assetId) || DEMO_FALLBACK_ASSETS[0];
+    } catch (err) {
+      if (assetId.startsWith('ast-demo')) {
+        return DEMO_FALLBACK_ASSETS.find((a) => a.id === assetId) || DEMO_FALLBACK_ASSETS[0];
+      }
+      throw err;
     }
   },
 
   getAssetEvidence: async (assetId: string): Promise<Evidence[]> => {
     try {
       return await api.get<Evidence[]>(`/assets/${assetId}/evidence`);
-    } catch (_) {
-      return [
-        {
-          id: `ev-${assetId}`,
-          asset_id: assetId,
-          evidence_type: 'OBSERVED',
-          source_file: 'src/crypto/jwt_signer.py',
-          line_number: 42,
-          detector_name: 'AST_RSA_Detector',
-          detector_version: '2.4.0',
-          excerpt: 'key = rsa.generate_private_key(public_exponent=65537, key_size=2048)',
-          confidence_score: 0.99,
-          created_at: new Date().toISOString(),
-        },
-      ];
+    } catch (err) {
+      if (assetId.startsWith('ast-demo')) {
+        return [
+          {
+            id: `ev-${assetId}`,
+            asset_id: assetId,
+            evidence_type: 'OBSERVED',
+            source_file: 'src/crypto/jwt_signer.py',
+            line_number: 42,
+            detector_name: 'AST_RSA_Detector',
+            detector_version: '2.4.0',
+            excerpt: 'key = rsa.generate_private_key(public_exponent=65537, key_size=2048)',
+            confidence_score: 0.99,
+            created_at: new Date().toISOString(),
+          },
+        ];
+      }
+      throw err;
     }
   },
 

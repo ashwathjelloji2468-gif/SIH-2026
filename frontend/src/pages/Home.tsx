@@ -19,7 +19,8 @@ import { ValidationSummaryCard } from '../components/Dashboard/ValidationSummary
 import { DisclaimerBanner } from '../components/Common/DisclaimerBanner';
 import { StatusBadge } from '../components/Common/StatusBadge';
 import { Link } from 'react-router-dom';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, AlertTriangle } from 'lucide-react';
+import { api } from '../services/api';
 
 export const Home: React.FC = () => {
   const { currentProject, setIsScanModalOpen } = useProject();
@@ -32,6 +33,59 @@ export const Home: React.FC = () => {
   const [simulations, setSimulations] = useState<SimulationRecord[]>([]);
   const [recommendations, setRecommendations] = useState<Map<string, Recommendation[]>>(new Map());
   const [loading, setLoading] = useState<boolean>(true);
+  const [apiError, setApiError] = useState<boolean>(false);
+
+  const loadDashboardData = async () => {
+    if (!currentProject) return;
+    setLoading(true);
+    setApiError(false);
+    try {
+      const [invRes, riskRes, covRes, scansRes, migRes, valRes, simRes] = await Promise.allSettled([
+        inventoryService.getProjectInventory(currentProject.id),
+        riskService.getRiskSummary(currentProject.id),
+        inventoryService.getProjectCoverage(currentProject.id),
+        scanService.getProjectScans(currentProject.id),
+        migrationService.getMigrationSummary(),
+        validationService.getValidationSummary(),
+        migrationService.listSimulations(),
+      ]);
+
+      const loadedAssets = invRes.status === 'fulfilled' ? (invRes.value || []) : [];
+      setAssets(loadedAssets);
+      if (riskRes.status === 'fulfilled') setRiskSummary(riskRes.value || null);
+      if (covRes.status === 'fulfilled') setCoverage(covRes.value || null);
+      if (scansRes.status === 'fulfilled') setScans(scansRes.value || []);
+      if (migRes.status === 'fulfilled') setMigrationSummary(migRes.value || null);
+      if (valRes.status === 'fulfilled') setValidationSummary(valRes.value || null);
+      if (simRes.status === 'fulfilled') setSimulations(simRes.value || []);
+
+      if (invRes.status === 'rejected' || riskRes.status === 'rejected') {
+        setApiError(true);
+      }
+
+      // Fetch recommendations for vulnerable assets (batch, non-blocking)
+      const vulnerableAssets = loadedAssets.filter((a: CryptoAsset) => a.quantum_safety === 'VULNERABLE');
+      if (vulnerableAssets.length > 0) {
+        const recResults = await Promise.allSettled(
+          vulnerableAssets.slice(0, 10).map((a: CryptoAsset) =>
+            recommendationService.getAssetRecommendations(a.id)
+          )
+        );
+        const recMap = new Map<string, Recommendation[]>();
+        recResults.forEach((res, idx) => {
+          if (res.status === 'fulfilled' && res.value) {
+            recMap.set(vulnerableAssets[idx].id, res.value);
+          }
+        });
+        setRecommendations(recMap);
+      }
+    } catch (err) {
+      console.error('Failed to load dashboard data:', err);
+      setApiError(true);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!currentProject) {
@@ -44,67 +98,37 @@ export const Home: React.FC = () => {
       setSimulations([]);
       setRecommendations(new Map());
       setLoading(false);
+      setApiError(false);
       return;
     }
 
-    let isMounted = true;
-    const loadDashboardData = async () => {
-      setLoading(true);
-      try {
-        const [invRes, riskRes, covRes, scansRes, migRes, valRes, simRes] = await Promise.allSettled([
-          inventoryService.getProjectInventory(currentProject.id),
-          riskService.getRiskSummary(currentProject.id),
-          inventoryService.getProjectCoverage(currentProject.id),
-          scanService.getProjectScans(currentProject.id),
-          migrationService.getMigrationSummary(),
-          validationService.getValidationSummary(),
-          migrationService.listSimulations(),
-        ]);
-
-        if (isMounted) {
-          const loadedAssets = invRes.status === 'fulfilled' ? (invRes.value || []) : [];
-          setAssets(loadedAssets);
-          if (riskRes.status === 'fulfilled') setRiskSummary(riskRes.value || null);
-          if (covRes.status === 'fulfilled') setCoverage(covRes.value || null);
-          if (scansRes.status === 'fulfilled') setScans(scansRes.value || []);
-          if (migRes.status === 'fulfilled') setMigrationSummary(migRes.value || null);
-          if (valRes.status === 'fulfilled') setValidationSummary(valRes.value || null);
-          if (simRes.status === 'fulfilled') setSimulations(simRes.value || []);
-
-          // Fetch recommendations for vulnerable assets (batch, non-blocking)
-          const vulnerableAssets = loadedAssets.filter((a: CryptoAsset) => a.quantum_safety === 'VULNERABLE');
-          if (vulnerableAssets.length > 0) {
-            const recResults = await Promise.allSettled(
-              vulnerableAssets.slice(0, 10).map((a: CryptoAsset) =>
-                recommendationService.getAssetRecommendations(a.id)
-              )
-            );
-            const recMap = new Map<string, Recommendation[]>();
-            recResults.forEach((res, idx) => {
-              if (res.status === 'fulfilled' && res.value) {
-                recMap.set(vulnerableAssets[idx].id, res.value);
-              }
-            });
-            if (isMounted) setRecommendations(recMap);
-          }
-        }
-      } catch (err) {
-        console.error('Failed to load dashboard data:', err);
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-
     loadDashboardData();
-    return () => {
-      isMounted = false;
-    };
   }, [currentProject]);
 
   return (
     <div className="space-y-8 pb-12">
       {/* Executive Hero */}
       <ExecutiveHero />
+
+      {/* Backend API Connection Alert */}
+      {apiError && (
+        <div className="rounded-xl border border-amber-800/80 bg-amber-950/40 p-4 text-xs font-mono text-amber-300 flex items-center justify-between shadow-xl">
+          <div className="flex items-center gap-2.5">
+            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>
+              <strong>Backend Service Alert:</strong> Unable to connect to SENTRIQ backend service at{' '}
+              <code className="text-amber-200 bg-amber-900/50 px-1 py-0.5 rounded">{api.getBaseUrl()}</code>.
+              Metrics reflect current live state.
+            </span>
+          </div>
+          <button
+            onClick={() => loadDashboardData()}
+            className="px-3 py-1 rounded bg-amber-900/60 hover:bg-amber-800 border border-amber-700 text-amber-200 text-xs font-sans font-semibold transition-colors cursor-pointer"
+          >
+            Retry Connection
+          </button>
+        </div>
+      )}
 
       {/* Scope and Discovery Disclaimer */}
       <DisclaimerBanner

@@ -33,7 +33,7 @@ export const MetricCards: React.FC<MetricCardsProps> = ({
   const vulnerableAssets = assets.filter((a) => a.quantum_safety === 'VULNERABLE').length;
   const vulnerablePercent = totalAssets > 0 ? Math.round((vulnerableAssets / totalAssets) * 100) : 0;
   const highRiskCount = riskSummary?.high_or_critical_risk_assets ?? 0;
-  const coveragePercent = coverage?.overall_coverage_percentage ?? 94.5;
+  const coveragePercent = coverage?.overall_coverage_percentage ?? 0;
 
   const cards = [
     {
