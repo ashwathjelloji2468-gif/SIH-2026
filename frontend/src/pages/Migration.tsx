@@ -5,6 +5,7 @@ import { MigrationPlan } from '../types';
 import { PlanBuilder } from '../components/Migration/PlanBuilder';
 import { TaskTimeline } from '../components/Migration/TaskTimeline';
 import { MigrationWizard } from '../components/Migration/MigrationWizard';
+import { ScrollNavControl } from '../components/Migration/ScrollNavControl';
 import { Lock3D } from '../components/Three/Lock3D';
 import { GitFork, Layers, RefreshCw, CheckCircle2, ShieldCheck } from 'lucide-react';
 
@@ -114,6 +115,9 @@ export const Migration: React.FC = () => {
           )}
         </div>
       )}
+
+      {/* Floating Vertical Scroll Navigation Control */}
+      <ScrollNavControl />
     </div>
   );
 };
