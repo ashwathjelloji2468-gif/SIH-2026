@@ -127,7 +127,7 @@ def test_stage1_creates_plan_and_stage2_simulates():
     assert len(fetched_plan["tasks"]) == len(plan_data["tasks"])
 
     # 3. Stage 2: Execute Sandbox Simulation using real plan_id
-    sim_resp = client.post(f"/api/v1/migration/plans/{plan_id}/simulate?pattern=RSA_TO_ML_KEM_HYBRID")
+    sim_resp = client.post(f"/api/v1/migration/plans/{plan_id}/simulate?pattern=RSA_TO_ML_DSA")
     assert sim_resp.status_code == 200
     sim_data = sim_resp.json()
 
@@ -168,7 +168,7 @@ def test_stage2_simulation_fails_gracefully_with_404_for_invalid_plan():
     client = TestClient(app)
 
     invalid_plan_id = "non-existent-plan-uuid-9999"
-    sim_resp = client.post(f"/api/v1/migration/plans/{invalid_plan_id}/simulate?pattern=RSA_TO_ML_KEM_HYBRID")
+    sim_resp = client.post(f"/api/v1/migration/plans/{invalid_plan_id}/simulate?pattern=RSA_TO_ML_DSA")
 
     assert sim_resp.status_code == 404
     assert sim_resp.json()["detail"] == "Migration plan not found"
@@ -197,12 +197,12 @@ def test_rerun_simulation_generates_new_simulation_id_and_validates():
     plan_id = create_resp.json()["id"]
 
     # 2. First Simulation Run
-    sim1_resp = client.post(f"/api/v1/migration/plans/{plan_id}/simulate?pattern=RSA_TO_ML_KEM_HYBRID")
+    sim1_resp = client.post(f"/api/v1/migration/plans/{plan_id}/simulate?pattern=RSA_TO_ML_DSA")
     assert sim1_resp.status_code == 200
     sim1_id = sim1_resp.json()["simulation_id"]
 
     # 3. Second (Re-run) Simulation Run
-    sim2_resp = client.post(f"/api/v1/migration/plans/{plan_id}/simulate?pattern=RSA_TO_ML_KEM_HYBRID")
+    sim2_resp = client.post(f"/api/v1/migration/plans/{plan_id}/simulate?pattern=RSA_TO_ML_DSA")
     assert sim2_resp.status_code == 200
     sim2_id = sim2_resp.json()["simulation_id"]
     assert sim2_id != sim1_id

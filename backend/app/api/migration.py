@@ -174,14 +174,35 @@ def recalculate_migration_plan(plan_id: str, db: Session = Depends(get_db)):
     return plan
 
 @router.post("/migration/plans/{plan_id}/simulate")
-def simulate_migration_plan(plan_id: str, pattern: str = "RSA_TO_ML_KEM_HYBRID", db: Session = Depends(get_db)):
+def simulate_migration_plan(plan_id: str, pattern: Optional[str] = None, db: Session = Depends(get_db)):
     repo = MigrationRepository(db)
     plan = repo.get_plan(plan_id)
     if not plan:
         raise HTTPException(status_code=404, detail="Migration plan not found")
     
-    if pattern not in DEMO_PATTERNS:
-        pattern = "RSA_TO_ML_KEM_HYBRID"
+    # Resolve asset to determine dynamic default pattern
+    target_asset = None
+    if plan.tasks and plan.tasks[0].asset_id:
+        target_asset = AssetRepository(db).get(plan.tasks[0].asset_id)
+    if not target_asset:
+        assets = AssetRepository(db).get_by_project(plan.project_id)
+        if assets:
+            target_asset = assets[0]
+
+    if not pattern or pattern not in DEMO_PATTERNS:
+        if target_asset:
+            alg_upper = (target_asset.algorithm_name or "").upper()
+            purpose = target_asset.purpose
+            if purpose in [CryptoPurpose.DIGITAL_SIGNATURE, CryptoPurpose.SIGNATURE, CryptoPurpose.AUTHENTICATION] or any(k in alg_upper for k in ["ECDSA", "ED25519", "ED448", "DSA"]) or ("RSA" in alg_upper and purpose != CryptoPurpose.KEY_ESTABLISHMENT):
+                pattern = "RSA_TO_ML_DSA" if "RSA" in alg_upper else "ECDSA_TO_ML_DSA"
+            elif purpose == CryptoPurpose.KEY_ESTABLISHMENT or any(k in alg_upper for k in ["ECDH", "X25519", "X448", "DH", "DIFFIE"]):
+                pattern = "ECDH_TO_ML_KEM_HYBRID"
+            elif purpose == CryptoPurpose.ENCRYPTION or "AES" in alg_upper:
+                pattern = "AES_256_GCM_RETENTION"
+            else:
+                pattern = "RSA_TO_ML_DSA"
+        else:
+            pattern = "RSA_TO_ML_DSA"
 
     config = SandboxConfig(
         cpu_limit_percent=50,

@@ -3,9 +3,57 @@ from typing import Dict, Any, List, Optional
 from app.models.enums import CryptoPurpose, RecommendationCategory, QuantumSafety
 
 TRANSFORMATION_PATTERNS = {
+    "RSA_TO_ML_DSA": {
+        "name": "RSA Signature to NIST FIPS 204 ML-DSA Digital Signature",
+        "target": "ML-DSA-65 (NIST FIPS 204)",
+        "strategy": "Lattice Signature Adapter",
+        "search_terms": ["rsa.generate_private_key", "PKCS1v15", "jwt.encode", "RS256", "RSA_PKCS1_SIGN"],
+        "template": (
+            "# NIST PQC Migration: ML-DSA-65 (FIPS 204) Lattice Signature Replacement for JWT/RSA\n"
+            "try:\n"
+            "    from pqcrypto.sign import ml_dsa_65\n"
+            "    public_key, secret_key = ml_dsa_65.generate_keypair()\n"
+            "except ImportError:\n"
+            "    # Fallback PQC Adapter Representation\n"
+            "    def generate_pqc_jwt_signer_keypair():\n"
+            "        return ('ML_DSA_65_PUBLIC_KEY', 'ML_DSA_65_SECRET_KEY')\n"
+        )
+    },
+    "ECDSA_TO_ML_DSA": {
+        "name": "ECDSA to NIST FIPS 204 ML-DSA Digital Signature",
+        "target": "ML-DSA-65 (NIST FIPS 204)",
+        "strategy": "Lattice Signature Adapter",
+        "search_terms": ["ec.generate_private_key", "ECDSA", "DSAPrivateKey"],
+        "template": (
+            "# NIST PQC Migration: ML-DSA-65 (FIPS 204) Lattice Signature Replacement for ECDSA\n"
+            "try:\n"
+            "    from pqcrypto.sign import ml_dsa_65\n"
+            "    public_key, secret_key = ml_dsa_65.generate_keypair()\n"
+            "except ImportError:\n"
+            "    # Fallback PQC Adapter Representation\n"
+            "    def generate_pqc_signature_keypair():\n"
+            "        return ('ML_DSA_65_PUBLIC_KEY', 'ML_DSA_65_SECRET_KEY')\n"
+        )
+    },
+    "RSA_ECDSA_TO_ML_DSA": {
+        "name": "RSA/ECDSA to NIST FIPS 204 ML-DSA Digital Signature",
+        "target": "ML-DSA-65 (NIST FIPS 204)",
+        "strategy": "Lattice Signature Adapter",
+        "search_terms": ["rsa.generate_private_key", "ec.generate_private_key", "ECDSA", "DSAPrivateKey"],
+        "template": (
+            "# NIST PQC Migration: ML-DSA (FIPS 204) Lattice Signature Replacement\n"
+            "try:\n"
+            "    from pqcrypto.sign import ml_dsa_65\n"
+            "    public_key, secret_key = ml_dsa_65.generate_keypair()\n"
+            "except ImportError:\n"
+            "    # Fallback PQC Adapter Representation\n"
+            "    def generate_pqc_signature_keypair():\n"
+            "        return ('ML_DSA_65_PUBLIC_KEY', 'ML_DSA_65_SECRET_KEY')\n"
+        )
+    },
     "ECDH_TO_ML_KEM": {
         "name": "ECDH to NIST FIPS 203 ML-KEM Key Establishment",
-        "target": "ML-KEM (FIPS 203)",
+        "target": "ML-KEM-768 Hybrid (NIST FIPS 203)",
         "strategy": "KEM Encapsulation Adapter",
         "search_terms": ["ECDH", "generate_private_key", "X25519", "X448", "DiffieHellman"],
         "template": (
@@ -19,20 +67,20 @@ TRANSFORMATION_PATTERNS = {
             "        return ('ML_KEM_768_PUBLIC_KEY', 'ML_KEM_768_SECRET_KEY')\n"
         )
     },
-    "RSA_ECDSA_TO_ML_DSA": {
-        "name": "RSA/ECDSA to NIST FIPS 204 ML-DSA Digital Signature",
-        "target": "ML-DSA (FIPS 204)",
-        "strategy": "Lattice Signature Adapter",
-        "search_terms": ["rsa.generate_private_key", "ec.generate_private_key", "ECDSA", "DSAPrivateKey"],
+    "ECDH_TO_ML_KEM_HYBRID": {
+        "name": "ECDH to NIST FIPS 203 ML-KEM Key Establishment",
+        "target": "ML-KEM-768 Hybrid (NIST FIPS 203)",
+        "strategy": "KEM Encapsulation Adapter",
+        "search_terms": ["ECDH", "generate_private_key", "X25519", "X448", "DiffieHellman"],
         "template": (
-            "# NIST PQC Migration: ML-DSA (FIPS 204) Lattice Signature Replacement\n"
+            "# NIST PQC Migration: ML-KEM (FIPS 203) Key Encapsulation Replacement\n"
             "try:\n"
-            "    from pqcrypto.sign import ml_dsa_65\n"
-            "    public_key, secret_key = ml_dsa_65.generate_keypair()\n"
+            "    from pqcrypto.kem import ml_kem_768\n"
+            "    public_key, secret_key = ml_kem_768.generate_keypair()\n"
             "except ImportError:\n"
             "    # Fallback PQC Adapter Representation\n"
-            "    def generate_pqc_signature_keypair():\n"
-            "        return ('ML_DSA_65_PUBLIC_KEY', 'ML_DSA_65_SECRET_KEY')\n"
+            "    def generate_pqc_kem_keypair():\n"
+            "        return ('ML_KEM_768_PUBLIC_KEY', 'ML_KEM_768_SECRET_KEY')\n"
         )
     }
 }
@@ -105,10 +153,16 @@ class MigrationTransformer:
 
         # Check CASE 1 & 2: Key Establishment (ECDH) or Digital Signatures (RSA/ECDSA)
         pattern_key = None
-        if purpose == CryptoPurpose.KEY_ESTABLISHMENT or any(k in alg_upper for k in ["ECDH", "DH", "X25519", "X448"]):
-            pattern_key = "ECDH_TO_ML_KEM"
-        elif purpose in [CryptoPurpose.DIGITAL_SIGNATURE, CryptoPurpose.SIGNATURE, CryptoPurpose.AUTHENTICATION] or any(k in alg_upper for k in ["RSA", "ECDSA", "DSA", "ED25519"]):
-            pattern_key = "RSA_ECDSA_TO_ML_DSA"
+        if isinstance(recommendation, dict) and recommendation.get("transformation_pattern"):
+            pattern_key = recommendation.get("transformation_pattern")
+        elif hasattr(recommendation, "transformation_pattern") and getattr(recommendation, "transformation_pattern"):
+            pattern_key = getattr(recommendation, "transformation_pattern")
+
+        if not pattern_key or pattern_key not in TRANSFORMATION_PATTERNS:
+            if purpose == CryptoPurpose.KEY_ESTABLISHMENT or any(k in alg_upper for k in ["ECDH", "DH", "X25519", "X448"]):
+                pattern_key = "ECDH_TO_ML_KEM_HYBRID"
+            elif purpose in [CryptoPurpose.DIGITAL_SIGNATURE, CryptoPurpose.SIGNATURE, CryptoPurpose.AUTHENTICATION] or any(k in alg_upper for k in ["RSA", "ECDSA", "DSA", "ED25519"]):
+                pattern_key = "RSA_TO_ML_DSA" if "RSA" in alg_upper else "ECDSA_TO_ML_DSA"
 
         if not pattern_key:
             return {

@@ -39,7 +39,7 @@ export const migrationService = {
     return api.post<MigrationPlan>(`/migration/plans/${planId}/recalculate`);
   },
 
-  simulateTransformation: async (planId: string, pattern = 'RSA_TO_ML_KEM_HYBRID'): Promise<SandboxSimulationResult> => {
+  simulateTransformation: async (planId: string, pattern = 'RSA_TO_ML_DSA'): Promise<SandboxSimulationResult> => {
     return api.post<SandboxSimulationResult>(`/migration/plans/${planId}/simulate?pattern=${encodeURIComponent(pattern)}`);
   },
 

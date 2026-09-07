@@ -35,6 +35,7 @@ interface TargetAssetCandidate {
   standard: string;
   urgency: 'CRITICAL' | 'HIGH' | 'MEDIUM';
   complexity: string;
+  transformationPattern: string;
 }
 
 const CANDIDATE_ASSETS: TargetAssetCandidate[] = [
@@ -43,37 +44,40 @@ const CANDIDATE_ASSETS: TargetAssetCandidate[] = [
     name: 'Authentication JWT Key Signer',
     file: 'src/crypto/jwt_signer.py',
     currentAlgorithm: 'RSA-2048 (PKCS#1 v1.5)',
-    recommendedTarget: 'ML-KEM-768 Hybrid (NIST FIPS 203)',
-    standard: 'FIPS 203',
+    recommendedTarget: 'ML-DSA-65 (NIST FIPS 204)',
+    standard: 'FIPS 204',
     urgency: 'CRITICAL',
     complexity: 'Moderate (2 Person-Days)',
+    transformationPattern: 'RSA_TO_ML_DSA',
   },
   {
     id: 'asset-2',
     name: 'TLS Session Key Exchange',
     file: 'src/network/tls_handshake.go',
-    currentAlgorithm: 'ECDSA-P256 (SECP256r1)',
-    recommendedTarget: 'ML-DSA-65 Lattice Standard (NIST FIPS 204)',
-    standard: 'FIPS 204',
+    currentAlgorithm: 'ECDH-P256 (SECP256r1)',
+    recommendedTarget: 'ML-KEM-768 Hybrid (NIST FIPS 203)',
+    standard: 'FIPS 203',
     urgency: 'HIGH',
     complexity: 'High (4 Person-Days)',
+    transformationPattern: 'ECDH_TO_ML_KEM_HYBRID',
   },
   {
     id: 'asset-3',
     name: 'Database KMS Key Vault Provider',
     file: 'services/vault/kms_provider.java',
     currentAlgorithm: 'AES-128-CBC',
-    recommendedTarget: 'AES-256-GCM + SPHINCS+ (NIST FIPS 205)',
-    standard: 'FIPS 205',
+    recommendedTarget: 'AES-256-GCM (Symmetric Retained)',
+    standard: 'AES-256',
     urgency: 'MEDIUM',
     complexity: 'Low (1 Person-Day)',
+    transformationPattern: 'AES_256_GCM_RETENTION',
   },
 ];
 
 export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [selectedAsset, setSelectedAsset] = useState<TargetAssetCandidate>(CANDIDATE_ASSETS[0]);
-  const [pattern, setPattern] = useState<string>('RSA_TO_ML_KEM_HYBRID');
+  const [pattern, setPattern] = useState<string>('RSA_TO_ML_DSA');
 
   // Simulation state
   const [simulationResult, setSimulationResult] = useState<SandboxSimulationResult | null>(null);
@@ -331,8 +335,10 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
                   onChange={(e) => setPattern(e.target.value)}
                   className="px-3.5 py-2 rounded-xl bg-[#0B0F19] border border-[#1E293B] text-xs font-mono text-[#22D3EE] focus:outline-none focus:border-[#22D3EE] cursor-pointer"
                 >
-                  <option value="RSA_TO_ML_KEM_HYBRID">RSA-2048 → ML-KEM-768 Hybrid (NIST FIPS 203)</option>
-                  <option value="ECDSA_TO_ML_DSA">ECDSA → ML-DSA-65 Lattice Standard (NIST FIPS 204)</option>
+                  <option value="RSA_TO_ML_DSA">RSA Signature → ML-DSA-65 (NIST FIPS 204)</option>
+                  <option value="ECDH_TO_ML_KEM_HYBRID">ECDH → ML-KEM-768 Hybrid (NIST FIPS 203)</option>
+                  <option value="ECDSA_TO_ML_DSA">ECDSA → ML-DSA-65 (NIST FIPS 204)</option>
+                  <option value="AES_256_GCM_RETENTION">AES-128 → AES-256-GCM Retention</option>
                 </select>
               </div>
             </div>
@@ -344,7 +350,10 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
                 return (
                   <div
                     key={asset.id}
-                    onClick={() => setSelectedAsset(asset)}
+                    onClick={() => {
+                      setSelectedAsset(asset);
+                      setPattern(asset.transformationPattern);
+                    }}
                     className={`p-5 rounded-2xl border transition-all duration-300 cursor-pointer relative ${
                       isSelected
                         ? 'bg-[#1E293B] border-[#22D3EE] shadow-[0_0_25px_rgba(34,211,238,0.2)] -translate-y-1'

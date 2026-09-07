@@ -34,9 +34,9 @@ def test_sandbox_isolation_and_demo_patterns():
     sandbox = SandboxEnvironment(plan_id="test-plan-1", config=config)
     sandbox_dir = sandbox.prepare_sandbox("/tmp/non_existent_path")
 
-    # Test RSA_TO_ML_KEM_HYBRID pattern
-    res1 = sandbox.apply_transformation_pattern("RSA_TO_ML_KEM_HYBRID")
-    assert res1["pattern_applied"] == "RSA_TO_ML_KEM_HYBRID"
+    # Test RSA_TO_ML_DSA pattern
+    res1 = sandbox.apply_transformation_pattern("RSA_TO_ML_DSA")
+    assert res1["pattern_applied"] == "RSA_TO_ML_DSA"
     assert res1["isolation"]["network_access"] == "BLOCKED"
     assert res1["isolation"]["human_approval_required_for_production"] is True
 

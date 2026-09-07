@@ -93,10 +93,24 @@ class RecommendationEngine:
 
         full_rationale = " ".join(rationale_lines)
 
+        # Derive transformation pattern
+        if category == RecommendationCategory.PQC_REPLACEMENT:
+            if "ML-DSA" in primary_cand or purpose in [CryptoPurpose.DIGITAL_SIGNATURE, CryptoPurpose.SIGNATURE, CryptoPurpose.AUTHENTICATION]:
+                transformation_pattern = "RSA_TO_ML_DSA" if "RSA" in alg_upper else "ECDSA_TO_ML_DSA"
+            elif "ML-KEM" in primary_cand or purpose == CryptoPurpose.KEY_ESTABLISHMENT:
+                transformation_pattern = "ECDH_TO_ML_KEM_HYBRID"
+            else:
+                transformation_pattern = "RSA_TO_ML_DSA"
+        elif category in [RecommendationCategory.RETAIN_SYMMETRIC_CRYPTO, RecommendationCategory.RETAIN_HASH, RecommendationCategory.RETAIN_MAC, RecommendationCategory.RETAIN_PASSWORD_DERIVATION]:
+            transformation_pattern = "AES_256_GCM_RETENTION" if purpose == CryptoPurpose.ENCRYPTION else "RETAIN_EXISTING"
+        else:
+            transformation_pattern = "MANUAL_REVIEW"
+
         return {
             "target_pqc_candidate": primary_cand,
             "recommended_algorithm": primary_cand,
             "alternative_algorithm": alt_cand,
+            "transformation_pattern": transformation_pattern,
             "category": category,
             "priority": priority,
             "standard_status": std_status,
@@ -135,66 +149,7 @@ class RecommendationEngine:
                 f"Message Authentication Code '{alg_upper}' uses symmetric hashing and does not require a PQC replacement."
             )
 
-        # 2. KEY ESTABLISHMENT
-        if purpose == CryptoPurpose.KEY_ESTABLISHMENT or any(k in alg_upper for k in ["ECDH", "X25519", "X448", "DH", "DIFFIE"]):
-            if quantum_safety in [QuantumSafety.QUANTUM_VULNERABLE, QuantumSafety.UNKNOWN] or any(k in alg_upper for k in ["RSA", "ECDH", "DH", "EC"]):
-                tradeoffs = {
-                    "algorithm": "ML-KEM (FIPS 203)",
-                    "purpose": "KEY_ESTABLISHMENT",
-                    "artifact_sizes": "Public key: 800-1568 bytes; Ciphertext: 768-1568 bytes.",
-                    "compatibility_notes": "Requires protocol adjustment for KEM encapsulation interface instead of direct RSA key transport.",
-                    "performance_notes": "Fast encapsulation and decapsulation efficiency. Benchmark network payload impact.",
-                    "alternative_approach": "Hybrid mode combining classical ECDH + ML-KEM preserves compatibility during migration."
-                }
-                return (
-                    RecommendationCategory.PQC_REPLACEMENT,
-                    "ML-KEM (FIPS 203)",
-                    "HYBRID (ECDH + ML-KEM)",
-                    StandardStatus.FINAL_STANDARD,
-                    tradeoffs,
-                    f"ML-KEM (FIPS 203) is the primary NIST-standardized PQC replacement for key establishment using '{alg_upper}'."
-                )
-
-        # 3. DIGITAL SIGNATURE
-        if purpose in [CryptoPurpose.DIGITAL_SIGNATURE, CryptoPurpose.SIGNATURE, CryptoPurpose.AUTHENTICATION] or any(k in alg_upper for k in ["ECDSA", "ED25519", "ED448", "DSA"]):
-            if quantum_safety in [QuantumSafety.QUANTUM_VULNERABLE, QuantumSafety.UNKNOWN] or any(k in alg_upper for k in ["RSA", "ECDSA", "DSA", "ED25519"]):
-                tradeoffs = {
-                    "algorithm": "ML-DSA (FIPS 204)",
-                    "purpose": "DIGITAL_SIGNATURE",
-                    "artifact_sizes": "Public key: 1.3KB-2.6KB; Signature: 2.4KB-4.6KB.",
-                    "compatibility_notes": "Requires buffer updates for signature storage (~2.4KB-4.6KB).",
-                    "performance_notes": "High verification performance. Suitable for TLS handshakes and token signing.",
-                    "alternative_approach": "SLH-DSA (FIPS 205) is a conservative hash-based signature alternative for long-term root CA or firmware signing."
-                }
-                return (
-                    RecommendationCategory.PQC_REPLACEMENT,
-                    "ML-DSA (FIPS 204)",
-                    "SLH-DSA (FIPS 205)",
-                    StandardStatus.FINAL_STANDARD,
-                    tradeoffs,
-                    f"ML-DSA (FIPS 204) is the primary NIST lattice-based signature replacement for '{alg_upper}'."
-                )
-
-        # 4. ENCRYPTION (Symmetric: AES, ChaCha20)
-        if purpose == CryptoPurpose.ENCRYPTION or any(k in alg_upper for k in ["AES", "CHACHA", "SALSA", "DES"]):
-            tradeoffs = {
-                "algorithm": "RETAIN_SYMMETRIC_CRYPTO",
-                "purpose": "ENCRYPTION",
-                "security_margin": "AES/ChaCha20 symmetric encryption retains 128+ bits of security against Grover's algorithm.",
-                "compatibility_notes": "No direct PQC algorithm replaces AES. Retain symmetric encryption.",
-                "performance_notes": "Excellent hardware-accelerated CPU performance (AES-NI).",
-                "action": "Focus PQC migration on protecting key establishment/wrapping used to establish symmetric keys."
-            }
-            return (
-                RecommendationCategory.RETAIN_SYMMETRIC_CRYPTO,
-                "RETAIN_EXISTING",
-                "PROTECT_KEY_EXCHANGE_WITH_PQC",
-                StandardStatus.FINAL_STANDARD,
-                tradeoffs,
-                f"Symmetric encryption algorithm '{alg_upper}' is not broken by Shor's algorithm. Retain symmetric encryption and ensure key establishment is quantum-safe."
-            )
-
-        # 5. HASHING
+        # 2. HASHING
         if purpose == CryptoPurpose.HASHING or any(k in alg_upper for k in ["SHA", "BLAKE", "RIPEMD", "MD5"]):
             tradeoffs = {
                 "algorithm": "RETAIN_HASH",
@@ -212,7 +167,7 @@ class RecommendationEngine:
                 f"Cryptographic hash function '{alg_upper}' is inherently quantum-resistant. Retain existing hash algorithm with 256+ bit output."
             )
 
-        # 6. PASSWORD DERIVATION
+        # 3. PASSWORD DERIVATION
         if purpose == CryptoPurpose.PASSWORD_DERIVATION or any(k in alg_upper for k in ["PBKDF2", "ARGON2", "BCRYPT", "SCRYPT"]):
             tradeoffs = {
                 "algorithm": "RETAIN_PASSWORD_DERIVATION",
@@ -230,7 +185,64 @@ class RecommendationEngine:
                 f"Password derivation function '{alg_upper}' is not vulnerable to public-key quantum attacks. Retain existing KDF."
             )
 
-        # 7. UNKNOWN / MANUAL REVIEW
+        # 4. SYMMETRIC ENCRYPTION (AES, ChaCha20, DES)
+        if purpose == CryptoPurpose.ENCRYPTION or any(k in alg_upper for k in ["AES", "CHACHA", "SALSA", "DES"]):
+            tradeoffs = {
+                "algorithm": "RETAIN_SYMMETRIC_CRYPTO",
+                "purpose": "ENCRYPTION",
+                "security_margin": "AES/ChaCha20 symmetric encryption retains 128+ bits of security against Grover's algorithm.",
+                "compatibility_notes": "No direct PQC algorithm replaces AES. Retain symmetric encryption with 256-bit keys (e.g., AES-256-GCM).",
+                "performance_notes": "Excellent hardware-accelerated CPU performance (AES-NI).",
+                "action": "Focus PQC migration on protecting key establishment/wrapping used to establish symmetric keys."
+            }
+            return (
+                RecommendationCategory.RETAIN_SYMMETRIC_CRYPTO,
+                "RETAIN_EXISTING",
+                "AES-256-GCM",
+                StandardStatus.FINAL_STANDARD,
+                tradeoffs,
+                f"Symmetric encryption algorithm '{alg_upper}' is not broken by Shor's algorithm. Retain symmetric encryption (upgrade to AES-256-GCM) and protect key establishment with PQC."
+            )
+
+        # 5. KEY ESTABLISHMENT (ECDH, DH, X25519, X448, RSA Key Exchange)
+        if purpose == CryptoPurpose.KEY_ESTABLISHMENT or any(k in alg_upper for k in ["ECDH", "X25519", "X448", "DH", "DIFFIE"]) or (any(k in alg_upper for k in ["RSA"]) and purpose == CryptoPurpose.KEY_ESTABLISHMENT):
+            tradeoffs = {
+                "algorithm": "ML-KEM (FIPS 203)",
+                "purpose": "KEY_ESTABLISHMENT",
+                "artifact_sizes": "Public key: 800-1568 bytes; Ciphertext: 768-1568 bytes.",
+                "compatibility_notes": "Requires protocol adjustment for KEM encapsulation interface instead of direct key exchange/transport.",
+                "performance_notes": "Fast encapsulation and decapsulation efficiency. Benchmark network payload impact.",
+                "alternative_approach": "Hybrid mode combining classical ECDH + ML-KEM preserves compatibility during migration."
+            }
+            return (
+                RecommendationCategory.PQC_REPLACEMENT,
+                "ML-KEM (FIPS 203)",
+                "HYBRID (ECDH + ML-KEM)",
+                StandardStatus.FINAL_STANDARD,
+                tradeoffs,
+                f"ML-KEM (FIPS 203) is the primary NIST-standardized PQC replacement for key establishment using '{alg_upper}'."
+            )
+
+        # 6. DIGITAL SIGNATURE (RSA, ECDSA, DSA, Ed25519, Ed448)
+        if purpose in [CryptoPurpose.DIGITAL_SIGNATURE, CryptoPurpose.SIGNATURE, CryptoPurpose.AUTHENTICATION] or any(k in alg_upper for k in ["ECDSA", "ED25519", "ED448", "DSA", "RSA"]):
+            tradeoffs = {
+                "algorithm": "ML-DSA (FIPS 204)",
+                "purpose": "DIGITAL_SIGNATURE",
+                "artifact_sizes": "Public key: 1.3KB-2.6KB; Signature: 2.4KB-4.6KB.",
+                "compatibility_notes": "Requires buffer updates for signature storage (~2.4KB-4.6KB).",
+                "performance_notes": "High verification performance. Suitable for TLS handshakes and token signing.",
+                "alternative_approach": "SLH-DSA (FIPS 205) is a conservative hash-based signature alternative for long-term root CA or firmware signing."
+            }
+            return (
+                RecommendationCategory.PQC_REPLACEMENT,
+                "ML-DSA (FIPS 204)",
+                "SLH-DSA (FIPS 205)",
+                StandardStatus.FINAL_STANDARD,
+                tradeoffs,
+                f"ML-DSA (FIPS 204) is the primary NIST lattice-based signature replacement for '{alg_upper}'."
+            )
+
+        # 7. UNKNOWN / CUSTOM / HSM / VENDOR
         tradeoffs = {
             "algorithm": "MANUAL_REVIEW",
             "purpose": "UNKNOWN",
@@ -245,6 +257,7 @@ class RecommendationEngine:
             tradeoffs,
             f"The cryptographic asset '{alg_upper}' could not be deterministically mapped to a standardized PQC candidate. Manual review required."
         )
+
 
     def _calculate_confidence(
         self,

@@ -16,15 +16,41 @@ SUPPORTED_LANGUAGES = {
 }
 
 DEMO_PATTERNS = {
-    "RSA_TO_ML_KEM_HYBRID": {
-        "name": "RSA-2048 to ML-KEM-768 Hybrid",
-        "description": "Replaces RSA-2048 key exchange with ML-KEM-768 hybrid mode",
-        "strategy": "HYBRID_KEY_EXCHANGE"
+    "RSA_TO_ML_DSA": {
+        "name": "RSA Signature to ML-DSA-65 (NIST FIPS 204)",
+        "description": "Replaces RSA-2048 JWT/digital signature with ML-DSA-65 lattice signature (NIST FIPS 204)",
+        "strategy": "QUANTUM_SAFE_SIGNATURE",
+        "target": "ML-DSA-65 (NIST FIPS 204)"
     },
     "ECDSA_TO_ML_DSA": {
-        "name": "ECDSA-P256 to ML-DSA-65",
-        "description": "Replaces ECDSA-P256 signature with ML-DSA-65 lattice signature",
-        "strategy": "QUANTUM_SAFE_SIGNATURE"
+        "name": "ECDSA-P256 to ML-DSA-65 (NIST FIPS 204)",
+        "description": "Replaces ECDSA-P256 signature with ML-DSA-65 lattice signature (NIST FIPS 204)",
+        "strategy": "QUANTUM_SAFE_SIGNATURE",
+        "target": "ML-DSA-65 (NIST FIPS 204)"
+    },
+    "ECDH_TO_ML_KEM_HYBRID": {
+        "name": "ECDH to ML-KEM-768 Hybrid (NIST FIPS 203)",
+        "description": "Replaces ECDH key exchange with ML-KEM-768 hybrid mode (NIST FIPS 203)",
+        "strategy": "HYBRID_KEY_EXCHANGE",
+        "target": "ML-KEM-768 Hybrid (NIST FIPS 203)"
+    },
+    "RSA_TO_ML_KEM_HYBRID": {
+        "name": "RSA Key Exchange to ML-KEM-768 Hybrid",
+        "description": "Replaces RSA key exchange with ML-KEM-768 hybrid mode",
+        "strategy": "HYBRID_KEY_EXCHANGE",
+        "target": "ML-KEM-768 Hybrid (NIST FIPS 203)"
+    },
+    "AES_256_GCM_RETENTION": {
+        "name": "AES Retention & Key Hardening",
+        "description": "Retain symmetric encryption, upgrade key length to AES-256-GCM",
+        "strategy": "SYMMETRIC_HARDENING",
+        "target": "AES-256-GCM"
+    },
+    "MANUAL_REVIEW": {
+        "name": "Manual Cryptographic Review",
+        "description": "Manual cryptographer review required for unknown/complex asset",
+        "strategy": "MANUAL_AUDIT",
+        "target": "MANUAL_REVIEW_REQUIRED"
     }
 }
 
@@ -144,8 +170,8 @@ class SandboxEnvironment:
             }
         }
 
-    def apply_transformation_pattern(self, pattern_key: str = "RSA_TO_ML_KEM_HYBRID") -> Dict[str, Any]:
-        pattern = DEMO_PATTERNS.get(pattern_key, DEMO_PATTERNS["RSA_TO_ML_KEM_HYBRID"])
+    def apply_transformation_pattern(self, pattern_key: str = "RSA_TO_ML_DSA") -> Dict[str, Any]:
+        pattern = DEMO_PATTERNS.get(pattern_key, DEMO_PATTERNS["RSA_TO_ML_DSA"])
         return {
             "pattern_applied": pattern_key,
             "name": pattern["name"],

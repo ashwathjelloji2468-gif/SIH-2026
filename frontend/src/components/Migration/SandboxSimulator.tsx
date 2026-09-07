@@ -8,7 +8,7 @@ interface SandboxSimulatorProps {
 }
 
 export const SandboxSimulator: React.FC<SandboxSimulatorProps> = ({ planId }) => {
-  const [pattern, setPattern] = useState<string>('RSA_TO_ML_KEM_HYBRID');
+  const [pattern, setPattern] = useState<string>('RSA_TO_ML_DSA');
   const [simulationResult, setSimulationResult] = useState<any | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,8 +46,10 @@ export const SandboxSimulator: React.FC<SandboxSimulatorProps> = ({ planId }) =>
             onChange={(e) => setPattern(e.target.value)}
             className="px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs font-mono text-cyan-300 focus:outline-none focus:border-cyan-500 cursor-pointer"
           >
-            <option value="RSA_TO_ML_KEM_HYBRID">RSA → ML-KEM-768 Hybrid (FIPS 203)</option>
-            <option value="ECDSA_TO_ML_DSA">ECDSA → ML-DSA-65 Lattice (FIPS 204)</option>
+            <option value="RSA_TO_ML_DSA">RSA Signature → ML-DSA-65 (NIST FIPS 204)</option>
+            <option value="ECDH_TO_ML_KEM_HYBRID">ECDH → ML-KEM-768 Hybrid (NIST FIPS 203)</option>
+            <option value="ECDSA_TO_ML_DSA">ECDSA → ML-DSA-65 (NIST FIPS 204)</option>
+            <option value="AES_256_GCM_RETENTION">AES-128 → AES-256-GCM Retention</option>
           </select>
 
           <button
