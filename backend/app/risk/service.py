@@ -103,10 +103,6 @@ class RiskService:
         assessed_list = []
         for asset in assets:
             ra = self.risk_repo.get_latest_for_asset(asset.id)
-            if not ra:
-                # Assess automatically if unassessed
-                eval_res = self.assess_asset(asset.id, force_reassessment=False)
-                ra = self.risk_repo.get_latest_for_asset(asset.id)
             if ra:
                 threats = self.risk_repo.get_threat_scenarios_for_asset(asset.id)
                 assessed_list.append(self._assessment_to_dict(ra, asset, threats))
@@ -149,8 +145,8 @@ class RiskService:
                 stype = ts.get("scenario_type", "UNKNOWN")
                 threat_scenario_counts[stype] = threat_scenario_counts.get(stype, 0) + 1
 
-        avg_score = round(total_score / max(1, assessed_count), 1)
-        avg_conf = round(total_conf / max(1, assessed_count), 2)
+        avg_score = round(total_score / assessed_count, 1) if assessed_count > 0 else 0.0
+        avg_conf = round(total_conf / assessed_count, 2) if assessed_count > 0 else 0.0
 
         # Deterministic Priority Ranking:
         # 1. risk_score desc

@@ -20,24 +20,16 @@ const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
 const SAVED_PROJECT_KEY = 'sentriq_active_project_id';
 
-const DEFAULT_FALLBACK_PROJECT: Project = {
-  id: 'proj-demo-cryptography-01',
-  name: 'pyca/cryptography-enterprise',
-  description: 'Enterprise Cryptography Core Library',
-  repository_url: 'https://github.com/pyca/cryptography',
-  created_at: '2026-09-01T00:00:00Z',
-  updated_at: '2026-09-05T00:00:00Z',
-};
-
 export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [projects, setProjects] = useState<Project[]>([DEFAULT_FALLBACK_PROJECT]);
-  const [currentProject, setCurrentProjectState] = useState<Project | null>(DEFAULT_FALLBACK_PROJECT);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [currentProject, setCurrentProjectState] = useState<Project | null>(null);
   const [latestScan, setLatestScan] = useState<Scan | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [isScanModalOpen, setIsScanModalOpen] = useState<boolean>(false);
 
   const fetchProjects = useCallback(async () => {
+    setLoading(true);
     setError(null);
     try {
       const data = await projectService.list();
@@ -53,10 +45,16 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
           data[0];
 
         setCurrentProjectState(preferred);
+        if (preferred) {
+          localStorage.setItem(SAVED_PROJECT_KEY, preferred.id);
+        }
+      } else {
+        setProjects([]);
+        setCurrentProjectState(null);
       }
     } catch (err: any) {
       console.warn('Backend connection notice:', err);
-      // Keep optimistic DEFAULT_FALLBACK_PROJECT intact so UI never stalls
+      setError(err?.message || 'Failed to connect to backend projects API');
     } finally {
       setLoading(false);
     }

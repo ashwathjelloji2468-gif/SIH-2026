@@ -40,19 +40,9 @@ const DEMO_FALLBACK_SCENARIOS: ThreatScenario[] = [
 
 export const riskService = {
   getRiskSummary: async (projectId: string): Promise<RiskSummary> => {
-    try {
-      const data = await api.get<RiskSummary>(`/projects/${projectId}/risk/summary`);
-      if (data) return data;
-      if (projectId.startsWith('proj-demo') || projectId.startsWith('demo-')) {
-        return DEMO_FALLBACK_RISK_SUMMARY;
-      }
-      throw new Error('Risk summary unavailable');
-    } catch (err) {
-      if (projectId.startsWith('proj-demo') || projectId.startsWith('demo-')) {
-        return DEMO_FALLBACK_RISK_SUMMARY;
-      }
-      throw err;
-    }
+    const data = await api.get<RiskSummary>(`/projects/${projectId}/risk/summary`);
+    if (data) return data;
+    throw new Error('Risk summary unavailable');
   },
 
   assessProjectRisk: async (
@@ -64,29 +54,7 @@ export const riskService = {
       business_criticality_score?: number;
     }
   ): Promise<RiskAssessment[]> => {
-    try {
-      return await api.post<RiskAssessment[]>(`/projects/${projectId}/risk/assess`, params || {});
-    } catch (err) {
-      if (projectId.startsWith('proj-demo') || projectId.startsWith('demo-')) {
-        return [
-          {
-            asset_id: 'ast-demo-01',
-            asset_name: 'Authentication JWT RSA Signer',
-            risk_score: 92.5,
-            risk_level: 'CRITICAL',
-            quantum_vulnerability_score: 95.0,
-            data_sensitivity_score: 90.0,
-            business_criticality_score: 92.0,
-            mosca_factor_score: 94.0,
-            exposure_score: 88.0,
-            migration_complexity_score: 45.0,
-            explanation: 'X=10y + Y=3y > Z=2033 (Deadline Breach). Harvest Now Decrypt Later vulnerability on long-lived auth credentials.',
-            confidence_score: 0.98,
-          },
-        ];
-      }
-      throw err;
-    }
+    return await api.post<RiskAssessment[]>(`/projects/${projectId}/risk/assess`, params || {});
   },
 
   getAssetRisk: async (assetId: string): Promise<RiskAssessment> => {

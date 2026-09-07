@@ -82,51 +82,19 @@ const DEMO_FALLBACK_COVERAGE: CoverageReport = {
 
 export const inventoryService = {
   getProjectInventory: async (projectId: string): Promise<CryptoAsset[]> => {
-    try {
-      const data = await api.get<CryptoAsset[]>(`/projects/${projectId}/inventory`);
-      if (Array.isArray(data)) return data;
-      if (projectId.startsWith('proj-demo') || projectId.startsWith('demo-')) {
-        return DEMO_FALLBACK_ASSETS;
-      }
-      return [];
-    } catch (err) {
-      if (projectId.startsWith('proj-demo') || projectId.startsWith('demo-')) {
-        return DEMO_FALLBACK_ASSETS;
-      }
-      throw err;
-    }
+    const data = await api.get<CryptoAsset[]>(`/projects/${projectId}/inventory`);
+    return Array.isArray(data) ? data : [];
   },
 
   getProjectCoverage: async (projectId: string): Promise<CoverageReport> => {
-    try {
-      const data = await api.get<CoverageReport>(`/projects/${projectId}/coverage`);
-      if (data) return data;
-      if (projectId.startsWith('proj-demo') || projectId.startsWith('demo-')) {
-        return DEMO_FALLBACK_COVERAGE;
-      }
-      throw new Error('Coverage data unavailable');
-    } catch (err) {
-      if (projectId.startsWith('proj-demo') || projectId.startsWith('demo-')) {
-        return DEMO_FALLBACK_COVERAGE;
-      }
-      throw err;
-    }
+    const data = await api.get<CoverageReport>(`/projects/${projectId}/coverage`);
+    if (data) return data;
+    throw new Error('Coverage data unavailable');
   },
 
   getProjectUnknowns: async (projectId: string): Promise<CryptoAsset[]> => {
-    try {
-      const data = await api.get<CryptoAsset[]>(`/projects/${projectId}/unknowns`);
-      if (Array.isArray(data)) return data;
-      if (projectId.startsWith('proj-demo') || projectId.startsWith('demo-')) {
-        return DEMO_FALLBACK_ASSETS.filter((a) => a.is_unknown);
-      }
-      return [];
-    } catch (err) {
-      if (projectId.startsWith('proj-demo') || projectId.startsWith('demo-')) {
-        return DEMO_FALLBACK_ASSETS.filter((a) => a.is_unknown);
-      }
-      throw err;
-    }
+    const data = await api.get<CryptoAsset[]>(`/projects/${projectId}/unknowns`);
+    return Array.isArray(data) ? data : [];
   },
 
   getAsset: async (assetId: string): Promise<CryptoAsset> => {
