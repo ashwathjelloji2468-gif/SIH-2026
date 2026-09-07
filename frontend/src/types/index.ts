@@ -135,9 +135,12 @@ export interface CoverageReport {
 export interface RiskSummary {
   project_id: string;
   total_assets: number;
+  assessed_assets?: number;
+  unassessed_assets?: number;
   high_or_critical_risk_assets: number;
   average_risk_score: number;
 }
+
 
 export interface RiskAssessment {
   id?: string;

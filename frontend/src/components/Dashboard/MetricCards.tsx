@@ -58,12 +58,15 @@ export const MetricCards: React.FC<MetricCardsProps> = ({
     {
       title: 'High / Critical Risk',
       value: `${highRiskCount}`,
-      subtitle: `Average Risk Score: ${riskSummary?.average_risk_score ?? 0} / 100`,
+      subtitle: (riskSummary?.assessed_assets || 0) === 0
+        ? `0 fully risk-assessed (${totalAssets} awaiting assessment)`
+        : `Average Risk Score: ${riskSummary?.average_risk_score ?? 0} / 100`,
       icon: AlertOctagon,
       borderColor: 'border-orange-500/25',
       iconBg: 'bg-orange-950/50 text-orange-400 border-orange-800/50',
       trend: 'HNDL Window',
     },
+
     {
       title: 'Discovery Coverage',
       value: `≤${coveragePercent}%`,

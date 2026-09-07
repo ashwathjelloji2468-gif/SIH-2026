@@ -115,26 +115,29 @@ class MigrationSimulator:
             else:
                 final_sim_status = SimulationStatus.FAILED
 
-            # 5. Persist Validation Runs
-            for check in val_summary.get("check_runs", []):
-                val_repo.create_validation_run(
-                    simulation_id=simulation.id,
-                    asset_id=asset_id,
-                    check_type=check.get("check_type", "BUILD"),
-                    status=ValidationStatus.PASSED if check.get("status") == "PASS" else ValidationStatus.FAILED,
-                    command=check.get("command"),
-                    exit_code=check.get("exit_code"),
-                    output_summary=check.get("output_summary"),
-                    evidence=check.get("evidence"),
-                    duration=check.get("duration", 0.0),
-                    build_passed=val_summary.get("build_passed", False),
-                    unit_tests_passed=val_summary.get("unit_tests_passed", False),
-                    crypto_tests_passed=val_summary.get("crypto_tests_passed", False),
-                    integration_tests_passed=val_summary.get("integration_tests_passed", False),
-                    regression_passed=val_summary.get("regression_passed", False),
-                    api_compatible=val_summary.get("api_compatible", False),
-                    logs=val_summary.get("logs")
-                )
+            # 5. Persist Validation Runs only if simulation is associated with a MigrationPlan
+            if simulation.migration_plan_id:
+                for check in val_summary.get("check_runs", []):
+                    val_repo.create_validation_run(
+                        simulation_id=simulation.id,
+                        plan_id=simulation.migration_plan_id,
+                        asset_id=asset_id,
+                        check_type=check.get("check_type", "BUILD"),
+                        status=ValidationStatus.PASSED if check.get("status") == "PASS" else ValidationStatus.FAILED,
+                        command=check.get("command"),
+                        exit_code=check.get("exit_code"),
+                        output_summary=check.get("output_summary"),
+                        evidence=check.get("evidence"),
+                        duration=check.get("duration", 0.0),
+                        build_passed=val_summary.get("build_passed", False),
+                        unit_tests_passed=val_summary.get("unit_tests_passed", False),
+                        crypto_tests_passed=val_summary.get("crypto_tests_passed", False),
+                        integration_tests_passed=val_summary.get("integration_tests_passed", False),
+                        regression_passed=val_summary.get("regression_passed", False),
+                        api_compatible=val_summary.get("api_compatible", False),
+                        logs=val_summary.get("logs")
+                    )
+
 
             # Update final simulation state
             updated_sim = sim_repo.update_simulation_result(
