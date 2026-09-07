@@ -207,6 +207,8 @@ def simulate_migration_plan(plan_id: str, pattern: str = "RSA_TO_ML_KEM_HYBRID",
     if not asset_id:
         asset_id = f"asset-{plan.project_id or 'target'}"
 
+    result["status"] = "TRANSFORMED"
+
     sim = sim_repo.create_simulation(
         asset_id=asset_id,
         project_id=plan.project_id,
@@ -214,6 +216,11 @@ def simulate_migration_plan(plan_id: str, pattern: str = "RSA_TO_ML_KEM_HYBRID",
         sandbox_path=sandbox_dir,
         transformation_type=pattern,
         status=SimulationStatus.TRANSFORMED
+    )
+    sim_repo.update_simulation_result(
+        sim.id,
+        status=SimulationStatus.TRANSFORMED,
+        changes_summary=result
     )
 
     return {

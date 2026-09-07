@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Cpu,
   ShieldCheck,
@@ -85,9 +85,26 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
   const [validating, setValidating] = useState<boolean>(false);
   const [valError, setValError] = useState<string | null>(null);
 
+  // Patch export & Deployment notification states
+  const [patchError, setPatchError] = useState<string | null>(null);
+  const [deployNotice, setDeployNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSimulationResult(null);
+    setValidationRun(null);
+    setSimError(null);
+    setValError(null);
+    setPatchError(null);
+    setDeployNotice(null);
+  }, [planId]);
+
   const handleRunSimulation = async () => {
+    if (simulating) return;
     setSimulating(true);
     setSimError(null);
+    setValidationRun(null); // Force Stage 3 to validate the new simulation
+    setPatchError(null);
+    setDeployNotice(null);
     try {
       const res = await migrationService.simulateTransformation(planId, pattern);
       setSimulationResult(res);
@@ -99,29 +116,32 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
   };
 
   const handleRunValidation = async () => {
+    if (validating) return;
     if (!simulationResult) {
       setValError('Sandbox simulation required before validation.');
       return;
     }
     setValidating(true);
     setValError(null);
+    setPatchError(null);
+    setDeployNotice(null);
     try {
       let res: ValidationRun;
       if (simulationResult.simulation_id) {
         const valRes = await validationService.validateSimulation(simulationResult.simulation_id);
         res = {
           id: valRes.id || `val-${Date.now()}`,
-          plan_id: planId,
-          status: valRes.status || 'SUCCESS',
-          build_passed: valRes.build_passed ?? true,
-          unit_tests_passed: valRes.unit_tests_passed ?? true,
-          crypto_tests_passed: valRes.crypto_tests_passed ?? true,
-          integration_tests_passed: valRes.integration_tests_passed ?? false,
-          regression_passed: valRes.regression_passed ?? false,
-          api_compatible: valRes.api_compatible ?? false,
+          plan_id: valRes.plan_id || planId,
+          status: valRes.status || 'FAILED',
+          build_passed: Boolean(valRes.build_passed),
+          unit_tests_passed: Boolean(valRes.unit_tests_passed),
+          crypto_tests_passed: Boolean(valRes.crypto_tests_passed),
+          integration_tests_passed: Boolean(valRes.integration_tests_passed),
+          regression_passed: Boolean(valRes.regression_passed),
+          api_compatible: Boolean(valRes.api_compatible),
           logs: valRes.logs || null,
-          residual_risk_score: valRes.residual_risk_score ?? 12.0,
-          confidence: valRes.confidence ?? 0.984,
+          residual_risk_score: typeof valRes.residual_risk_score === 'number' ? valRes.residual_risk_score : 15.0,
+          confidence: typeof valRes.confidence === 'number' ? valRes.confidence : 0.90,
           created_at: valRes.created_at || new Date().toISOString(),
         };
       } else {
@@ -133,6 +153,51 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
     } finally {
       setValidating(false);
     }
+  };
+
+  const handleDownloadPatch = () => {
+    setPatchError(null);
+    setDeployNotice(null);
+    if (!simulationResult) {
+      setPatchError('No simulation diff available. Please run Stage 2 Sandbox Simulation first.');
+      return;
+    }
+
+    const targetFile = selectedAsset.file;
+    const originalSnippet =
+      simulationResult.transformation.original_snippet ||
+      `# ${targetFile}\nfrom cryptography.hazmat.primitives.asymmetric import rsa\n\ndef generate_keypair():\n    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)\n    return private_key`;
+
+    const transformedSnippet =
+      simulationResult.transformation.transformed_snippet ||
+      `# ${targetFile}\nfrom pqcrypto.kem import ml_kem_768  # NIST FIPS 203 Standard\n\ndef generate_keypair():\n    public_key, secret_key = ml_kem_768.generate_keypair()\n    return public_key, secret_key`;
+
+    const diffLines: string[] = [
+      `--- a/${targetFile}`,
+      `+++ b/${targetFile}`,
+      `@@ -1,8 +1,5 @@`,
+    ];
+    originalSnippet.split('\n').forEach((line) => diffLines.push(`-${line}`));
+    transformedSnippet.split('\n').forEach((line) => diffLines.push(`+${line}`));
+
+    const diffContent = simulationResult.transformation.diff_details || diffLines.join('\n');
+
+    const blob = new Blob([diffContent], { type: 'text/x-diff;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `migration_${selectedAsset.id || 'refactor'}.diff`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDeployStaging = () => {
+    setPatchError(null);
+    setDeployNotice(
+      'Staging deployment integration is not configured in this environment. Refactoring patch and CycloneDX 1.6 CBOM are ready for manual CI/CD pipeline release.'
+    );
   };
 
   // Helper for step click
@@ -584,49 +649,89 @@ def generate_keypair():
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {/* Build Compilation */}
                   <div className="p-4 rounded-2xl bg-[#0B0F19] border border-[#1E293B] shadow-md flex items-start gap-3">
-                    <div className="p-2 rounded-xl bg-emerald-950/60 border border-emerald-800/60 text-emerald-400 shrink-0 mt-0.5">
-                      <CheckCircle2 className="w-5 h-5" />
+                    <div className={`p-2 rounded-xl border shrink-0 mt-0.5 ${
+                      validationRun.build_passed
+                        ? 'bg-emerald-950/60 border-emerald-800/60 text-emerald-400'
+                        : 'bg-rose-950/60 border-rose-800/60 text-rose-400'
+                    }`}>
+                      {validationRun.build_passed ? <CheckCircle2 className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
                     </div>
                     <div>
                       <div className="text-[11px] font-mono text-[#94A3B8] uppercase">Build Compilation</div>
-                      <div className="text-sm font-bold font-mono text-emerald-300 mt-0.5">PASSED (0 Errors)</div>
-                      <div className="text-[10px] text-[#94A3B8] mt-1">Zero AST compilation syntax errors</div>
+                      <div className={`text-sm font-bold font-mono mt-0.5 ${
+                        validationRun.build_passed ? 'text-emerald-300' : 'text-rose-300'
+                      }`}>
+                        {validationRun.build_passed ? 'PASSED (0 Errors)' : 'FAILED'}
+                      </div>
+                      <div className="text-[10px] text-[#94A3B8] mt-1">
+                        {validationRun.build_passed ? 'Zero AST compilation syntax errors' : 'Compilation error detected'}
+                      </div>
                     </div>
                   </div>
 
                   {/* Unit Tests */}
                   <div className="p-4 rounded-2xl bg-[#0B0F19] border border-[#1E293B] shadow-md flex items-start gap-3">
-                    <div className="p-2 rounded-xl bg-emerald-950/60 border border-emerald-800/60 text-emerald-400 shrink-0 mt-0.5">
-                      <CheckCircle2 className="w-5 h-5" />
+                    <div className={`p-2 rounded-xl border shrink-0 mt-0.5 ${
+                      validationRun.unit_tests_passed
+                        ? 'bg-emerald-950/60 border-emerald-800/60 text-emerald-400'
+                        : 'bg-rose-950/60 border-rose-800/60 text-rose-400'
+                    }`}>
+                      {validationRun.unit_tests_passed ? <CheckCircle2 className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
                     </div>
                     <div>
                       <div className="text-[11px] font-mono text-[#94A3B8] uppercase">Unit Test Suite</div>
-                      <div className="text-sm font-bold font-mono text-emerald-300 mt-0.5">100% OK (42/42)</div>
-                      <div className="text-[10px] text-[#94A3B8] mt-1">All unit assertions verified</div>
+                      <div className={`text-sm font-bold font-mono mt-0.5 ${
+                        validationRun.unit_tests_passed ? 'text-emerald-300' : 'text-rose-300'
+                      }`}>
+                        {validationRun.unit_tests_passed ? '100% OK (42/42)' : 'FAILED (0/42)'}
+                      </div>
+                      <div className="text-[10px] text-[#94A3B8] mt-1">
+                        {validationRun.unit_tests_passed ? 'All unit assertions verified' : 'Unit assertions failed'}
+                      </div>
                     </div>
                   </div>
 
                   {/* Crypto KAT Validation */}
                   <div className="p-4 rounded-2xl bg-[#0B0F19] border border-[#1E293B] shadow-md flex items-start gap-3">
-                    <div className="p-2 rounded-xl bg-emerald-950/60 border border-emerald-800/60 text-emerald-400 shrink-0 mt-0.5">
-                      <CheckCircle2 className="w-5 h-5" />
+                    <div className={`p-2 rounded-xl border shrink-0 mt-0.5 ${
+                      validationRun.crypto_tests_passed
+                        ? 'bg-emerald-950/60 border-emerald-800/60 text-emerald-400'
+                        : 'bg-rose-950/60 border-rose-800/60 text-rose-400'
+                    }`}>
+                      {validationRun.crypto_tests_passed ? <CheckCircle2 className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
                     </div>
                     <div>
                       <div className="text-[11px] font-mono text-[#94A3B8] uppercase">PQC KAT Tests</div>
-                      <div className="text-sm font-bold font-mono text-emerald-300 mt-0.5">VERIFIED (FIPS 203)</div>
-                      <div className="text-[10px] text-[#94A3B8] mt-1">Known Answer Test vectors match</div>
+                      <div className={`text-sm font-bold font-mono mt-0.5 ${
+                        validationRun.crypto_tests_passed ? 'text-emerald-300' : 'text-rose-300'
+                      }`}>
+                        {validationRun.crypto_tests_passed ? 'VERIFIED (FIPS 203)' : 'FAILED'}
+                      </div>
+                      <div className="text-[10px] text-[#94A3B8] mt-1">
+                        {validationRun.crypto_tests_passed ? 'Known Answer Test vectors match' : 'KAT vector mismatch'}
+                      </div>
                     </div>
                   </div>
 
                   {/* Integration / Regression */}
                   <div className="p-4 rounded-2xl bg-[#0B0F19] border border-[#1E293B] shadow-md flex items-start gap-3">
-                    <div className="p-2 rounded-xl bg-cyan-950/60 border border-cyan-800/60 text-[#22D3EE] shrink-0 mt-0.5">
+                    <div className={`p-2 rounded-xl border shrink-0 mt-0.5 ${
+                      (validationRun.regression_passed || validationRun.integration_tests_passed)
+                        ? 'bg-cyan-950/60 border-cyan-800/60 text-[#22D3EE]'
+                        : 'bg-rose-950/60 border-rose-800/60 text-rose-400'
+                    }`}>
                       <ShieldCheck className="w-5 h-5" />
                     </div>
                     <div>
                       <div className="text-[11px] font-mono text-[#94A3B8] uppercase">Integration / Regression</div>
-                      <div className="text-sm font-bold font-mono text-[#22D3EE] mt-0.5">PASS (0 Regressions)</div>
-                      <div className="text-[10px] text-[#94A3B8] mt-1">API handshake contracts intact</div>
+                      <div className={`text-sm font-bold font-mono mt-0.5 ${
+                        (validationRun.regression_passed || validationRun.integration_tests_passed) ? 'text-[#22D3EE]' : 'text-rose-300'
+                      }`}>
+                        {(validationRun.regression_passed || validationRun.integration_tests_passed) ? 'PASS (0 Regressions)' : 'FAILED'}
+                      </div>
+                      <div className="text-[10px] text-[#94A3B8] mt-1">
+                        {(validationRun.regression_passed || validationRun.integration_tests_passed) ? 'API handshake contracts intact' : 'Regression break detected'}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -639,7 +744,11 @@ def generate_keypair():
                         <Terminal className="w-4 h-4 text-[#22D3EE]" />
                         <span>Automated Test Runner Output Log</span>
                       </div>
-                      <span className="text-[10px] text-emerald-400 font-bold">Execution Status: SUCCESS</span>
+                      <span className={`text-[10px] font-bold ${
+                        validationRun.status === 'SUCCESS' ? 'text-emerald-400' : 'text-rose-400'
+                      }`}>
+                        Execution Status: {validationRun.status}
+                      </span>
                     </div>
                     <pre className="p-4 text-[11px] font-mono text-slate-300 whitespace-pre-wrap max-h-56 overflow-y-auto leading-relaxed bg-[#06080F]">
                       {validationRun.logs}
@@ -686,15 +795,24 @@ def generate_keypair():
                   <div className="relative flex items-center justify-center">
                     <div className="w-28 h-28 rounded-full border-4 border-[#22D3EE]/20 flex items-center justify-center bg-[#0B1120] shadow-[0_0_25px_rgba(34,211,238,0.3)]">
                       <div className="text-center font-mono">
-                        <div className="text-2xl font-extrabold text-[#F8FAFC]">98.4%</div>
+                        <div className="text-2xl font-extrabold text-[#F8FAFC]">
+                          {validationRun ? `${(validationRun.confidence * 100).toFixed(1)}%` : '98.4%'}
+                        </div>
                         <div className="text-[9px] text-[#22D3EE] uppercase tracking-wider font-bold">Confidence</div>
                       </div>
                     </div>
                   </div>
 
                   <div className="space-y-1.5">
-                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-950/70 border border-emerald-800 text-emerald-300 font-mono text-[11px] font-bold">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> High Confidence — Production Ready
+                    <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-mono text-[11px] font-bold border ${
+                      (validationRun?.status === 'SUCCESS' || !validationRun)
+                        ? 'bg-emerald-950/70 border-emerald-800 text-emerald-300'
+                        : 'bg-rose-950/70 border-rose-800 text-rose-300'
+                    }`}>
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      {(validationRun?.status === 'SUCCESS' || !validationRun)
+                        ? 'High Confidence — Production Ready'
+                        : 'Validation Review Required'}
                     </div>
                     <h4 className="text-xl font-bold font-mono text-[#F8FAFC]">NIST FIPS 203/204 Migration Validated</h4>
                     <p className="text-xs text-[#94A3B8] max-w-md leading-relaxed">
@@ -708,13 +826,17 @@ def generate_keypair():
                 <div className="grid grid-cols-2 gap-3 w-full lg:w-auto font-mono">
                   <div className="p-3.5 rounded-2xl bg-[#0B0F19]/80 border border-slate-800">
                     <div className="text-[10px] text-[#94A3B8] uppercase">Residual Risk</div>
-                    <div className="text-lg font-bold text-[#22D3EE]">12 / 100</div>
+                    <div className="text-lg font-bold text-[#22D3EE]">
+                      {validationRun ? validationRun.residual_risk_score : 12} / 100
+                    </div>
                     <div className="text-[10px] text-emerald-400 font-semibold">-88% Risk Reduction</div>
                   </div>
 
                   <div className="p-3.5 rounded-2xl bg-[#0B0F19]/80 border border-slate-800">
                     <div className="text-[10px] text-[#94A3B8] uppercase">KAT Verification</div>
-                    <div className="text-lg font-bold text-emerald-300">100% Pass</div>
+                    <div className="text-lg font-bold text-emerald-300">
+                      {validationRun?.crypto_tests_passed !== false ? '100% Pass' : 'Failed'}
+                    </div>
                     <div className="text-[10px] text-[#94A3B8]">FIPS 203 Vectors</div>
                   </div>
 
@@ -732,6 +854,21 @@ def generate_keypair():
                 </div>
               </div>
 
+              {/* Inline Action Errors & Notices */}
+              {patchError && (
+                <div className="p-3.5 rounded-xl bg-rose-950/60 border border-rose-800/80 text-xs text-rose-300 font-mono flex items-center gap-2">
+                  <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0" />
+                  <span>{patchError}</span>
+                </div>
+              )}
+
+              {deployNotice && (
+                <div className="p-3.5 rounded-xl bg-cyan-950/60 border border-cyan-800/80 text-xs text-cyan-200 font-mono flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-cyan-400 shrink-0" />
+                  <span>{deployNotice}</span>
+                </div>
+              )}
+
               {/* Deployment & Action Buttons */}
               <div className="pt-6 border-t border-slate-800 flex flex-wrap items-center justify-between gap-4 font-mono text-xs">
                 <div className="flex items-center gap-2 text-emerald-400 text-xs">
@@ -741,9 +878,7 @@ def generate_keypair():
 
                 <div className="flex items-center gap-3">
                   <button
-                    onClick={() => {
-                      alert('Refactoring patch exported as .diff format.');
-                    }}
+                    onClick={handleDownloadPatch}
                     className="px-4 py-2.5 rounded-xl border border-[#1E293B] bg-[#0B0F19] hover:bg-[#1E293B] text-[#F8FAFC] font-semibold cursor-pointer transition-all flex items-center gap-2"
                   >
                     <Download className="w-4 h-4 text-[#22D3EE]" />
@@ -751,9 +886,7 @@ def generate_keypair():
                   </button>
 
                   <button
-                    onClick={() => {
-                      alert('Migration deployment triggered to Staging Environment successfully!');
-                    }}
+                    onClick={handleDeployStaging}
                     className="px-5 py-2.5 rounded-xl bg-[#22D3EE] hover:bg-[#22D3EE]/90 text-slate-950 font-bold shadow-[0_0_20px_rgba(34,211,238,0.3)] cursor-pointer transition-all flex items-center gap-2"
                   >
                     <span>Deploy to Staging Environment</span>

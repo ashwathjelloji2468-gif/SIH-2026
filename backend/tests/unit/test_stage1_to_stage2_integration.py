@@ -183,3 +183,34 @@ def test_invalid_plan_reference_simulation_returns_409():
     resp = client.post("/api/v1/migration/simulations/sim-invalid-plan-ref/validate")
     assert resp.status_code == 409
     assert "references a migration plan that does not exist" in resp.json()["detail"]
+
+
+def test_rerun_simulation_generates_new_simulation_id_and_validates():
+    client = TestClient(app)
+
+    # 1. Create Migration Plan
+    create_resp = client.post(
+        "/api/v1/projects/proj-integration-01/migration/plans",
+        json={"name": "Re-run Test Roadmap"}
+    )
+    assert create_resp.status_code == 200
+    plan_id = create_resp.json()["id"]
+
+    # 2. First Simulation Run
+    sim1_resp = client.post(f"/api/v1/migration/plans/{plan_id}/simulate?pattern=RSA_TO_ML_KEM_HYBRID")
+    assert sim1_resp.status_code == 200
+    sim1_id = sim1_resp.json()["simulation_id"]
+
+    # 3. Second (Re-run) Simulation Run
+    sim2_resp = client.post(f"/api/v1/migration/plans/{plan_id}/simulate?pattern=RSA_TO_ML_KEM_HYBRID")
+    assert sim2_resp.status_code == 200
+    sim2_id = sim2_resp.json()["simulation_id"]
+    assert sim2_id != sim1_id
+
+    # 4. Validate Second Simulation Run
+    val_resp = client.post(f"/api/v1/migration/simulations/{sim2_id}/validate")
+    assert val_resp.status_code == 200
+    val_data = val_resp.json()
+    assert val_data["simulation_id"] == sim2_id
+    assert val_data["plan_id"] == plan_id
+    assert "status" in val_data
