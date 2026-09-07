@@ -34,8 +34,15 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     try {
       const data = await projectService.list();
       if (data && data.length > 0) {
+        // Exclude automated test fixture rows from production selector
+        const isTestFixture = (p: Project) =>
+          ['Coverage Test Project', 'Sim Project', 'Test Payment Gateway'].includes(p.name);
+
+        const cleanProjects = data.filter((p) => !isTestFixture(p));
+        const finalProjects = cleanProjects.length > 0 ? cleanProjects : data;
+
         // Sort projects so primary scanned repos come first
-        const sortedProjects = [...data].sort((a, b) => {
+        const sortedProjects = [...finalProjects].sort((a, b) => {
           const aPriority = a.name.includes('cryptography') ? 5 : a.name.includes('paramiko') ? 4 : a.name.startsWith('demo-') ? 3 : 1;
           const bPriority = b.name.includes('cryptography') ? 5 : b.name.includes('paramiko') ? 4 : b.name.startsWith('demo-') ? 3 : 1;
           return bPriority - aPriority;
