@@ -127,10 +127,10 @@ export const PlanBuilder: React.FC<PlanBuilderProps> = ({ onPlanCreated }) => {
               onChange={(e) => setTestingLevel(e.target.value as TestingRequirement)}
               className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-200 text-xs focus:outline-none focus:border-cyan-500"
             >
-              <option value="BASIC">BASIC (Unit tests only)</option>
-              <option value="STANDARD">STANDARD (Unit + functional)</option>
+              <option value="LOW">LOW (Unit tests only)</option>
+              <option value="MEDIUM">MEDIUM (Unit + functional)</option>
               <option value="HIGH">HIGH (FIPS validation + fuzzing)</option>
-              <option value="STRICT">STRICT (Formal verification + continuous regression)</option>
+              <option value="REGULATED">REGULATED (Formal verification + continuous regression)</option>
             </select>
           </div>
 

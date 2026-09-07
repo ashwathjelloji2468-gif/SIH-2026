@@ -26,7 +26,7 @@ export type ThreatScenarioType = 'CONSERVATIVE' | 'MODERATE' | 'AGGRESSIVE' | 'C
 
 export type ValidationStatus = 'SUCCESS' | 'FAILED' | 'ERROR' | 'IN_PROGRESS';
 
-export type TestingRequirement = 'BASIC' | 'STANDARD' | 'HIGH' | 'STRICT';
+export type TestingRequirement = 'LOW' | 'MEDIUM' | 'HIGH' | 'REGULATED';
 
 // System Health
 export interface HealthResponse {
