@@ -1,85 +1,146 @@
-from typing import Dict, Any
-from app.models.enums import RiskLevel, QuantumSafety
-from app.risk.mosca import calculate_mosca_urgency
-from app.risk.scoring import get_quantum_vulnerability_score
+from typing import Dict, Any, List, Optional
+from datetime import datetime, timezone
+from app.models.enums import RiskLevel, QuantumSafety, CryptoPurpose
+from app.risk.rules import (
+    classify_algorithm_vulnerability,
+    determine_crypto_purpose,
+    get_sensitivity_score,
+    get_criticality_score,
+    get_migration_complexity_score,
+    get_lifetime_exposure_score
+)
+from app.risk.mosca import calculate_mosca_analysis
+from app.risk.scoring import (
+    calculate_deterministic_risk_score,
+    get_risk_level_from_score,
+    calculate_confidence_score
+)
+from app.risk.scenarios import evaluate_threat_scenarios
 
 class RiskEngine:
-    def __init__(
-        self,
-        weight_quantum: float = 0.25,
-        weight_sensitivity: float = 0.20,
-        weight_criticality: float = 0.20,
-        weight_mosca: float = 0.20,
-        weight_exposure: float = 0.10,
-        weight_complexity: float = 0.05
-    ):
-        self.w_quantum = weight_quantum
-        self.w_sensitivity = weight_sensitivity
-        self.w_criticality = weight_criticality
-        self.w_mosca = weight_mosca
-        self.w_exposure = weight_exposure
-        self.w_complexity = weight_complexity
-
+    """
+    Deterministic Quantum Risk Engine for Prompt 3.
+    """
     def evaluate_asset_risk(
         self,
         algorithm_name: str,
-        quantum_safety: QuantumSafety,
-        data_sensitivity: float = 70.0,
-        business_criticality: float = 80.0,
-        exposure: float = 50.0,
-        migration_complexity: float = 50.0,
+        quantum_safety: Optional[QuantumSafety] = None,
+        purpose: Optional[CryptoPurpose] = None,
+        asset_type: str = "ALGORITHM",
+        detector_names: Optional[List[str]] = None,
+        data_sensitivity_label: str = "UNKNOWN",
+        business_criticality_label: str = "UNKNOWN",
         data_lifetime_years: float = 10.0,
         migration_time_years: float = 3.0,
-        quantum_threat_horizon_year: int = 2033
+        quantum_threat_horizon_year: Optional[int] = None,
+        evidence_excerpts: Optional[List[str]] = None
     ) -> Dict[str, Any]:
-        
-        # 1. Quantum Vulnerability Subscore
-        quantum_vulnerability_score = get_quantum_vulnerability_score(algorithm_name, quantum_safety)
 
-        # 2. Mosca Subscore
-        mosca_result = calculate_mosca_urgency(
+        # 1. Quantum Vulnerability Classification
+        classified_qs, quantum_exposure, qs_rationale = classify_algorithm_vulnerability(algorithm_name)
+
+        # Use classified_qs unless explicit quantum_safety was provided and is not UNKNOWN
+        final_qs = quantum_safety if (quantum_safety and quantum_safety != QuantumSafety.UNKNOWN) else classified_qs
+        if final_qs != classified_qs:
+            # Re-evaluate score if explicit safety overrides default classification
+            if final_qs == QuantumSafety.QUANTUM_VULNERABLE:
+                quantum_exposure = 100.0
+            elif final_qs == QuantumSafety.QUANTUM_RESISTANT_WITH_REDUCED_SECURITY_MARGIN:
+                quantum_exposure = 30.0
+            elif final_qs in [QuantumSafety.QUANTUM_SAFE, QuantumSafety.NOT_DIRECTLY_QUANTUM_VULNERABLE]:
+                quantum_exposure = 10.0
+            else:
+                quantum_exposure = 50.0
+
+        # 2. Purpose Mapping
+        final_purpose = determine_crypto_purpose(algorithm_name, purpose)
+
+        # 3. Sensitivity & Criticality Scores
+        sensitivity_score = get_sensitivity_score(data_sensitivity_label)
+        criticality_score = get_criticality_score(business_criticality_label)
+
+        # 4. Migration Complexity
+        complexity_score, complexity_rationale = get_migration_complexity_score(asset_type, detector_names or [])
+
+        # 5. Lifetime Exposure & Mosca Analysis
+        lifetime_score, lifetime_rationale = get_lifetime_exposure_score(
+            data_lifetime_years=data_lifetime_years,
+            migration_time_years=migration_time_years,
+            quantum_threat_horizon_year=quantum_threat_horizon_year or 2033
+        )
+
+        mosca = calculate_mosca_analysis(
             data_lifetime_years=data_lifetime_years,
             migration_time_years=migration_time_years,
             quantum_threat_horizon_year=quantum_threat_horizon_year
         )
-        mosca_score = mosca_result["mosca_score"]
 
-        # 3. Weighted Total Risk Score
-        total_risk_score = (
-            (quantum_vulnerability_score * self.w_quantum) +
-            (data_sensitivity * self.w_sensitivity) +
-            (business_criticality * self.w_criticality) +
-            (mosca_score * self.w_mosca) +
-            (exposure * self.w_exposure) +
-            (migration_complexity * self.w_complexity)
+        # 6. Overall Deterministic Risk Score
+        risk_score = calculate_deterministic_risk_score(
+            quantum_exposure=quantum_exposure,
+            data_sensitivity=sensitivity_score,
+            business_criticality=criticality_score,
+            migration_complexity=complexity_score,
+            lifetime_exposure=lifetime_score
         )
 
-        total_risk_score = round(min(100.0, max(0.0, total_risk_score)), 1)
+        # 7. Risk Level Thresholds
+        risk_level = get_risk_level_from_score(risk_score)
 
-        # 4. Risk Level Categorization
-        if total_risk_score >= 80.0:
-            risk_level = RiskLevel.CRITICAL
-        elif total_risk_score >= 60.0:
-            risk_level = RiskLevel.HIGH
-        elif total_risk_score >= 35.0:
-            risk_level = RiskLevel.MEDIUM
+        # Urgency / Priority Classification
+        if risk_score >= 75.0 or mosca["mosca_status"] == "DEADLINE_RISK":
+            priority = "CRITICAL"
+        elif risk_score >= 50.0 or mosca["mosca_status"] == "MIGRATION_REQUIRED":
+            priority = "HIGH"
+        elif risk_score >= 25.0:
+            priority = "MODERATE"
         else:
-            risk_level = RiskLevel.LOW
+            priority = "LOW"
 
-        explanation = (
-            f"Asset '{algorithm_name}' evaluated with overall risk score {total_risk_score}/100 ({risk_level.value}). "
-            f"Quantum Vulnerability: {quantum_vulnerability_score:.0f}%, {mosca_result['explanation']}"
+        # 8. Confidence Score (Independent of Risk Score)
+        confidence_score = calculate_confidence_score(detector_names or [], len(evidence_excerpts or []))
+
+        # 9. Threat Scenarios
+        scenarios = evaluate_threat_scenarios(
+            algorithm_name=algorithm_name,
+            quantum_safety=final_qs,
+            purpose=final_purpose,
+            data_sensitivity_label=data_sensitivity_label,
+            data_lifetime_years=data_lifetime_years,
+            mosca_status=mosca["mosca_status"],
+            evidence_excerpts=evidence_excerpts
         )
+
+        # 10. Evidence-Driven Rationale
+        rationale_items = [
+            qs_rationale,
+            f"Asset purpose is classified as '{final_purpose.value if hasattr(final_purpose, 'value') else final_purpose}'.",
+            f"Data sensitivity is '{data_sensitivity_label.upper()}' ({sensitivity_score:.0f}/100) and business criticality is '{business_criticality_label.upper()}' ({criticality_score:.0f}/100).",
+            complexity_rationale,
+            mosca["rationale"],
+            f"Confidence score is {confidence_score:.2f} based on evidence detection methods."
+        ]
+
+        factors = {
+            "quantum_exposure": quantum_exposure,
+            "data_sensitivity": sensitivity_score,
+            "business_criticality": criticality_score,
+            "migration_complexity": complexity_score,
+            "lifetime_exposure": lifetime_score,
+            "mosca_score": mosca["mosca_score"]
+        }
 
         return {
-            "risk_score": total_risk_score,
-            "risk_level": risk_level,
-            "quantum_vulnerability_score": quantum_vulnerability_score,
-            "data_sensitivity_score": data_sensitivity,
-            "business_criticality_score": business_criticality,
-            "mosca_factor_score": mosca_score,
-            "exposure_score": exposure,
-            "migration_complexity_score": migration_complexity,
-            "explanation": explanation,
-            "confidence_score": 0.90
+            "algorithm_name": algorithm_name,
+            "quantum_status": final_qs.value if hasattr(final_qs, "value") else str(final_qs),
+            "crypto_purpose": final_purpose.value if hasattr(final_purpose, "value") else str(final_purpose),
+            "risk_score": risk_score,
+            "risk_level": risk_level.value if hasattr(risk_level, "value") else str(risk_level),
+            "priority": priority,
+            "confidence_score": confidence_score,
+            "factors": factors,
+            "mosca": mosca,
+            "threat_scenarios": scenarios,
+            "rationale": rationale_items,
+            "explanation": " ".join(rationale_items)
         }

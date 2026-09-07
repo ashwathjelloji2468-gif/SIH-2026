@@ -73,6 +73,7 @@ class CryptoAsset(Base):
     evidence_items = relationship("Evidence", back_populates="asset", cascade="all, delete-orphan")
     risk_assessments = relationship("RiskAssessment", back_populates="asset", cascade="all, delete-orphan")
     recommendations = relationship("Recommendation", back_populates="asset", cascade="all, delete-orphan")
+    threat_scenarios = relationship("ThreatScenario", back_populates="asset", cascade="all, delete-orphan")
 
 class Evidence(Base):
     __tablename__ = "evidence"
@@ -103,14 +104,23 @@ class RiskAssessment(Base):
     asset_id = Column(String, ForeignKey("crypto_assets.id", ondelete="CASCADE"), nullable=False)
     risk_score = Column(Float, nullable=False)  # 0 to 100
     risk_level = Column(SQLEnum(RiskLevel), nullable=False)
+    quantum_exposure = Column(Float, default=0.0)
     quantum_vulnerability_score = Column(Float, default=0.0)
     data_sensitivity_score = Column(Float, default=0.0)
     business_criticality_score = Column(Float, default=0.0)
     mosca_factor_score = Column(Float, default=0.0)
     exposure_score = Column(Float, default=0.0)
     migration_complexity_score = Column(Float, default=0.0)
-    explanation = Column(Text, nullable=True)
+    lifetime_exposure_score = Column(Float, default=0.0)
     confidence_score = Column(Float, default=1.0)
+    quantum_status = Column(String, nullable=True)
+    crypto_purpose = Column(String, nullable=True)
+    mosca_status = Column(String, nullable=True)
+    quantum_threat_horizon = Column(Integer, default=2033)
+    priority = Column(String, nullable=True)
+    explanation = Column(Text, nullable=True)
+    rationale = Column(JSON, nullable=True)
+    factors = Column(JSON, nullable=True)
     risk_model_version = Column(String, default="2.0-MOSCA", nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
@@ -139,14 +149,22 @@ class ThreatScenario(Base):
     __tablename__ = "threat_scenarios"
 
     id = Column(String, primary_key=True, default=generate_uuid)
+    asset_id = Column(String, ForeignKey("crypto_assets.id", ondelete="CASCADE"), nullable=True)
     name = Column(String, nullable=False)
     scenario_type = Column(SQLEnum(ThreatScenarioType), default=ThreatScenarioType.MODERATE, nullable=False)
-    quantum_threat_horizon_year = Column(Integer, nullable=False)  # Z
+    quantum_threat_horizon_year = Column(Integer, nullable=False, default=2033)  # Z
     data_lifetime_years = Column(Integer, default=10, nullable=False)  # X
     migration_time_years = Column(Integer, default=3, nullable=False)  # Y
+    severity = Column(String, default="HIGH")
+    urgency = Column(String, default="HIGH")
     description = Column(Text, nullable=True)
+    rationale = Column(Text, nullable=True)
+    evidence = Column(JSON, nullable=True)
     threat_scenario_version = Column(String, default="1.1", nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    # Relationships
+    asset = relationship("CryptoAsset", back_populates="threat_scenarios")
 
 class MigrationPlan(Base):
     __tablename__ = "migration_plans"

@@ -112,10 +112,14 @@ class CoverageReportResponse(BaseModel):
 
 # Risk Assessment Schemas
 class RiskAssessRequest(BaseModel):
-    threat_scenario_id: Optional[str] = None
+    asset_id: Optional[str] = None
+    project_id: Optional[str] = None
+    data_sensitivity_label: Optional[str] = "UNKNOWN"
+    business_criticality_label: Optional[str] = "UNKNOWN"
+    data_lifetime_years: Optional[float] = 10.0
+    migration_time_years: Optional[float] = 3.0
     quantum_threat_horizon_year: Optional[int] = 2033
-    data_sensitivity_score: Optional[float] = 70.0
-    business_criticality_score: Optional[float] = 80.0
+    force_reassessment: Optional[bool] = True
 
 class RiskAssessmentResponse(BaseModel):
     id: str
