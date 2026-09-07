@@ -40,6 +40,7 @@ class EvidenceType(str, Enum):
     INFERRED = "INFERRED"
     ASSUMED = "ASSUMED"
     EXTERNAL = "EXTERNAL"
+    UNKNOWN = "UNKNOWN"
 
 class StandardStatus(str, Enum):
     FINAL_STANDARD = "FINAL_STANDARD"
