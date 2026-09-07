@@ -7,7 +7,8 @@ from sqlalchemy.orm import relationship
 from app.core.database import Base
 from app.models.enums import (
     ScanStatus, AssetType, CryptoPurpose, RiskLevel, EvidenceType,
-    StandardStatus, ThreatScenarioType, ValidationStatus, QuantumSafety, ReviewStatus
+    StandardStatus, ThreatScenarioType, ValidationStatus, QuantumSafety, ReviewStatus,
+    RecommendationCategory
 )
 
 def generate_uuid() -> str:
@@ -132,11 +133,19 @@ class Recommendation(Base):
 
     id = Column(String, primary_key=True, default=generate_uuid)
     asset_id = Column(String, ForeignKey("crypto_assets.id", ondelete="CASCADE"), nullable=False)
+    risk_assessment_id = Column(String, ForeignKey("risk_assessments.id", ondelete="SET NULL"), nullable=True)
     target_pqc_candidate = Column(String, nullable=False)
+    recommended_algorithm = Column(String, nullable=True)
+    alternative_algorithm = Column(String, nullable=True)
+    category = Column(SQLEnum(RecommendationCategory), default=RecommendationCategory.MANUAL_REVIEW, nullable=False)
+    priority = Column(String, default="LOW")
     standard_status = Column(SQLEnum(StandardStatus), default=StandardStatus.FINAL_STANDARD, nullable=False)
     rationale = Column(Text, nullable=False)
     compatibility_notes = Column(Text, nullable=True)
     performance_notes = Column(Text, nullable=True)
+    tradeoffs = Column(JSON, nullable=True)
+    threat_scenarios = Column(JSON, nullable=True)
+    migration_notes = Column(Text, nullable=True)
     migration_complexity = Column(String, default="MEDIUM")
     confidence = Column(Float, default=1.0)
     kb_version = Column(String, default="2026.3.0-NIST-PQC", nullable=False)

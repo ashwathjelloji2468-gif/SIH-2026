@@ -30,6 +30,8 @@ class RiskEngine:
         detector_names: Optional[List[str]] = None,
         data_sensitivity_label: str = "UNKNOWN",
         business_criticality_label: str = "UNKNOWN",
+        data_sensitivity: Optional[float] = None,
+        business_criticality: Optional[float] = None,
         data_lifetime_years: float = 10.0,
         migration_time_years: float = 3.0,
         quantum_threat_horizon_year: Optional[int] = None,
@@ -56,8 +58,8 @@ class RiskEngine:
         final_purpose = determine_crypto_purpose(algorithm_name, purpose)
 
         # 3. Sensitivity & Criticality Scores
-        sensitivity_score = get_sensitivity_score(data_sensitivity_label)
-        criticality_score = get_criticality_score(business_criticality_label)
+        sensitivity_score = data_sensitivity if data_sensitivity is not None else get_sensitivity_score(data_sensitivity_label)
+        criticality_score = business_criticality if business_criticality is not None else get_criticality_score(business_criticality_label)
 
         # 4. Migration Complexity
         complexity_score, complexity_rationale = get_migration_complexity_score(asset_type, detector_names or [])

@@ -76,3 +76,8 @@ def calculate_mosca_analysis(
         "protection_window_years": protection_window,
         "rationale": rationale
     }
+
+def calculate_mosca_urgency(data_lifetime_years: float = 10.0, migration_time_years: float = 3.0, quantum_threat_horizon_year: int = None, current_year: int = None) -> Dict[str, Any]:
+    res = calculate_mosca_analysis(data_lifetime_years, migration_time_years, quantum_threat_horizon_year, current_year)
+    res["urgency_level"] = "CRITICAL" if res["mosca_score"] >= 80.0 else ("HIGH" if res["mosca_score"] >= 50.0 else "LOW")
+    return res
