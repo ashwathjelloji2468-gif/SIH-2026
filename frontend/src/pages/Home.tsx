@@ -59,7 +59,15 @@ export const Home: React.FC = () => {
       if (valRes.status === 'fulfilled') setValidationSummary(valRes.value || null);
       if (simRes.status === 'fulfilled') setSimulations(simRes.value || []);
 
-      if (invRes.status === 'rejected' || riskRes.status === 'rejected') {
+      const isConnectionError = (res: PromiseSettledResult<any>) => {
+        if (res.status === 'rejected') {
+          const reason = res.reason;
+          return reason?.status === 0 || reason?.message?.includes('Network request failed') || reason?.name === 'TypeError';
+        }
+        return false;
+      };
+
+      if (isConnectionError(invRes) || isConnectionError(riskRes)) {
         setApiError(true);
       }
 

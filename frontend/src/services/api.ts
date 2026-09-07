@@ -89,7 +89,7 @@ export function clearApiCache(endpointPrefix?: string): void {
   } catch (_) {}
 }
 
-async function request<T>(endpoint: string, options: RequestInit = {}, timeoutMs = 4000): Promise<T> {
+async function request<T>(endpoint: string, options: RequestInit = {}, timeoutMs = 15000): Promise<T> {
   const url = `${BASE_URL}${endpoint}`;
   
   const headers = new Headers(options.headers || {});
@@ -99,6 +99,13 @@ async function request<T>(endpoint: string, options: RequestInit = {}, timeoutMs
   headers.set('Accept', 'application/json');
 
   const controller = new AbortController();
+  if (options.signal) {
+    if (options.signal.aborted) {
+      controller.abort();
+    } else {
+      options.signal.addEventListener('abort', () => controller.abort(), { once: true });
+    }
+  }
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   const config: RequestInit = {
@@ -163,7 +170,7 @@ export const api = {
 
     // No cache: perform fast fetch with fallback handling
     try {
-      const fresh = await request<T>(endpoint, { ...options, method: 'GET' }, 3500);
+      const fresh = await request<T>(endpoint, { ...options, method: 'GET' });
       writeCache(endpoint, fresh);
       return fresh;
     } catch (err) {
