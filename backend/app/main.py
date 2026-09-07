@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -37,10 +38,23 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Set CORS Middleware
+# Set CORS Middleware with explicit origins for production Vercel & local development
+allowed_origins = [
+    "https://frontend-phi-seven-18.vercel.app",
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:3000",
+]
+
+cors_env = os.getenv("ALLOWED_ORIGINS") or os.getenv("BACKEND_CORS_ORIGINS")
+if cors_env:
+    extra_origins = [origin.strip() for origin in cors_env.split(",") if origin.strip()]
+    allowed_origins.extend(extra_origins)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
