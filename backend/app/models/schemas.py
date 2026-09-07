@@ -186,13 +186,24 @@ class MigrationPlanCreate(BaseModel):
 class MigrationTaskResponse(BaseModel):
     id: str
     plan_id: str
+    project_id: Optional[str] = None
     asset_id: str
+    recommendation_id: Optional[str] = None
     title: str
     description: Optional[str] = None
-    person_days: float
-    sequence_order: int
-    status: str
+    task_type: Optional[str] = "ALGORITHM_REPLACEMENT"
+    priority: Optional[str] = "P2"
+    migration_complexity: Optional[str] = "MEDIUM"
+    person_days: float = 1.0
+    sequence_order: int = 1
+    status: str = "NOT_STARTED"
+    affected_components: List[str] = []
+    dependencies: List[str] = []
+    blockers: List[str] = []
+    validation_requirements: List[str] = []
+    rationale: Optional[str] = None
     created_at: datetime
+    updated_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 
