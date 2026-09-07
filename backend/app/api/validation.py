@@ -67,20 +67,31 @@ def get_validation_for_simulation(simulation_id: str, db: Session = Depends(get_
     return runs
 
 @router.get("/validation/summary")
-def get_validation_summary(db: Session = Depends(get_db)):
+def get_validation_summary(project_id: Optional[str] = Query(None), db: Session = Depends(get_db)):
     val_repo = ValidationRepository(db)
-    runs = val_repo.list_all()
+    runs = val_repo.get_by_project(project_id) if project_id else val_repo.list_all()
 
     total_runs = len(runs)
-    passed_runs = sum(1 for r in runs if r.status in ["PASS", "PASSED"])
-    failed_runs = sum(1 for r in runs if r.status in ["FAIL", "FAILED"])
-    blocked_runs = sum(1 for r in runs if r.status in ["BLOCKED", "SKIPPED"])
+    passed_runs = sum(1 for r in runs if getattr(r.status, "value", str(r.status)) in ["PASS", "PASSED", "SUCCESS"])
+    failed_runs = sum(1 for r in runs if getattr(r.status, "value", str(r.status)) in ["FAIL", "FAILED"])
+    error_runs = sum(1 for r in runs if getattr(r.status, "value", str(r.status)) in ["ERROR", "BLOCKED"])
+    in_progress_runs = sum(1 for r in runs if getattr(r.status, "value", str(r.status)) in ["PENDING", "IN_PROGRESS", "RUNNING"])
+
+    avg_conf = (sum(r.confidence for r in runs if r.confidence is not None) / total_runs) if total_runs > 0 else 0.0
+    avg_risk = (sum(r.residual_risk_score for r in runs if r.residual_risk_score is not None) / total_runs) if total_runs > 0 else 0.0
 
     return {
+        "total_validations": total_runs,
+        "passed": passed_runs,
+        "failed": failed_runs,
+        "error": error_runs,
+        "in_progress": in_progress_runs,
+        "average_confidence": round(avg_conf, 2),
+        "average_residual_risk": round(avg_risk, 1),
         "total_validation_runs": total_runs,
         "passed_runs": passed_runs,
         "failed_runs": failed_runs,
-        "blocked_runs": blocked_runs,
+        "blocked_runs": error_runs,
         "pass_rate": round(passed_runs / total_runs, 2) if total_runs > 0 else 0.0,
         "runs": runs
     }

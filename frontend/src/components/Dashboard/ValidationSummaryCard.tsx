@@ -134,30 +134,44 @@ export const ValidationSummaryCard: React.FC<ValidationSummaryCardProps> = ({
               <div className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">
                 Recent Simulations
               </div>
-              {simulations.slice(0, 4).map((sim) => (
-                <div
-                  key={sim.id}
-                  className="flex items-center justify-between rounded-lg bg-slate-900/30 border border-slate-800/40 px-3 py-2 text-xs font-mono"
-                >
-                  <div className="flex items-center gap-2 truncate">
-                    <span
-                      className={`w-1.5 h-1.5 rounded-full ${
-                        sim.status === 'SUCCESS'
-                          ? 'bg-emerald-400'
-                          : sim.status === 'FAILED'
-                          ? 'bg-rose-400'
-                          : 'bg-amber-400'
-                      }`}
-                    />
-                    <span className="text-slate-300 truncate">
-                      {sim.source_algorithm || 'N/A'} → {sim.target_algorithm || 'N/A'}
-                    </span>
+              {simulations.slice(0, 4).map((sim) => {
+                const algLabel = (sim.source_algorithm && sim.target_algorithm)
+                  ? `${sim.source_algorithm} → ${sim.target_algorithm}`
+                  : (sim as any).transformation_type
+                  ? (sim as any).transformation_type.replace(/_TO_/g, ' → ').replace(/_/g, ' ')
+                  : 'PQC Migration Simulation';
+                
+                const dateLabel = sim.created_at
+                  ? new Date(sim.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                  : '';
+
+                return (
+                  <div
+                    key={sim.id}
+                    className="flex items-center justify-between rounded-lg bg-slate-900/30 border border-slate-800/40 px-3 py-2 text-xs font-mono"
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          sim.status === 'SUCCESS' || sim.status === 'TRANSFORMED'
+                            ? 'bg-emerald-400'
+                            : sim.status === 'FAILED'
+                            ? 'bg-rose-400'
+                            : 'bg-amber-400'
+                        }`}
+                      />
+                      <span className="text-slate-300 truncate font-semibold">
+                        {algLabel}
+                      </span>
+                    </div>
+                    {dateLabel && (
+                      <span className="text-[10px] text-slate-500 shrink-0 ml-2">
+                        {dateLabel}
+                      </span>
+                    )}
                   </div>
-                  <span className="text-[10px] text-slate-500 shrink-0 ml-2">
-                    {sim.created_at ? new Date(sim.created_at).toLocaleDateString() : ''}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

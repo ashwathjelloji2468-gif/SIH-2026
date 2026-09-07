@@ -45,9 +45,9 @@ export const Home: React.FC = () => {
         riskService.getRiskSummary(currentProject.id),
         inventoryService.getProjectCoverage(currentProject.id),
         scanService.getProjectScans(currentProject.id),
-        migrationService.getMigrationSummary(),
-        validationService.getValidationSummary(),
-        migrationService.listSimulations(),
+        migrationService.getMigrationSummary(currentProject.id),
+        validationService.getValidationSummary(currentProject.id),
+        migrationService.listSimulations(currentProject.id),
       ]);
 
       const loadedAssets = invRes.status === 'fulfilled' ? (invRes.value || []) : [];

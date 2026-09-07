@@ -73,3 +73,32 @@ class ValidationRepository:
 
     def list_all(self) -> List[ValidationRun]:
         return self.db.query(ValidationRun).order_by(desc(ValidationRun.created_at)).all()
+
+    def get_by_project(self, project_id: str) -> List[ValidationRun]:
+        from app.models.db_models import CryptoAsset, Scan, MigrationPlan, MigrationSimulation
+        runs_by_asset = (
+            self.db.query(ValidationRun)
+            .join(CryptoAsset, ValidationRun.asset_id == CryptoAsset.id)
+            .join(Scan, CryptoAsset.scan_id == Scan.id)
+            .filter(Scan.project_id == project_id)
+            .all()
+        )
+        runs_by_plan = (
+            self.db.query(ValidationRun)
+            .join(MigrationPlan, ValidationRun.plan_id == MigrationPlan.id)
+            .filter(MigrationPlan.project_id == project_id)
+            .all()
+        )
+        runs_by_sim = (
+            self.db.query(ValidationRun)
+            .join(MigrationSimulation, ValidationRun.simulation_id == MigrationSimulation.id)
+            .filter(MigrationSimulation.project_id == project_id)
+            .all()
+        )
+        seen = set()
+        unique_runs = []
+        for r in runs_by_asset + runs_by_plan + runs_by_sim:
+            if r.id not in seen:
+                seen.add(r.id)
+                unique_runs.append(r)
+        return sorted(unique_runs, key=lambda x: x.created_at or "", reverse=True)

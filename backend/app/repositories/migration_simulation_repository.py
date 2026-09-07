@@ -41,7 +41,10 @@ class MigrationSimulationRepository:
     def list_simulations(self, project_id: Optional[str] = None) -> List[MigrationSimulation]:
         query = self.db.query(MigrationSimulation)
         if project_id:
-            query = query.filter(MigrationSimulation.project_id == project_id)
+            from app.models.db_models import CryptoAsset, Scan
+            query = query.outerjoin(CryptoAsset, MigrationSimulation.asset_id == CryptoAsset.id).outerjoin(Scan, CryptoAsset.scan_id == Scan.id).filter(
+                (MigrationSimulation.project_id == project_id) | (Scan.project_id == project_id)
+            )
         return query.order_by(desc(MigrationSimulation.created_at)).all()
 
     def update_simulation_result(

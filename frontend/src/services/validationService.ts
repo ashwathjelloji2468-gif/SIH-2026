@@ -30,9 +30,10 @@ export const validationService = {
   },
 
   /** Get aggregated validation summary across all runs */
-  getValidationSummary: async (): Promise<ValidationSummary | null> => {
+  getValidationSummary: async (projectId?: string): Promise<ValidationSummary | null> => {
     try {
-      return await api.get<ValidationSummary>('/validation/summary');
+      const url = projectId ? `/validation/summary?project_id=${projectId}` : '/validation/summary';
+      return await api.get<ValidationSummary>(url);
     } catch (_) {
       return null;
     }

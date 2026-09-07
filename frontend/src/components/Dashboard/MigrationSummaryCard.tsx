@@ -136,10 +136,10 @@ export const MigrationSummaryCard: React.FC<MigrationSummaryCardProps> = ({
                 <div className="col-span-2 flex justify-end">
                   <span
                     className={`text-[10px] px-1.5 py-0.5 rounded-full border font-bold ${
-                      riskColors['HIGH'] || riskColors['MEDIUM']
+                      riskColors[asset.quantum_safety] || riskColors['HIGH']
                     }`}
                   >
-                    VULNERABLE
+                    {asset.quantum_safety === 'VULNERABLE' ? 'HIGH' : asset.quantum_safety}
                   </span>
                 </div>
               </div>

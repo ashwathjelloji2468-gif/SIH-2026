@@ -50,18 +50,20 @@ export const migrationService = {
   },
 
   /** List all Prompt 6 simulations */
-  listSimulations: async (): Promise<SimulationRecord[]> => {
+  listSimulations: async (projectId?: string): Promise<SimulationRecord[]> => {
     try {
-      return await api.get<SimulationRecord[]>('/migration/simulations');
+      const url = projectId ? `/migration/simulations?project_id=${projectId}` : '/migration/simulations';
+      return await api.get<SimulationRecord[]>(url);
     } catch (_) {
       return [];
     }
   },
 
   /** Get aggregated migration summary from Prompt 5/6 endpoints */
-  getMigrationSummary: async (): Promise<MigrationSummary | null> => {
+  getMigrationSummary: async (projectId?: string): Promise<MigrationSummary | null> => {
     try {
-      return await api.get<MigrationSummary>('/migration/summary');
+      const url = projectId ? `/migration/summary?project_id=${projectId}` : '/migration/summary';
+      return await api.get<MigrationSummary>(url);
     } catch (_) {
       return null;
     }
