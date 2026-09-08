@@ -14,9 +14,10 @@ import { useNavigate } from 'react-router-dom';
 interface AssetDetailDrawerProps {
   asset: CryptoAsset | null;
   onClose: () => void;
+  onAssetReviewed?: () => void;
 }
 
-export const AssetDetailDrawer: React.FC<AssetDetailDrawerProps> = ({ asset, onClose }) => {
+export const AssetDetailDrawer: React.FC<AssetDetailDrawerProps> = ({ asset, onClose, onAssetReviewed }) => {
   const [evidenceList, setEvidenceList] = useState<Evidence[]>([]);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [riskAssessment, setRiskAssessment] = useState<RiskAssessment | null>(null);
@@ -24,6 +25,11 @@ export const AssetDetailDrawer: React.FC<AssetDetailDrawerProps> = ({ asset, onC
   const [impact, setImpact] = useState<AssetImpact | null>(null);
   const [migrationInfo, setMigrationInfo] = useState<Record<string, any> | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
+  const [reviewAlgo, setReviewAlgo] = useState<string>('');
+  const [reviewPurpose, setReviewPurpose] = useState<string>('ENCRYPTION');
+  const [reviewAction, setReviewAction] = useState<'RESOLVE' | 'REJECT'>('RESOLVE');
+  const [reviewSubmitting, setReviewSubmitting] = useState<boolean>(false);
+  const [reviewSuccess, setReviewSuccess] = useState<boolean>(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -63,6 +69,32 @@ export const AssetDetailDrawer: React.FC<AssetDetailDrawerProps> = ({ asset, onC
     };
   }, [asset]);
 
+  useEffect(() => {
+    if (asset) {
+      setReviewAlgo(asset.algorithm_name === 'UNKNOWN_ALGORITHM' ? 'AES' : asset.algorithm_name);
+      setReviewPurpose(asset.purpose || 'ENCRYPTION');
+      setReviewSuccess(false);
+    }
+  }, [asset]);
+
+  const handleReviewSubmit = async () => {
+    if (!asset) return;
+    setReviewSubmitting(true);
+    try {
+      await inventoryService.reviewUnknownAsset(asset.id, {
+        algorithm_name: reviewAction === 'RESOLVE' ? reviewAlgo : undefined,
+        purpose: reviewAction === 'RESOLVE' ? (reviewPurpose as any) : undefined,
+        action: reviewAction,
+      });
+      setReviewSuccess(true);
+      if (onAssetReviewed) onAssetReviewed();
+    } catch (err) {
+      console.error('Failed to submit review:', err);
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
+
   if (!asset) return null;
 
   const isVulnerable = asset.quantum_safety === 'VULNERABLE';
@@ -100,6 +132,101 @@ export const AssetDetailDrawer: React.FC<AssetDetailDrawerProps> = ({ asset, onC
 
           {/* Drawer Scrollable Content */}
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            {/* Human Review Controls Section */}
+            {(asset.is_unknown || asset.review_status === 'PENDING' || (asset.review_status as string) === 'PENDING_REVIEW') && (
+              <div className="rounded-2xl border border-amber-500/40 bg-[#1E293B] p-5 space-y-4 shadow-xl">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-700/80">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-amber-950/80 border border-amber-800/80 text-amber-400">
+                      <AlertTriangle className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold font-mono text-slate-100">Human-in-the-Loop Review</h3>
+                      <p className="text-[11px] text-slate-400">Preserving original automated evidence while submitting human classification decision</p>
+                    </div>
+                  </div>
+                  {reviewSuccess && (
+                    <span className="text-xs font-mono text-emerald-400 font-bold flex items-center gap-1">
+                      <CheckCircle2 className="w-4 h-4" /> Reviewed & Saved
+                    </span>
+                  )}
+                </div>
+
+                {/* Automated Evidence Snapshot (Untouched) */}
+                <div className="rounded-xl border border-slate-700/60 bg-[#0B0F19] p-3 text-[11px] font-mono space-y-1">
+                  <div className="text-slate-400">Detector: <span className="text-cyan-300">{primaryEvidence?.detector_name || 'AST_Pattern_Engine'}</span></div>
+                  <div className="text-slate-400">Confidence: <span className="text-emerald-300">{Math.round((primaryEvidence?.confidence_score || 0.95) * 100)}%</span></div>
+                  <div className="text-slate-400">Reason: <span className="text-amber-300">{asset.unknown_reason || 'Unclassified heuristic detection'}</span></div>
+                </div>
+
+                {!reviewSuccess && (
+                  <div className="space-y-3 pt-1">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-mono text-slate-300 mb-1">Identified Algorithm</label>
+                        <input
+                          type="text"
+                          value={reviewAlgo}
+                          onChange={(e) => setReviewAlgo(e.target.value)}
+                          className="w-full px-3 py-1.5 rounded-lg bg-[#0B0F19] border border-slate-700 text-slate-200 text-xs font-mono focus:outline-none focus:border-cyan-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-mono text-slate-300 mb-1">Crypto Purpose</label>
+                        <select
+                          value={reviewPurpose}
+                          onChange={(e) => setReviewPurpose(e.target.value)}
+                          className="w-full px-3 py-1.5 rounded-lg bg-[#0B0F19] border border-slate-700 text-slate-200 text-xs font-mono focus:outline-none focus:border-cyan-500"
+                        >
+                          <option value="ENCRYPTION">ENCRYPTION</option>
+                          <option value="SIGNATURE">DIGITAL_SIGNATURE</option>
+                          <option value="KEY_ESTABLISHMENT">KEY_ESTABLISHMENT</option>
+                          <option value="HASHING">HASHING</option>
+                          <option value="MAC">MAC</option>
+                          <option value="AUTHENTICATION">AUTHENTICATION</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setReviewAction('RESOLVE')}
+                          className={`px-3 py-1 rounded-lg text-xs font-mono cursor-pointer border ${
+                            reviewAction === 'RESOLVE'
+                              ? 'bg-cyan-950/80 border-cyan-500 text-cyan-300 font-bold'
+                              : 'bg-slate-900 border-slate-800 text-slate-400'
+                          }`}
+                        >
+                          Confirm
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setReviewAction('REJECT')}
+                          className={`px-3 py-1 rounded-lg text-xs font-mono cursor-pointer border ${
+                            reviewAction === 'REJECT'
+                              ? 'bg-rose-950/80 border-rose-500 text-rose-300 font-bold'
+                              : 'bg-slate-900 border-slate-800 text-slate-400'
+                          }`}
+                        >
+                          Reject
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleReviewSubmit}
+                        disabled={reviewSubmitting}
+                        className="px-4 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold font-mono transition-all cursor-pointer shadow-md shadow-amber-950/40"
+                      >
+                        {reviewSubmitting ? 'Saving...' : 'Submit Review'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             {/* 4-Step Explainability Framework: WHAT -> WHERE -> WHY -> WHAT NEXT */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* WHAT */}
