@@ -7,6 +7,7 @@ from app.scanners.container_scanner import ContainerScanner
 from app.scanners.binary_scanner import BinaryScanner
 from app.scanners.dependency_scanner import DependencyScanner
 from app.scanners.certificate_scanner import CertificateScanner
+from app.scanners.protocol_scanner import ProtocolScanner
 from app.discovery.deduplication import deduplicate_findings
 from app.normalization.crypto_asset_normalizer import determine_quantum_safety
 from app.cbom.cyclonedx_adapter import generate_cbom_json
@@ -27,7 +28,14 @@ class ScanOrchestrator:
         try:
             scan_repo.update_status(scan_id, ScanStatus.RUNNING)
 
-            scanners = [SourceScanner(), DependencyScanner(), CertificateScanner(), ContainerScanner(), BinaryScanner()]
+            scanners = [
+                SourceScanner(),
+                DependencyScanner(),
+                CertificateScanner(),
+                ContainerScanner(),
+                BinaryScanner(),
+                ProtocolScanner()
+            ]
             raw_findings = []
             for scanner in scanners:
                 raw_findings.extend(scanner.scan(scan.target_path))
