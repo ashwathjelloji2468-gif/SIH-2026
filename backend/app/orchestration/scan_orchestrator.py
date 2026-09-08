@@ -8,6 +8,7 @@ from app.scanners.binary_scanner import BinaryScanner
 from app.scanners.dependency_scanner import DependencyScanner
 from app.scanners.certificate_scanner import CertificateScanner
 from app.scanners.protocol_scanner import ProtocolScanner
+from app.scanners.vendor_scanner import VendorScanner
 from app.discovery.deduplication import deduplicate_findings
 from app.normalization.crypto_asset_normalizer import determine_quantum_safety
 from app.cbom.cyclonedx_adapter import generate_cbom_json
@@ -34,7 +35,8 @@ class ScanOrchestrator:
                 CertificateScanner(),
                 ContainerScanner(),
                 BinaryScanner(),
-                ProtocolScanner()
+                ProtocolScanner(),
+                VendorScanner()
             ]
             raw_findings = []
             for scanner in scanners:
