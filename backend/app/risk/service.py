@@ -54,6 +54,16 @@ class RiskService:
         detector_names = [e.detector_name for e in (asset.evidence_items or [])]
         excerpts = [e.excerpt for e in (asset.evidence_items or []) if e.excerpt]
 
+        # Dynamically estimate repo-level migration time Y if default 3.0 is passed
+        if migration_time_years == 3.0 and self.asset_repo and hasattr(asset, "scan_id"):
+            try:
+                project_assets = self.asset_repo.get_by_scan(asset.scan_id)
+                if project_assets:
+                    from app.risk.mosca import estimate_migration_time_from_assets
+                    migration_time_years = estimate_migration_time_from_assets(project_assets)
+            except Exception:
+                pass
+
         eval_result = self.engine.evaluate_asset_risk(
             algorithm_name=asset.algorithm_name,
             quantum_safety=asset.quantum_safety,
@@ -83,11 +93,17 @@ class RiskService:
             raise RuntimeError("Database repository unavailable.")
         assets = self.asset_repo.get_by_project(project_id)
         results = []
+        
+        # Calculate dynamic Y for the repository
+        from app.risk.mosca import estimate_migration_time_from_assets
+        dynamic_y = estimate_migration_time_from_assets(assets)
+
         for asset in assets:
             res = self.assess_asset(
                 asset_id=asset.id,
                 data_sensitivity_label=data_sensitivity_label,
                 business_criticality_label=business_criticality_label,
+                migration_time_years=dynamic_y,
                 quantum_threat_horizon_year=quantum_threat_horizon_year,
                 force_reassessment=True
             )
