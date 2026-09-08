@@ -153,6 +153,10 @@ class RecommendationResponse(BaseModel):
     rationale: str
     compatibility_notes: Optional[str] = None
     performance_notes: Optional[str] = None
+    latency_impact: Optional[str] = None
+    cost_impact: Optional[str] = None
+    latency_level: Optional[str] = None
+    cost_level: Optional[str] = None
     migration_complexity: str
     confidence: float
     kb_version: str = "2026.3.0-NIST-PQC"

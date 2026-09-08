@@ -1,4 +1,5 @@
 import uuid
+from typing import Optional
 from datetime import datetime, timezone
 from sqlalchemy import (
     Column, String, Integer, Float, Boolean, DateTime, ForeignKey, Text, JSON, Enum as SQLEnum
@@ -183,6 +184,30 @@ class Recommendation(Base):
 
     # Relationships
     asset = relationship("CryptoAsset", back_populates="recommendations")
+
+    @property
+    def latency_impact(self) -> Optional[str]:
+        if self.tradeoffs and isinstance(self.tradeoffs, dict):
+            return self.tradeoffs.get("latency_impact")
+        return None
+
+    @property
+    def cost_impact(self) -> Optional[str]:
+        if self.tradeoffs and isinstance(self.tradeoffs, dict):
+            return self.tradeoffs.get("cost_impact")
+        return None
+
+    @property
+    def latency_level(self) -> Optional[str]:
+        if self.tradeoffs and isinstance(self.tradeoffs, dict):
+            return self.tradeoffs.get("latency_level", "LOW")
+        return "LOW"
+
+    @property
+    def cost_level(self) -> Optional[str]:
+        if self.tradeoffs and isinstance(self.tradeoffs, dict):
+            return self.tradeoffs.get("cost_level", "MEDIUM")
+        return "MEDIUM"
 
 class ThreatScenario(Base):
     __tablename__ = "threat_scenarios"

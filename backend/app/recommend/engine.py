@@ -6,8 +6,9 @@ from app.models.enums import (
 
 class RecommendationEngine:
     """
-    Deterministic PQC Recommendation Engine for Prompt 4.
-    Purpose-first, risk-aware, threat-aware candidate selection.
+    Deterministic PQC Recommendation Engine for Prompt 4 & Component E.
+    Purpose-first, risk-aware, threat-aware candidate selection enriched with
+    practical latency and cost considerations.
     """
     def evaluate_recommendations(self, asset: Any) -> List[Dict[str, Any]]:
         detector_names = [e.detector_name for e in (getattr(asset, "evidence_items", []) or [])]
@@ -54,21 +55,30 @@ class RecommendationEngine:
         else:
             priority = "LOW"
 
-        # 3. Determine Migration Notes from Migration Complexity
+        # 3. Extract Latency & Cost Factors
+        latency_impact = tradeoffs.get("latency_impact", "Minimal latency impact.")
+        cost_impact = tradeoffs.get("cost_impact", "Standard migration cost.")
+        latency_level = tradeoffs.get("latency_level", "LOW")
+        cost_level = tradeoffs.get("cost_level", "MEDIUM")
+
+        # 4. Determine Migration Notes from Migration Complexity & Cost Impact
         comp_str = (migration_complexity or "MEDIUM").upper()
         if comp_str == "HIGH":
-            migration_notes = "Phased migration recommended with extensive compatibility testing and human review due to complex dependencies/native binaries."
+            base_mig_notes = "Phased migration recommended with extensive compatibility testing and human review due to complex dependencies/native binaries."
         elif comp_str == "MEDIUM":
-            migration_notes = "Standard PQC migration recommended with automated testing and dependency updates."
+            base_mig_notes = "Standard PQC migration recommended with automated testing and dependency updates."
         elif comp_str == "LOW":
-            migration_notes = "Straightforward PQC transition via direct code or config update."
+            base_mig_notes = "Straightforward PQC transition via direct code or config update."
         else:
-            migration_notes = "Cryptographic complexity assessment required prior to committing migration resources."
+            base_mig_notes = "Cryptographic complexity assessment required prior to committing migration resources."
 
-        # 4. Calculate Recommendation Confidence (independent of risk score)
+        full_mig_notes = f"{base_mig_notes} | Cost Impact: {cost_impact}"
+        full_perf_notes = f"{tradeoffs.get('performance_notes', '')} | Latency Impact: {latency_impact}".strip(" |")
+
+        # 5. Calculate Recommendation Confidence
         confidence = self._calculate_confidence(alg_upper, purpose, detector_names or [])
 
-        # 5. Enrich Rationale with Threat & Risk Context
+        # 6. Enrich Rationale with Threat & Risk Context
         rationale_lines = [base_rationale]
 
         if "HARVEST_NOW_DECRYPT_LATER" in threat_types:
@@ -116,10 +126,14 @@ class RecommendationEngine:
             "standard_status": std_status,
             "rationale": full_rationale,
             "compatibility_notes": tradeoffs.get("compatibility_notes"),
-            "performance_notes": tradeoffs.get("performance_notes"),
+            "performance_notes": full_perf_notes,
+            "latency_impact": latency_impact,
+            "cost_impact": cost_impact,
+            "latency_level": latency_level,
+            "cost_level": cost_level,
             "tradeoffs": tradeoffs,
             "threat_scenarios": threat_scenarios or [],
-            "migration_notes": migration_notes,
+            "migration_notes": full_mig_notes,
             "migration_complexity": comp_str,
             "confidence": confidence,
             "kb_version": "2026.3.0-NIST-PQC"
@@ -131,14 +145,18 @@ class RecommendationEngine:
         purpose: CryptoPurpose,
         quantum_safety: QuantumSafety
     ):
-        # 1. MAC (Check MAC before HASHING since HMAC contains SHA)
+        # 1. MAC
         if purpose == CryptoPurpose.MAC or "HMAC" in alg_upper:
             tradeoffs = {
                 "algorithm": "RETAIN_MAC",
                 "purpose": "MAC",
                 "security_margin": "HMAC relies on symmetric hashing and is inherently quantum-resistant.",
                 "compatibility_notes": "Drop-in symmetric message authentication.",
-                "performance_notes": "Fast symmetric authentication."
+                "performance_notes": "Fast symmetric authentication.",
+                "latency_impact": "Zero latency overhead. Fast symmetric authentication.",
+                "cost_impact": "Zero migration cost. Retain existing MAC configuration.",
+                "latency_level": "LOW",
+                "cost_level": "LOW"
             }
             return (
                 RecommendationCategory.RETAIN_MAC,
@@ -156,7 +174,11 @@ class RecommendationEngine:
                 "purpose": "HASHING",
                 "security_margin": "Symmetric hash functions (SHA-256, SHA-384, SHA-512, SHA-3) retain sufficient quantum security.",
                 "compatibility_notes": "Ensure output size is at least 256 bits.",
-                "performance_notes": "High performance standard CPU hashing."
+                "performance_notes": "High performance standard CPU hashing.",
+                "latency_impact": "Zero latency overhead. Hardware-accelerated cryptographic hash processing.",
+                "cost_impact": "Zero migration cost. Retain existing hashing pipeline.",
+                "latency_level": "LOW",
+                "cost_level": "LOW"
             }
             return (
                 RecommendationCategory.RETAIN_HASH,
@@ -174,7 +196,11 @@ class RecommendationEngine:
                 "purpose": "PASSWORD_DERIVATION",
                 "security_margin": "Password key derivation functions do not use public-key cryptography and are not broken by Shor's algorithm.",
                 "compatibility_notes": "Retain iterative/memory-hard password hashing.",
-                "performance_notes": "Configured memory and work factors control brute-force resistance."
+                "performance_notes": "Configured memory and work factors control brute-force resistance.",
+                "latency_impact": "Configured work factor delay (100ms-500ms) for brute-force resistance. Not affected by quantum algorithm changes.",
+                "cost_impact": "Zero migration cost. Retain existing KDF parameters.",
+                "latency_level": "LOW",
+                "cost_level": "LOW"
             }
             return (
                 RecommendationCategory.RETAIN_PASSWORD_DERIVATION,
@@ -193,6 +219,10 @@ class RecommendationEngine:
                 "security_margin": "AES/ChaCha20 symmetric encryption retains 128+ bits of security against Grover's algorithm.",
                 "compatibility_notes": "No direct PQC algorithm replaces AES. Retain symmetric encryption with 256-bit keys (e.g., AES-256-GCM).",
                 "performance_notes": "Excellent hardware-accelerated CPU performance (AES-NI).",
+                "latency_impact": "Zero latency overhead. Hardware-accelerated via AES-NI / ARMv8 Crypto instructions (~0.01ms per block).",
+                "cost_impact": "Zero migration cost. Retain existing symmetric encryption pipeline.",
+                "latency_level": "LOW",
+                "cost_level": "LOW",
                 "action": "Focus PQC migration on protecting key establishment/wrapping used to establish symmetric keys."
             }
             return (
@@ -211,7 +241,11 @@ class RecommendationEngine:
                 "purpose": "KEY_ESTABLISHMENT",
                 "artifact_sizes": "Public key: 800-1568 bytes; Ciphertext: 768-1568 bytes.",
                 "compatibility_notes": "Requires protocol adjustment for KEM encapsulation interface instead of direct key exchange/transport.",
-                "performance_notes": "Fast encapsulation and decapsulation efficiency. Benchmark network payload impact.",
+                "performance_notes": "Fast encapsulation and decapsulation efficiency (~0.05ms). Minimal network payload impact (+1.9KB).",
+                "latency_impact": "Low CPU encapsulation latency (+0.05ms). Public key size: 800 bytes (ML-KEM-768), ciphertext: 1088 bytes. Minimal network RTT impact (+1.9KB handshake payload).",
+                "cost_impact": "Low to Moderate implementation cost. Software dependency update (OpenSSL 3.2+ / liboqs / BouncyCastle). Estimated effort: 2-5 person-days.",
+                "latency_level": "LOW",
+                "cost_level": "MODERATE",
                 "alternative_approach": "Hybrid mode combining classical ECDH + ML-KEM preserves compatibility during migration."
             }
             return (
@@ -230,7 +264,11 @@ class RecommendationEngine:
                 "purpose": "DIGITAL_SIGNATURE",
                 "artifact_sizes": "Public key: 1.3KB-2.6KB; Signature: 2.4KB-4.6KB.",
                 "compatibility_notes": "Requires buffer updates for signature storage (~2.4KB-4.6KB).",
-                "performance_notes": "High verification performance. Suitable for TLS handshakes and token signing.",
+                "performance_notes": "High verification throughput and fast CPU signing (~0.1ms).",
+                "latency_impact": "High verification throughput, low CPU overhead. Signature size: 3.3KB (ML-DSA-65), public key: 1.9KB. May require TCP segment fragmentation handling for TLS handshakes.",
+                "cost_impact": "Moderate to High cost. Requires PKI certificate chain re-issuance, trust store updates, and application buffer expansion. Estimated effort: 5-10 person-days.",
+                "latency_level": "MODERATE",
+                "cost_level": "HIGH",
                 "alternative_approach": "SLH-DSA (FIPS 205) is a conservative hash-based signature alternative for long-term root CA or firmware signing."
             }
             return (
@@ -247,7 +285,11 @@ class RecommendationEngine:
             "algorithm": "MANUAL_REVIEW",
             "purpose": "UNKNOWN",
             "compatibility_notes": "Cryptographic purpose or algorithm classification is unknown. Manual cryptography audit required.",
-            "performance_notes": "N/A"
+            "performance_notes": "N/A",
+            "latency_impact": "Latency impact undetermined pending manual cryptographic audit.",
+            "cost_impact": "Cost undetermined pending manual code and architecture review.",
+            "latency_level": "UNKNOWN",
+            "cost_level": "HIGH"
         }
         return (
             RecommendationCategory.MANUAL_REVIEW,
