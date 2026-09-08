@@ -1,6 +1,7 @@
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
 from app.models.enums import RiskLevel, QuantumSafety, CryptoPurpose
+from app.normalization.crypto_asset_normalizer import classify_crypto_asset
 from app.risk.rules import (
     classify_algorithm_vulnerability,
     determine_crypto_purpose,
@@ -37,6 +38,13 @@ class RiskEngine:
         quantum_threat_horizon_year: Optional[int] = None,
         evidence_excerpts: Optional[List[str]] = None
     ) -> Dict[str, Any]:
+
+        # 0. Artefact Classification
+        classification = classify_crypto_asset(algorithm_name, asset_type=asset_type, purpose=purpose)
+        if business_criticality_label == "UNKNOWN":
+            business_criticality_label = classification["business_criticality_label"]
+        if data_lifetime_years == 10.0 and classification["data_lifetime_years"] != 10.0:
+            data_lifetime_years = classification["data_lifetime_years"]
 
         # 1. Quantum Vulnerability Classification
         classified_qs, quantum_exposure, qs_rationale = classify_algorithm_vulnerability(algorithm_name)
@@ -136,6 +144,7 @@ class RiskEngine:
             "algorithm_name": algorithm_name,
             "quantum_status": final_qs.value if hasattr(final_qs, "value") else str(final_qs),
             "crypto_purpose": final_purpose.value if hasattr(final_purpose, "value") else str(final_purpose),
+            "classification": classification,
             "risk_score": risk_score,
             "risk_level": risk_level.value if hasattr(risk_level, "value") else str(risk_level),
             "priority": priority,

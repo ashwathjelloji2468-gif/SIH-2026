@@ -76,6 +76,36 @@ class CryptoAsset(Base):
     recommendations = relationship("Recommendation", back_populates="asset", cascade="all, delete-orphan")
     threat_scenarios = relationship("ThreatScenario", back_populates="asset", cascade="all, delete-orphan")
 
+    @property
+    def classification(self):
+        from app.normalization.crypto_asset_normalizer import classify_crypto_asset
+        return classify_crypto_asset(
+            algorithm_name=self.algorithm_name,
+            key_size=self.key_size,
+            asset_type=self.asset_type,
+            purpose=self.purpose
+        )
+
+    @property
+    def data_lifetime_years(self) -> float:
+        return self.classification["data_lifetime_years"]
+
+    @property
+    def lifetime_label(self) -> str:
+        return self.classification["lifetime_label"]
+
+    @property
+    def business_criticality_label(self) -> str:
+        return self.classification["business_criticality_label"]
+
+    @property
+    def business_criticality_score(self) -> float:
+        return self.classification["business_criticality_score"]
+
+    @property
+    def classification_summary(self) -> str:
+        return self.classification["classification_summary"]
+
 class Evidence(Base):
     __tablename__ = "evidence"
 
