@@ -67,7 +67,27 @@ class ProjectRepository:
         self.db.refresh(db_obj)
         return db_obj
 
+    def update_y_context(
+        self,
+        project_id: str,
+        user_y_scenario: Optional[str] = None,
+        clear_user_y: bool = False
+    ) -> Optional[Project]:
+        db_obj = self.get(project_id)
+        if not db_obj:
+            return None
+
+        if clear_user_y:
+            db_obj.user_y_scenario = None
+        elif user_y_scenario is not None:
+            db_obj.user_y_scenario = user_y_scenario
+
+        self.db.commit()
+        self.db.refresh(db_obj)
+        return db_obj
+
     def delete(self, project_id: str) -> bool:
+
         db_obj = self.get(project_id)
         if db_obj:
             self.db.delete(db_obj)

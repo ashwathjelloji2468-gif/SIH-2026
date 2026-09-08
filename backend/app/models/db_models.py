@@ -24,8 +24,10 @@ class Project(Base):
     repository_url = Column(String, nullable=True)
     user_x_years = Column(Integer, nullable=True)
     user_domain = Column(String, nullable=True)
+    user_y_scenario = Column(String, nullable=True)
     folder_contexts = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
 
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 

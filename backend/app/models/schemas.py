@@ -29,12 +29,14 @@ class ProjectUpdate(BaseModel):
     repository_url: Optional[str] = None
     user_x_years: Optional[int] = None
     user_domain: Optional[str] = None
+    user_y_scenario: Optional[str] = None
     folder_contexts: Optional[Dict[str, Any]] = None
 
 class ProjectResponse(ProjectBase):
     id: str
     user_x_years: Optional[int] = None
     user_domain: Optional[str] = None
+    user_y_scenario: Optional[str] = None
     folder_contexts: Optional[Dict[str, Any]] = None
     created_at: datetime
     updated_at: datetime
@@ -71,6 +73,28 @@ class DomainBaselineSchema(BaseModel):
     description: str
     compliance_references: List[str]
     keywords: List[str]
+
+# Y Engine Schemas
+class YResultResponse(BaseModel):
+    value: int  # 5 | 10 | 15 | 20
+    unit: str = "years"
+    scenario: str  # "FAST" | "STANDARD" | "COMPLEX" | "LEGACY_HEAVY"
+    scenarioTitle: str
+    source: str  # "SYSTEM_DEFAULT" | "USER_SELECTED"
+    explanation: str
+    details: Optional[str] = None
+
+class YContextUpdateRequest(BaseModel):
+    user_y_scenario: Optional[str] = None
+    clear_user_y: bool = False
+
+class MigrationScenarioSchema(BaseModel):
+    key: str
+    title: str
+    value: int
+    description: str
+    details: str
+
 
 
 # Scan Schemas
