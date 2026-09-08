@@ -50,17 +50,30 @@ export const MoscaUrgencyCard: React.FC<MoscaUrgencyCardProps> = ({
       <div className="space-y-4">
         {/* The Equation */}
         <div className="p-3.5 rounded-lg bg-slate-950/70 border border-slate-800 font-mono text-center">
-          <div className="text-xs text-slate-400 mb-1">Fundamental Mosca Inequality:</div>
+          <div className="text-xs text-slate-400 mb-1.5 font-sans font-medium">Fundamental Mosca Inequality:</div>
           <div className="text-base sm:text-lg font-extrabold tracking-wide">
             <span className="text-cyan-400">X ({xLifetime}y)</span> +{' '}
             <span className="text-blue-400">Y ({yMigration}y)</span>{' '}
             <span className={isBreached ? 'text-rose-400 font-black' : 'text-emerald-400'}>
               {isBreached ? '>' : '≤'}
             </span>{' '}
-            <span className="text-purple-400">Z ({yearsUntilZ}y until {zHorizonYear})</span>
+            <span className="text-purple-400">Z ({yearsUntilZ}y)</span>
           </div>
-          <div className="text-[11px] text-slate-500 mt-1">
-            {totalRequiredTime} years required vs {yearsUntilZ} years available until Cryptanalytically Relevant Quantum Computer (CRQC)
+
+          {/* Explicit X, Y, Z breakdown labels */}
+          <div className="grid grid-cols-3 gap-2 mt-3 text-center border-t border-slate-800/80 pt-2.5 text-[11px] font-sans">
+            <div>
+              <div className="font-semibold text-cyan-400">X = Data Lifetime</div>
+              <div className="text-slate-400 text-[10px]">Shelf-Life ({xLifetime} yrs)</div>
+            </div>
+            <div>
+              <div className="font-semibold text-blue-400">Y = Migration Time</div>
+              <div className="text-slate-400 text-[10px]">Migration ({yMigration} yrs)</div>
+            </div>
+            <div>
+              <div className="font-semibold text-purple-400">Z = Years until CRQC</div>
+              <div className="text-slate-400 text-[10px]">Threat Horizon ({yearsUntilZ}y / {zHorizonYear})</div>
+            </div>
           </div>
         </div>
 

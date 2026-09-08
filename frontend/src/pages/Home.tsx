@@ -167,7 +167,11 @@ export const Home: React.FC = () => {
       {/* Mosca Theorem Urgency & Algorithm Distribution Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-6">
-          <MoscaUrgencyCard />
+          <MoscaUrgencyCard
+            xLifetime={riskSummary?.mosca?.data_lifetime_years}
+            yMigration={riskSummary?.mosca?.migration_time_years}
+            zHorizonYear={riskSummary?.mosca?.quantum_threat_horizon}
+          />
         </div>
         <div className="lg:col-span-6">
           <AlgorithmChart assets={assets} />

@@ -61,20 +61,20 @@ const MoscaScene: React.FC<MoscaMeshProps> = ({
 
         {/* Dynamic Labels */}
         <Html position={[-2, 1.2, 0]} center>
-          <div className="px-2 py-1 rounded bg-[#06080F]/90 border border-cyan-500/40 text-[10px] font-mono text-cyan-300 font-bold whitespace-nowrap shadow-lg">
-            X (Lifetime) = {dataLifetime}y
+          <div className="px-2 py-1 rounded bg-[#06080F]/90 border border-cyan-500/40 text-[10px] font-mono text-cyan-400 font-bold whitespace-nowrap shadow-lg">
+            X (Data Lifetime) = {dataLifetime}y
           </div>
         </Html>
 
         <Html position={[2, 1.2, 0]} center>
-          <div className="px-2 py-1 rounded bg-[#06080F]/90 border border-emerald-500/40 text-[10px] font-mono text-emerald-300 font-bold whitespace-nowrap shadow-lg">
-            Y (Migration) = {migrationTime}y
+          <div className="px-2 py-1 rounded bg-[#06080F]/90 border border-blue-500/40 text-[10px] font-mono text-blue-400 font-bold whitespace-nowrap shadow-lg">
+            Y (Migration Time) = {migrationTime}y
           </div>
         </Html>
 
         <Html position={[0, -1.8, 2]} center>
-          <div className="px-2 py-1 rounded bg-[#06080F]/90 border border-rose-500/40 text-[10px] font-mono text-rose-300 font-bold whitespace-nowrap shadow-lg">
-            Z (Horizon) = {threatHorizon}
+          <div className="px-2 py-1 rounded bg-[#06080F]/90 border border-purple-500/40 text-[10px] font-mono text-purple-400 font-bold whitespace-nowrap shadow-lg">
+            Z (Years until CRQC) = {threatHorizon}
           </div>
         </Html>
       </group>

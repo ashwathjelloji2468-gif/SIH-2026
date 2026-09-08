@@ -129,22 +129,25 @@ export const ProductShowcase: React.FC = () => {
             >
               <div className="text-center mb-8">
                 <h3 className="text-xl font-semibold text-white mb-2">Mosca's Theorem Analysis</h3>
-                <div className="text-2xl font-mono text-cyan-300 my-6 tracking-widest bg-cyan-950/30 p-4 rounded-xl border border-cyan-500/20 inline-block">
-                  X + Y &gt; Z
+                <div className="text-xl md:text-2xl font-mono my-6 tracking-wide bg-slate-950/70 p-4 rounded-xl border border-slate-800 inline-block">
+                  <span className="text-cyan-400">X (10y)</span> + <span className="text-blue-400">Y (3y)</span> <span className="text-rose-400 font-bold">&gt;</span> <span className="text-purple-400">Z (7y)</span>
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-3xl mb-10">
                 <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4 text-center">
-                  <div className="text-slate-400 text-sm mb-1">Data Lifetime (X)</div>
-                  <div className="text-3xl font-bold text-white">10<span className="text-lg text-slate-500 ml-1">yrs</span></div>
+                  <div className="text-cyan-400 text-sm font-semibold mb-1">X = Data Lifetime</div>
+                  <div className="text-slate-400 text-xs mb-1">Confidentiality Shelf-Life</div>
+                  <div className="text-3xl font-bold text-cyan-400">10<span className="text-lg text-slate-500 ml-1">yrs</span></div>
                 </div>
                 <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4 text-center">
-                  <div className="text-slate-400 text-sm mb-1">Migration Time (Y)</div>
-                  <div className="text-3xl font-bold text-white">3<span className="text-lg text-slate-500 ml-1">yrs</span></div>
+                  <div className="text-blue-400 text-sm font-semibold mb-1">Y = Migration Time</div>
+                  <div className="text-slate-400 text-xs mb-1">Upgrade Execution Effort</div>
+                  <div className="text-3xl font-bold text-blue-400">3<span className="text-lg text-slate-500 ml-1">yrs</span></div>
                 </div>
                 <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4 text-center">
-                  <div className="text-slate-400 text-sm mb-1">Threat Horizon (Z)</div>
-                  <div className="text-3xl font-bold text-rose-400">2033</div>
+                  <div className="text-purple-400 text-sm font-semibold mb-1">Z = Years until CRQC</div>
+                  <div className="text-slate-400 text-xs mb-1">Quantum Threat Horizon (2033)</div>
+                  <div className="text-3xl font-bold text-purple-400">7<span className="text-lg text-slate-500 ml-1">yrs</span></div>
                 </div>
               </div>
               <div className="bg-rose-500/20 border border-rose-500/50 text-rose-200 px-6 py-3 rounded-full font-semibold flex items-center gap-2">

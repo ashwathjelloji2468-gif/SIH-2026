@@ -85,11 +85,16 @@ export const Risk: React.FC = () => {
             <h3 className="text-sm font-semibold text-slate-100 font-mono">3D Threat Horizon & Risk Exposure Space</h3>
           </div>
           <span className="text-xs font-mono text-cyan-300 bg-cyan-950/60 border border-cyan-800/60 px-2.5 py-1 rounded-full">
-            Theorem: X (10y) + Y (3y) &gt; Z (2033)
+            Theorem: X ({riskSummary?.mosca?.data_lifetime_years || 10}y) + Y ({riskSummary?.mosca?.migration_time_years || 3}y) &gt; Z ({riskSummary?.mosca?.quantum_threat_horizon || 2033})
           </span>
         </div>
         <div className="h-[380px] w-full rounded-xl overflow-hidden bg-[#06080F]/90 border border-slate-800/60 relative">
-          <MoscaGraph3D dataLifetime={10} migrationTime={3} threatHorizon={2033} className="w-full h-full" />
+          <MoscaGraph3D
+            dataLifetime={riskSummary?.mosca?.data_lifetime_years || 10}
+            migrationTime={riskSummary?.mosca?.migration_time_years || 3}
+            threatHorizon={riskSummary?.mosca?.quantum_threat_horizon || 2033}
+            className="w-full h-full"
+          />
         </div>
       </div>
 

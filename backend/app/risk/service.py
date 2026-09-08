@@ -192,6 +192,10 @@ class RiskService:
             reverse=True
         )
 
+        # Calculate dynamic Mosca summary for the project
+        from app.risk.mosca import calculate_mosca_urgency
+        mosca_summary = calculate_mosca_urgency(assets=assets)
+
         return {
             "project_id": project_id,
             "total_assets": total_assets,
@@ -208,6 +212,7 @@ class RiskService:
             "confidence_summary": {
                 "average_confidence": avg_conf
             },
+            "mosca": mosca_summary,
             "priority_list": priority_list,
             "highest_risk_assets": priority_list[:5]
         }

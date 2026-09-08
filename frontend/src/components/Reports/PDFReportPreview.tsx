@@ -128,10 +128,10 @@ export const PDFReportPreview: React.FC<PDFReportPreviewProps> = ({ assets, risk
         <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-900/40 p-5">
           <h2 className="text-sm font-bold uppercase tracking-wider text-slate-300 font-mono flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-rose-400" />
-            <span>2. Mosca Theorem Timeline Analysis (X + Y &gt; Z)</span>
+            <span>2. Mosca Theorem Timeline Analysis: X (Data Lifetime) + Y (Migration Time) &gt; Z (Years until CRQC)</span>
           </h2>
           <p className="text-xs text-slate-300 leading-relaxed">
-            Assuming an enterprise customer data confidentiality shelf-life of <strong>10 years</strong> (X) and an estimated PQC migration deployment timeframe of <strong>3 years</strong> (Y), the total required security runway is <strong>13 years</strong>. With the consensus quantum threat horizon placed at <strong>2033</strong> (~7 years remaining), the organization is in an active <strong>Harvest Now, Decrypt Later (HNDL) exposure window</strong>.
+            Assuming an enterprise customer data confidentiality shelf-life of <strong>10 years</strong> (<span className="text-cyan-400 font-mono font-bold">X: Data Lifetime</span>) and an estimated PQC migration deployment timeframe of <strong>3 years</strong> (<span className="text-blue-400 font-mono font-bold">Y: Migration Time</span>), the total required security runway is <strong>13 years</strong>. With the consensus quantum threat horizon placed at <strong>2033</strong> (<span className="text-purple-400 font-mono font-bold">Z: 7 years until CRQC</span>), the organization is in an active <strong>Harvest Now, Decrypt Later (HNDL) exposure window</strong>.
           </p>
         </div>
 

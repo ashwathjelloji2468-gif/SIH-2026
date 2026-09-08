@@ -148,6 +148,18 @@ export interface RiskSummary {
   quantum_vulnerable_count?: number;
   quantum_resistant_count?: number;
   unknown_count?: number;
+  mosca?: {
+    mosca_score: number;
+    mosca_status: string;
+    urgency_gap_years: number;
+    quantum_threat_horizon: number;
+    years_until_quantum: number;
+    data_lifetime_years: number;
+    migration_time_years: number;
+    protection_window_years: number;
+    rationale?: string;
+    urgency_level?: string;
+  };
 }
 
 
