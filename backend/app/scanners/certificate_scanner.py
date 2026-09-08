@@ -246,14 +246,45 @@ class CertificateScanner(BaseScanner):
                     continue
 
                 # Handle multi-cert PEM files
+                file_findings = []
                 if b"-----BEGIN CERTIFICATE-----" in data:
                     parts = data.split(b"-----END CERTIFICATE-----")
                     for part in parts:
                         if b"-----BEGIN CERTIFICATE-----" not in part:
                             continue
                         pem = part + b"-----END CERTIFICATE-----\n"
-                        findings.extend(self._parse_certificate(pem, rel_path))
+                        file_findings.extend(self._parse_certificate(pem, rel_path))
                 else:
-                    findings.extend(self._parse_certificate(data, rel_path))
+                    file_findings.extend(self._parse_certificate(data, rel_path))
+
+                # Detect cross-component references to this certificate file across codebase
+                refs = self._find_cert_references(target_path, rel_path)
+                for f_item in file_findings:
+                    f_item.extra_metadata["references"] = refs
+                    f_item.extra_metadata["cryptoRefArray"] = refs
+
+                findings.extend(file_findings)
 
         return findings
+
+    def _find_cert_references(self, target_path: str, cert_rel_path: str) -> List[str]:
+        refs = []
+        base_name = os.path.basename(cert_rel_path)
+        if not os.path.isdir(target_path):
+            return refs
+        for root, _, files in os.walk(target_path):
+            for f in files:
+                if f.endswith((".py", ".js", ".jsx", ".ts", ".tsx", ".java", ".go", ".rs", ".json", ".yaml", ".yml")):
+                    full_path = os.path.join(root, f)
+                    rel_path = os.path.relpath(full_path, target_path)
+                    if rel_path == cert_rel_path:
+                        continue
+                    try:
+                        with open(full_path, "r", encoding="utf-8", errors="ignore") as file_obj:
+                            content = file_obj.read()
+                            if base_name in content or cert_rel_path in content:
+                                refs.append(rel_path)
+                    except Exception:
+                        pass
+        return list(set(refs))
+

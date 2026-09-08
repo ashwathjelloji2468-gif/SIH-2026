@@ -63,8 +63,10 @@ class ScanOrchestrator:
                     quantum_safety=q_safety,
                     is_unknown=is_unk,
                     unknown_reason=unk_reason,
-                    review_status=rev_status
+                    review_status=rev_status,
+                    extra_metadata=raw.extra_metadata
                 )
+
                 created_assets.append(asset)
 
                 finding_repo.add_evidence(

@@ -1,9 +1,3 @@
-import os
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from services.vault.isolated_vault import encrypt_bank_statement
 
-def encrypt_bank_statement(data: bytes, key: bytes):
-    # AES-GCM symmetric encryption
-    aesgcm = AESGCM(key)
-    nonce = os.urandom(12)
-    ciphertext = aesgcm.encrypt(nonce, data, None)
-    return nonce + ciphertext
+__all__ = ["encrypt_bank_statement"]

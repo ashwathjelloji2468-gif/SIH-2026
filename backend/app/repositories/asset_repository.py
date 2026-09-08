@@ -20,7 +20,8 @@ class AssetRepository:
         quantum_safety: QuantumSafety = QuantumSafety.UNKNOWN,
         is_unknown: bool = False,
         unknown_reason: Optional[str] = None,
-        review_status: ReviewStatus = ReviewStatus.RESOLVED
+        review_status: ReviewStatus = ReviewStatus.RESOLVED,
+        extra_metadata: Optional[dict] = None
     ) -> CryptoAsset:
         db_obj = CryptoAsset(
             scan_id=scan_id,
@@ -34,8 +35,10 @@ class AssetRepository:
             quantum_safety=quantum_safety,
             is_unknown=is_unknown,
             unknown_reason=unknown_reason,
-            review_status=review_status
+            review_status=review_status,
+            extra_metadata=extra_metadata
         )
+
         self.db.add(db_obj)
         self.db.commit()
         self.db.refresh(db_obj)

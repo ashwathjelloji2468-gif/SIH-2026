@@ -67,8 +67,10 @@ class CryptoAsset(Base):
     is_unknown = Column(Boolean, default=False, nullable=False)
     unknown_reason = Column(Text, nullable=True)
     review_status = Column(SQLEnum(ReviewStatus), default=ReviewStatus.RESOLVED, nullable=False)
+    extra_metadata = Column(JSON, nullable=True)
 
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
 
     # Relationships
     scan = relationship("Scan", back_populates="assets")

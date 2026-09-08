@@ -47,11 +47,25 @@ class ImpactAnalyzer:
         indirect_dependents = []
 
         if asset_node_id in graph.graph:
+            connected_nodes = set(list(graph.graph.neighbors(asset_node_id)) + list(graph.graph.predecessors(asset_node_id)))
+            for node_id in connected_nodes:
+                n_data = graph.graph.nodes[node_id]
+                n_type = n_data.get("type", "")
+                if n_type == "Component":
+                    c_lbl = n_data.get("label", node_id.replace("component:", ""))
+                    if c_lbl not in affected_components:
+                        affected_components.append(c_lbl)
+                elif n_type in ("SourceFile", "Certificate", "Binary", "Container", "Package"):
+                    f_lbl = n_data.get("label", node_id.replace("file:", ""))
+                    if f_lbl not in affected_files:
+                        affected_files.append(f_lbl)
+
             for neighbor in graph.graph.neighbors(asset_node_id):
                 direct_dependents.append(neighbor)
             for node_id in descendants:
                 if node_id not in direct_dependents and node_id != asset_node_id:
                     indirect_dependents.append(node_id)
+
 
         # Calculate Impact Score Factors (Total max 100)
         # Factor 1: Direct dependency score (max 30)

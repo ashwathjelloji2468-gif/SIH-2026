@@ -127,7 +127,58 @@ class GraphBuilder:
                 provenance="impact_analysis"
             )
 
+            # 4b. Add Cross-Component References (cryptoRefArray / references)
+            extra_metadata = getattr(asset, "extra_metadata", {}) or {}
+            extra_refs = []
+            if isinstance(extra_metadata, dict):
+                extra_refs.extend(extra_metadata.get("references", []) or [])
+                extra_refs.extend(extra_metadata.get("cryptoRefArray", []) or [])
+
+            for ev in getattr(asset, "evidence_items", []) or []:
+                sf = getattr(ev, "source_file", None)
+                if sf and sf != location:
+                    extra_refs.append(sf)
+
+            for ref_path in set(extra_refs):
+                ref_parts = [p for p in ref_path.replace("\\", "/").split("/") if p and p not in [".", ".."]]
+                ref_comp_name = ref_parts[-2] if len(ref_parts) > 1 else "Core"
+                ref_comp_id = f"component:{ref_comp_name}"
+                ref_file_id = f"file:{ref_path}"
+
+                # Ensure Component & SourceFile nodes exist for cross-component reference
+                self.dep_graph.add_node(
+                    node_id=ref_comp_id,
+                    node_type="Component",
+                    label=ref_comp_name,
+                    metadata={"component_name": ref_comp_name}
+                )
+                self.dep_graph.add_node(
+                    node_id=ref_file_id,
+                    node_type="SourceFile",
+                    label=ref_path,
+                    metadata={"location": ref_path}
+                )
+                self.dep_graph.add_edge(
+                    source_id=ref_comp_id,
+                    target_id=ref_file_id,
+                    relationship="contains",
+                    provenance="file_system"
+                )
+                self.dep_graph.add_edge(
+                    source_id=ref_file_id,
+                    target_id=asset_node_id,
+                    relationship="uses",
+                    provenance="cross_component_reference"
+                )
+                self.dep_graph.add_edge(
+                    source_id=asset_node_id,
+                    target_id=ref_comp_id,
+                    relationship="impacts",
+                    provenance="impact_analysis"
+                )
+
             # 5. Add Evidence Items
+
             evidence_items = getattr(asset, "evidence_items", []) or []
             for ev in evidence_items:
                 ev_id = getattr(ev, "id", None)

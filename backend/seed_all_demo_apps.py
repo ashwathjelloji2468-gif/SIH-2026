@@ -19,10 +19,12 @@ def seed_demo_apps():
         scan_repo = ScanRepository(db)
         orchestrator = ScanOrchestrator()
 
+        base_test_apps = os.path.abspath(os.path.join(os.path.dirname(__file__), "../test_apps"))
+
         apps = [
-            {"name": "demo-bank", "path": "/Users/jashwath/.gemini/antigravity/scratch/SIH-2026/test_apps/demo-bank"},
-            {"name": "demo-government", "path": "/Users/jashwath/.gemini/antigravity/scratch/SIH-2026/test_apps/demo-government"},
-            {"name": "demo-healthcare", "path": "/Users/jashwath/.gemini/antigravity/scratch/SIH-2026/test_apps/demo-healthcare"}
+            {"name": "demo-bank", "path": os.path.join(base_test_apps, "demo-bank")},
+            {"name": "demo-government", "path": os.path.join(base_test_apps, "demo-government")},
+            {"name": "demo-healthcare", "path": os.path.join(base_test_apps, "demo-healthcare")}
         ]
 
         for item in apps:
@@ -33,8 +35,12 @@ def seed_demo_apps():
                     "description": f"Synthetic demo repository for {item['name']}",
                     "repository_url": None
                 }))
-                scan = scan_repo.create(project_id=proj.id, target_path=item["path"], scan_type="source")
-                orchestrator.run_scan(scan.id, db)
+            else:
+                proj = existing[0]
+
+            scan = scan_repo.create(project_id=proj.id, target_path=item["path"], scan_type="source")
+            orchestrator.run_scan(scan.id, db)
+
 
     finally:
         db.close()

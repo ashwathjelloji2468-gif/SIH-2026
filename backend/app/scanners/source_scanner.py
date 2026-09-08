@@ -126,4 +126,33 @@ class SourceScanner(BaseScanner):
                     except Exception:
                         continue
 
+        # Attach cross-component references for shared modules
+        for f in findings:
+            if "common/" in f.file_path or "shared/" in f.file_path or "lib/" in f.file_path or "shared" in f.file_path:
+                refs = self._find_module_references(target_path, f.file_path)
+                f.extra_metadata["references"] = refs
+                f.extra_metadata["cryptoRefArray"] = refs
+
         return findings
+
+    def _find_module_references(self, target_path: str, module_rel_path: str) -> List[str]:
+        refs = []
+        base_name = os.path.splitext(os.path.basename(module_rel_path))[0]
+        if not os.path.isdir(target_path):
+            return refs
+        for root, _, files in os.walk(target_path):
+            for f in files:
+                if f.endswith((".py", ".js", ".jsx", ".ts", ".tsx")):
+                    full_path = os.path.join(root, f)
+                    rel_path = os.path.relpath(full_path, target_path)
+                    if rel_path == module_rel_path:
+                        continue
+                    try:
+                        with open(full_path, "r", encoding="utf-8", errors="ignore") as file_obj:
+                            content = file_obj.read()
+                            if base_name in content or module_rel_path in content:
+                                refs.append(rel_path)
+                    except Exception:
+                        pass
+        return list(set(refs))
+
