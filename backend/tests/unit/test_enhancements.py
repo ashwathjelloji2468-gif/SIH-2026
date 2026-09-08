@@ -45,3 +45,28 @@ def test_sandbox_isolation_and_demo_patterns():
     assert res2["pattern_applied"] == "ECDSA_TO_ML_DSA"
 
     sandbox.cleanup()
+
+def test_coverage_engine_semantics():
+    from app.models.db_models import CryptoAsset
+    from app.models.enums import AssetType, ReviewStatus
+
+    # Create mock assets mimicking pyca/cryptography: 636 total, 153 unknown/pending review
+    assets = []
+    # 483 deterministic algorithm assets
+    for i in range(483):
+        assets.append(CryptoAsset(id=f"a-{i}", asset_type=AssetType.ALGORITHM, is_unknown=False, review_status=ReviewStatus.RESOLVED))
+    # 153 unknown/pending review assets
+    for i in range(153):
+        assets.append(CryptoAsset(id=f"u-{i}", asset_type=AssetType.ALGORITHM, is_unknown=True, review_status=ReviewStatus.PENDING_REVIEW))
+
+    engine = CoverageEngine()
+    report = engine.calculate_project_coverage("test-proj", assets)
+
+    assert report["total_assets_discovered"] == 636
+    assert report["unknown_needs_review_count"] == 153
+    # 483 / 636 = 75.9%
+    assert report["overall_coverage_percentage"] == 75.9
+    assert len(report["categories"]) == 6
+    cat_names = [c["category_name"] for c in report["categories"]]
+    assert "Vendor-Managed Systems" in cat_names
+    assert "Binary-only Applications" in cat_names

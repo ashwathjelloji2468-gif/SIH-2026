@@ -68,8 +68,8 @@ export const MetricCards: React.FC<MetricCardsProps> = ({
     },
 
     {
-      title: 'Discovery Coverage',
-      value: `≤${coveragePercent}%`,
+      title: 'Deterministic Scope',
+      value: `${coveragePercent}%`,
       subtitle: `${coverage?.unknown_needs_review_count || 0} unknowns require human review`,
       icon: Layers,
       borderColor: 'border-emerald-500/25',

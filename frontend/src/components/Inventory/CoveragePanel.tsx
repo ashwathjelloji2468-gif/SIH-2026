@@ -72,7 +72,7 @@ const CATEGORY_META: Record<
   },
   vendor_managed: {
     icon: Building2,
-    label: 'Vendor-Managed',
+    label: 'Vendor-Managed / Black-Box',
     color: 'text-slate-400',
     bgColor: 'bg-slate-800/50',
     borderColor: 'border-slate-700/50',
@@ -82,7 +82,10 @@ const CATEGORY_META: Record<
 
 /** Normalise category_name from the API to our key. */
 function normaliseCategoryKey(name: string): string {
-  return name.toLowerCase().replace(/[\s-]+/g, '_');
+  const key = name.toLowerCase().replace(/[\s-]+/g, '_');
+  if (key.includes('vendor_managed')) return 'vendor_managed';
+  if (key.includes('binary_only')) return 'binary_only';
+  return key;
 }
 
 /** Generate sensible fallback categories when the API doesn't return them. */
@@ -135,7 +138,7 @@ export const CoveragePanel: React.FC<CoveragePanelProps> = ({
   return (
     <div className="space-y-6">
       {/* ───── Main Coverage Card ───── */}
-      <div className="rounded-2xl border border-[#1E293B] bg-[#0B1120] p-6 shadow-xl relative overflow-hidden">
+      <div className="rounded-2xl border border-[#1E293B] bg-[#0B0F19] p-6 shadow-xl relative overflow-hidden">
         {/* Subtle glow */}
         <div className="absolute -top-24 -right-24 w-72 h-72 bg-[#22D3EE]/5 rounded-full blur-3xl pointer-events-none" />
 
@@ -148,7 +151,7 @@ export const CoveragePanel: React.FC<CoveragePanelProps> = ({
             </div>
             <h3 className="text-xl font-bold font-mono text-[#F8FAFC]">Cryptographic Discovery Scope & Coverage</h3>
             <p className="text-xs text-[#94A3B8] mt-1 max-w-xl leading-relaxed">
-              SENTRIQ never claims 100% discovery. Coverage reflects deterministic AST scanning, dependency resolution, and heuristic inference. Gaps are explicitly flagged for human review.
+              SENTRIQ measures deterministic AST scanning, dependency resolution, and classification confidence across discovered cryptographic primitives. Unclassified assets are flagged for human review.
             </p>
           </div>
 
@@ -158,7 +161,7 @@ export const CoveragePanel: React.FC<CoveragePanelProps> = ({
               <div className="w-20 h-20 rounded-full border-[3px] border-[#22D3EE]/20 flex items-center justify-center bg-[#0B0F19] shadow-[0_0_20px_rgba(34,211,238,0.15)]">
                 <div className="text-center font-mono">
                   <div className="text-xl font-extrabold text-[#F8FAFC]">{overallPct}%</div>
-                  <div className="text-[8px] text-[#22D3EE] uppercase tracking-wider font-bold">Overall</div>
+                  <div className="text-[8px] text-[#22D3EE] uppercase tracking-wider font-bold">Deterministic</div>
                 </div>
               </div>
             </div>
@@ -194,7 +197,7 @@ export const CoveragePanel: React.FC<CoveragePanelProps> = ({
                       </div>
                       <div>
                         <div className="text-xs font-semibold text-[#F8FAFC]">{meta.label}</div>
-                        <div className="text-[10px] text-[#94A3B8] font-mono">{cat.scanned_count} assets scanned</div>
+                        <div className="text-[10px] text-[#94A3B8] font-mono">{cat.scanned_count} cryptographic assets detected</div>
                       </div>
                     </div>
                     <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border ${badge.className}`}>
@@ -205,7 +208,7 @@ export const CoveragePanel: React.FC<CoveragePanelProps> = ({
                   {/* Progress Bar */}
                   <div className="mb-2">
                     <div className="flex items-center justify-between text-[11px] font-mono mb-1">
-                      <span className="text-[#94A3B8]">Coverage</span>
+                      <span className="text-[#94A3B8]">Asset Share</span>
                       <span className="text-[#F8FAFC] font-bold">{cat.coverage_percentage}%</span>
                     </div>
                     <div className="h-2 rounded-full bg-slate-800 overflow-hidden">

@@ -23,8 +23,8 @@ export const DisclaimerBanner: React.FC<DisclaimerBannerProps> = ({
       </div>
       <div className="flex items-center gap-4 shrink-0 font-mono text-[11px]">
         <div className="flex items-center gap-1.5">
-          <span className="text-[#94A3B8]">Coverage:</span>
-          <span className="text-[#22D3EE] font-semibold">≤{coveragePercentage}%</span>
+          <span className="text-[#94A3B8]">Deterministic Scope:</span>
+          <span className="text-[#22D3EE] font-semibold">{coveragePercentage}%</span>
         </div>
         {unknownCount > 0 && (
           <div className="flex items-center gap-1 text-amber-400 bg-amber-950/40 px-2.5 py-0.5 rounded-full border border-amber-800/40">

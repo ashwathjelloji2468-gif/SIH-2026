@@ -36,8 +36,10 @@ class CoverageEngine:
 
         unknowns = [a for a in assets if a.is_unknown or a.review_status == ReviewStatus.PENDING_REVIEW]
 
-        overall_coverage = round(sum(c["coverage_percentage"] for c in category_reports[:4]), 1)
-        overall_coverage = min(95.0, max(10.0, overall_coverage))  # Never claim 100%
+        # Calculate deterministic classification rate across discovered assets
+        deterministic_count = max(0, total_count - len(unknowns))
+        confidence_rate = round((deterministic_count / max(1, total_count)) * 100.0, 1) if total_count > 0 else 0.0
+        overall_coverage = min(95.0, max(0.0, confidence_rate))  # Honest scope rate (100% discovery is never claimed)
 
         return {
             "project_id": project_id,
@@ -45,5 +47,5 @@ class CoverageEngine:
             "categories": category_reports,
             "total_assets_discovered": total_count,
             "unknown_needs_review_count": len(unknowns),
-            "disclaimer": "ECDAT explicitly communicates limitations and coverage. 100% cryptographic discovery is never claimed."
+            "disclaimer": "ECDAT explicitly communicates discovery scope limitations. 100% cryptographic discovery is never claimed."
         }
