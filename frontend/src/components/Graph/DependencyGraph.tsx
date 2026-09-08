@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { ProjectGraph, GraphNode, AssetImpact } from '../../types';
 import { graphService } from '../../services/graphService';
-import { Network, AlertTriangle, ShieldCheck, Loader2, Target, Share2 } from 'lucide-react';
+import { Network, Loader2, Target } from 'lucide-react';
 
 interface DependencyGraphProps {
   graph: ProjectGraph | null;
   loading: boolean;
-  onNodeSelect?: (node: GraphNode) => void;
+  onNodeSelect?: (node: GraphNode | null) => void;
 }
 
 export const DependencyGraph: React.FC<DependencyGraphProps> = ({ graph, loading, onNodeSelect }) => {
@@ -15,6 +15,14 @@ export const DependencyGraph: React.FC<DependencyGraphProps> = ({ graph, loading
   const [impactLoading, setImpactLoading] = useState<boolean>(false);
 
   const handleNodeClick = async (node: GraphNode) => {
+    // Toggle selection if clicking already selected node
+    if (selectedNode?.id === node.id) {
+      setSelectedNode(null);
+      setBlastImpact(null);
+      if (onNodeSelect) onNodeSelect(null);
+      return;
+    }
+
     setSelectedNode(node);
     if (onNodeSelect) onNodeSelect(node);
 
@@ -63,6 +71,55 @@ export const DependencyGraph: React.FC<DependencyGraphProps> = ({ graph, loading
   const nodeMap = new Map(nodesWithPos.map((n) => [n.id, n]));
   const impactedIds = new Set(blastImpact?.impacted_asset_ids || []);
 
+  const selectedId = selectedNode?.id;
+
+  // Compute 1-hop direct downstream dependents (PRIMARY -> DIRECT)
+  const directIds = new Set<string>();
+  if (selectedId) {
+    graph.edges.forEach((edge) => {
+      if (edge.source === selectedId && edge.target !== selectedId) {
+        directIds.add(edge.target);
+      }
+    });
+    // Fallback if graph edge direction in dataset is target -> source
+    if (directIds.size === 0) {
+      graph.edges.forEach((edge) => {
+        if (edge.target === selectedId && edge.source !== selectedId) {
+          directIds.add(edge.source);
+        }
+      });
+    }
+  }
+
+  // Compute downstream/reachable indirect dependents beyond 1-hop (DIRECT -> INDIRECT)
+  const indirectIds = new Set<string>();
+  if (selectedId && directIds.size > 0) {
+    const visited = new Set<string>([selectedId, ...Array.from(directIds)]);
+    const queue = Array.from(directIds);
+
+    while (queue.length > 0) {
+      const curr = queue.shift()!;
+      graph.edges.forEach((edge) => {
+        if (edge.source === curr && !visited.has(edge.target)) {
+          visited.add(edge.target);
+          indirectIds.add(edge.target);
+          queue.push(edge.target);
+        }
+      });
+    }
+  }
+
+  // Order node rendering: Unaffected -> Indirect -> Direct -> Primary (Primary renders on top)
+  const sortedNodes = [...nodesWithPos].sort((a, b) => {
+    const getOrder = (nId: string) => {
+      if (nId === selectedId) return 4;
+      if (directIds.has(nId)) return 3;
+      if (indirectIds.has(nId)) return 2;
+      return 1;
+    };
+    return getOrder(a.id) - getOrder(b.id);
+  });
+
   return (
     <div className="rounded-3xl border border-slate-800 bg-[#0B0F19] p-6 sm:p-8 shadow-2xl space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800/80">
@@ -75,17 +132,54 @@ export const DependencyGraph: React.FC<DependencyGraphProps> = ({ graph, loading
           <p className="text-xs text-slate-400 mt-0.5">
             Click any node to evaluate blast radius across interconnected protocols and data pipelines.
           </p>
+
+          {/* Graph Context Status Line when a node is selected */}
+          {selectedNode && (
+            <div className="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-slate-800/60 font-mono text-xs text-cyan-300">
+              <span className="flex items-center gap-1.5 bg-cyan-950/60 border border-cyan-800/60 px-3 py-1 rounded-full font-bold">
+                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                Primary Asset: <span className="text-white ml-1">{selectedNode.name || selectedNode.algorithm || selectedNode.id}</span>
+                {selectedNode.location && <span className="text-slate-400 ml-1">· {selectedNode.location}</span>}
+              </span>
+              <span className="bg-slate-900 border border-slate-800 text-slate-300 px-3 py-1 rounded-full font-semibold">
+                {directIds.size} Direct · {indirectIds.size} Indirect Impact
+              </span>
+            </div>
+          )}
         </div>
 
-        <div className="flex items-center gap-3 text-xs font-mono text-slate-400 shrink-0">
-          <span className="flex items-center gap-1.5 text-rose-400">
-            <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
-            <span>Vulnerable (Shor)</span>
-          </span>
-          <span className="flex items-center gap-1.5 text-cyan-400">
-            <span className="w-2.5 h-2.5 rounded-full bg-cyan-400" />
-            <span>Symmetric / PQC</span>
-          </span>
+        {/* Legend */}
+        <div className="flex flex-col gap-1.5 text-xs font-mono text-slate-400 shrink-0">
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-1.5 text-rose-400">
+              <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+              <span>Vulnerable (Shor)</span>
+            </span>
+            <span className="flex items-center gap-1.5 text-cyan-400">
+              <span className="w-2.5 h-2.5 rounded-full bg-cyan-400" />
+              <span>Symmetric / PQC</span>
+            </span>
+          </div>
+          {selectedId && (
+            <div className="flex items-center gap-2.5 pt-1 border-t border-slate-800/80 text-[10px] text-slate-400">
+              <span className="flex items-center gap-1 text-cyan-300 font-bold">
+                <span className="w-2 h-2 rounded-full border border-cyan-400 bg-cyan-500/20" />
+                <span>Primary</span>
+              </span>
+              <span className="flex items-center gap-1 text-cyan-400 font-medium">
+                <span className="w-2 h-2 rounded-full bg-cyan-400" />
+                <span>Direct</span>
+              </span>
+              <span className="flex items-center gap-1 text-slate-400">
+                <span className="w-2 h-2 rounded-full bg-cyan-400/50" />
+                <span>Indirect</span>
+              </span>
+              <span className="flex items-center gap-1 text-slate-600">
+                <span className="w-2 h-2 rounded-full bg-slate-700" />
+                <span>Unaffected</span>
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -98,6 +192,28 @@ export const DependencyGraph: React.FC<DependencyGraphProps> = ({ graph, loading
             if (!source || !target) return null;
 
             const isImpacted = impactedIds.has(edge.source) || impactedIds.has(edge.target);
+            const isPrimaryEdge = selectedId ? ((edge.source === selectedId && directIds.has(edge.target)) || (edge.target === selectedId && directIds.has(edge.source))) : false;
+            const isDirectToIndirectEdge = selectedId ? ((directIds.has(edge.source) && indirectIds.has(edge.target)) || (directIds.has(edge.target) && indirectIds.has(edge.source))) : false;
+
+            let strokeColor = isImpacted ? '#F43F5E' : 'rgba(6, 182, 212, 0.22)';
+            let strokeWidth = isImpacted ? '2' : '1';
+            let strokeOpacity = 1.0;
+
+            if (selectedId) {
+              if (isPrimaryEdge) {
+                strokeColor = isImpacted ? '#F43F5E' : '#06B6D4';
+                strokeWidth = '3';
+                strokeOpacity = 1.0;
+              } else if (isDirectToIndirectEdge) {
+                strokeColor = isImpacted ? '#F43F5E' : 'rgba(6, 182, 212, 0.7)';
+                strokeWidth = '1.75';
+                strokeOpacity = 0.75;
+              } else {
+                strokeColor = 'rgba(148, 163, 184, 0.15)';
+                strokeWidth = '1';
+                strokeOpacity = 0.2;
+              }
+            }
 
             return (
               <line
@@ -106,8 +222,9 @@ export const DependencyGraph: React.FC<DependencyGraphProps> = ({ graph, loading
                 y1={source.y}
                 x2={target.x}
                 y2={target.y}
-                stroke={isImpacted ? '#F43F5E' : 'rgba(6, 182, 212, 0.22)'}
-                strokeWidth={isImpacted ? '2' : '1'}
+                stroke={strokeColor}
+                strokeWidth={strokeWidth}
+                opacity={strokeOpacity}
                 strokeDasharray={edge.type === 'CALLS' ? '4,4' : undefined}
                 className="transition-all duration-300"
               />
@@ -115,11 +232,30 @@ export const DependencyGraph: React.FC<DependencyGraphProps> = ({ graph, loading
           })}
 
           {/* Nodes */}
-          {nodesWithPos.map((node) => {
-            const isSelected = selectedNode?.id === node.id;
+          {sortedNodes.map((node) => {
+            const isSelected = selectedId === node.id;
+            const isDirect = selectedId ? directIds.has(node.id) : false;
+            const isIndirect = selectedId ? indirectIds.has(node.id) : false;
+            const isUnaffected = selectedId ? (!isSelected && !isDirect && !isIndirect) : false;
             const isImpacted = impactedIds.has(node.id);
             const isVulnerable = node.algorithm === 'RSA' || node.algorithm === 'ECDSA' || node.algorithm === 'DSA';
-            const size = Math.max(8, Math.min(20, (node.centrality || 0.1) * 40));
+
+            const baseSize = Math.max(8, Math.min(20, (node.centrality || 0.1) * 40));
+            const nodeSize = isSelected
+              ? baseSize * 1.6
+              : isDirect
+              ? baseSize * 1.25
+              : baseSize;
+
+            const nodeOpacity = isSelected || isDirect
+              ? 1.0
+              : isIndirect
+              ? 0.75
+              : isUnaffected
+              ? 0.25
+              : 0.88;
+
+            const baseColor = isVulnerable ? '#F43F5E' : '#06B6D4';
 
             return (
               <g
@@ -127,32 +263,115 @@ export const DependencyGraph: React.FC<DependencyGraphProps> = ({ graph, loading
                 className="cursor-pointer transition-transform duration-200 hover:scale-110"
                 onClick={() => handleNodeClick(node)}
               >
-                {/* Selected Halo Ring */}
+                {/* Outer Glow & Halo Rings */}
+                {isSelected && (
+                  <>
+                    <circle
+                      cx={node.x}
+                      cy={node.y}
+                      r={nodeSize + 10}
+                      fill="rgba(6, 182, 212, 0.15)"
+                      stroke="#06B6D4"
+                      strokeWidth="2"
+                      strokeDasharray="4,4"
+                      className="animate-spin"
+                    />
+                    <circle
+                      cx={node.x}
+                      cy={node.y}
+                      r={nodeSize + 4}
+                      fill="none"
+                      stroke="#06B6D4"
+                      strokeWidth="2"
+                    />
+                  </>
+                )}
+
+                {isDirect && (
+                  <circle
+                    cx={node.x}
+                    cy={node.y}
+                    r={nodeSize + 4}
+                    fill="none"
+                    stroke="#06B6D4"
+                    strokeWidth="1.5"
+                    opacity="0.9"
+                  />
+                )}
+
+                {isIndirect && (
+                  <circle
+                    cx={node.x}
+                    cy={node.y}
+                    r={nodeSize + 3}
+                    fill="none"
+                    stroke="#06B6D4"
+                    strokeWidth="1"
+                    strokeDasharray="2,2"
+                    opacity="0.5"
+                  />
+                )}
+
+                {!isSelected && !isDirect && !isIndirect && isImpacted && (
+                  <circle
+                    cx={node.x}
+                    cy={node.y}
+                    r={nodeSize + 4}
+                    fill="none"
+                    stroke="#F43F5E"
+                    strokeWidth="2"
+                  />
+                )}
+
+                {/* Primary Node Badge Label */}
+                {isSelected && (
+                  <g transform={`translate(${node.x}, ${node.y - nodeSize - 18})`}>
+                    <rect
+                      x="-25"
+                      y="-9"
+                      width="50"
+                      height="15"
+                      rx="7.5"
+                      fill="#06B6D4"
+                      stroke="#FFFFFF"
+                      strokeWidth="1"
+                    />
+                    <text
+                      x="0"
+                      y="2.5"
+                      fill="#06080F"
+                      fontSize="8.5"
+                      fontWeight="900"
+                      fontFamily="JetBrains Mono"
+                      textAnchor="middle"
+                    >
+                      PRIMARY
+                    </text>
+                  </g>
+                )}
+
+                {/* Main Node Circle */}
                 <circle
                   cx={node.x}
                   cy={node.y}
-                  r={size + 5}
-                  fill="none"
-                  stroke={isSelected ? '#06B6D4' : isImpacted ? '#F43F5E' : 'transparent'}
-                  strokeWidth="2.5"
-                  strokeDasharray={isSelected ? '3,3' : undefined}
-                  className={isSelected ? 'animate-spin' : ''}
+                  r={nodeSize}
+                  fill={baseColor}
+                  stroke={isSelected ? '#FFFFFF' : isDirect ? '#06B6D4' : 'none'}
+                  strokeWidth={isSelected ? '2.5' : isDirect ? '1.5' : '0'}
+                  opacity={nodeOpacity}
                 />
-                <circle
-                  cx={node.x}
-                  cy={node.y}
-                  r={size}
-                  fill={isVulnerable ? '#F43F5E' : '#06B6D4'}
-                  opacity={0.88}
-                />
+
+                {/* Node Label Text */}
                 <text
                   x={node.x}
-                  y={node.y - size - 5}
-                  fill="#94A3B8"
-                  fontSize="9.5"
+                  y={node.y - nodeSize - (isSelected ? 25 : 5)}
+                  fill={isSelected ? '#22D3EE' : isDirect ? '#E2E8F0' : isUnaffected ? '#475569' : '#94A3B8'}
+                  fontSize={isSelected ? '11' : isDirect ? '10' : '9.5'}
                   fontFamily="JetBrains Mono"
                   textAnchor="middle"
-                  className="pointer-events-none font-semibold"
+                  fontWeight={isSelected ? '800' : isDirect ? '700' : '600'}
+                  opacity={nodeOpacity}
+                  className="pointer-events-none"
                 >
                   {node.name || node.algorithm || node.id.slice(0, 6)}
                 </text>
@@ -202,3 +421,4 @@ export const DependencyGraph: React.FC<DependencyGraphProps> = ({ graph, loading
     </div>
   );
 };
+
