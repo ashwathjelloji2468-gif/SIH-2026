@@ -5,9 +5,11 @@ import { inventoryService } from '../services/inventoryService';
 import { graphService } from '../services/graphService';
 import { getProjectXContext, updateProjectXContext } from '../services/xEngineService';
 import { getProjectYContext, updateProjectYContext } from '../services/yEngineService';
+import { getProjectZContext } from '../services/zEngineService';
 import { CryptoAsset, RiskSummary, RiskAssessment, ThreatScenario, ProjectGraph } from '../types';
 import { ProjectXContextResponse, XContextUpdateInput } from '../types/xEngine';
 import { ProjectYContextResponse, YContextUpdateInput } from '../types/yEngine';
+import { ZProjectEvaluationResponse } from '../types/zEngine';
 import { RiskMatrix } from '../components/Risk/RiskMatrix';
 import { MoscaSimulator } from '../components/Risk/MoscaSimulator';
 import { DependencyGraph } from '../components/Graph/DependencyGraph';
@@ -16,6 +18,7 @@ import { XContextCard } from '../components/XEngine/XContextCard';
 import { XContextModal } from '../components/XEngine/XContextModal';
 import { YContextCard } from '../components/YEngine/YContextCard';
 import { YContextModal } from '../components/YEngine/YContextModal';
+import { ZContextCard } from '../components/ZEngine/ZContextCard';
 import { ShieldAlert, RefreshCw, Cpu, Network, Box } from 'lucide-react';
 
 export const Risk: React.FC = () => {
@@ -27,9 +30,11 @@ export const Risk: React.FC = () => {
   const [graph, setGraph] = useState<ProjectGraph | null>(null);
   const [xContext, setXContext] = useState<ProjectXContextResponse | null>(null);
   const [yContext, setYContext] = useState<ProjectYContextResponse | null>(null);
+  const [zContext, setZContext] = useState<ZProjectEvaluationResponse | null>(null);
   const [isXModalOpen, setIsXModalOpen] = useState<boolean>(false);
   const [isYModalOpen, setIsYModalOpen] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
+
 
   const fetchRiskData = async () => {
     if (!currentProject) {
@@ -45,13 +50,14 @@ export const Risk: React.FC = () => {
 
     setLoading(true);
     try {
-      const [invRes, sumRes, scenRes, graphRes, xRes, yRes] = await Promise.allSettled([
+      const [invRes, sumRes, scenRes, graphRes, xRes, yRes, zRes] = await Promise.allSettled([
         inventoryService.getProjectInventory(currentProject.id),
         riskService.getRiskSummary(currentProject.id),
         riskService.listThreatScenarios(),
         graphService.getProjectGraph(currentProject.id),
         getProjectXContext(currentProject.id),
         getProjectYContext(currentProject.id),
+        getProjectZContext(currentProject.id),
       ]);
 
       if (invRes.status === 'fulfilled') setAssets(invRes.value || []);
@@ -60,6 +66,7 @@ export const Risk: React.FC = () => {
       if (graphRes.status === 'fulfilled') setGraph(graphRes.value || null);
       if (xRes.status === 'fulfilled') setXContext(xRes.value || null);
       if (yRes.status === 'fulfilled') setYContext(yRes.value || null);
+      if (zRes.status === 'fulfilled') setZContext(zRes.value || null);
     } catch (err) {
       console.error('Failed to load risk data:', err);
     } finally {
@@ -130,6 +137,13 @@ export const Risk: React.FC = () => {
           isLoading={loading}
         />
       </div>
+
+      {/* Z Engine — Component-Wise Quantum Exposure Card */}
+      <ZContextCard
+        zContext={zContext}
+        isLoading={loading}
+      />
+
 
       {/* 3D Mosca Threat Horizon Visualization Card */}
       <div className="rounded-2xl border border-slate-800 bg-[#0B0F19] p-6 shadow-2xl space-y-4">

@@ -358,3 +358,47 @@ class CBOMResponse(BaseModel):
     version: int = 1
     metadata: Dict[str, Any]
     components: List[Dict[str, Any]] = []
+
+
+# Z Engine Schemas
+class ZComponentInput(BaseModel):
+    id: Optional[str] = None
+    component_id: Optional[str] = None
+    primitive: Optional[str] = None
+    algorithm_name: Optional[str] = None
+    algorithm: Optional[str] = None
+    key_size: Optional[int] = None
+    output_size: Optional[int] = None
+    purpose: Optional[str] = None
+    location: Optional[str] = None
+    repository_path: Optional[str] = None
+
+
+class ZResultResponse(BaseModel):
+    component_id: str
+    primitive: str
+    algorithm: str
+    key_size: Optional[int] = None
+    location: Optional[str] = None
+    quantum_horizon: int = 10
+    target_horizon_year: int = 2036
+    quantum_class: str
+    status: str
+    z_value: Optional[float] = None
+    classical_security_bits: Optional[int] = None
+    quantum_security_bits: Optional[int] = None
+    explanation: str
+    confidence: str = "HIGH"
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class ZProjectEvaluationResponse(BaseModel):
+    quantum_horizon: int
+    target_horizon_year: int
+    total_components: int
+    vulnerable_components: int
+    class_breakdown: Dict[str, int]
+    status_breakdown: Dict[str, int]
+    components: List[ZResultResponse]
+    explanation: str
+
