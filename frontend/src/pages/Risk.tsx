@@ -3,11 +3,15 @@ import { useProject } from '../context/ProjectContext';
 import { riskService } from '../services/riskService';
 import { inventoryService } from '../services/inventoryService';
 import { graphService } from '../services/graphService';
+import { getProjectXContext, updateProjectXContext } from '../services/xEngineService';
 import { CryptoAsset, RiskSummary, RiskAssessment, ThreatScenario, ProjectGraph } from '../types';
+import { ProjectXContextResponse, XContextUpdateInput } from '../types/xEngine';
 import { RiskMatrix } from '../components/Risk/RiskMatrix';
 import { MoscaSimulator } from '../components/Risk/MoscaSimulator';
 import { DependencyGraph } from '../components/Graph/DependencyGraph';
 import { MoscaGraph3D } from '../components/Three/MoscaGraph3D';
+import { XContextCard } from '../components/XEngine/XContextCard';
+import { XContextModal } from '../components/XEngine/XContextModal';
 import { ShieldAlert, RefreshCw, Cpu, Network, Box } from 'lucide-react';
 
 export const Risk: React.FC = () => {
@@ -17,6 +21,8 @@ export const Risk: React.FC = () => {
   const [assessments, setAssessments] = useState<RiskAssessment[]>([]);
   const [scenarios, setScenarios] = useState<ThreatScenario[]>([]);
   const [graph, setGraph] = useState<ProjectGraph | null>(null);
+  const [xContext, setXContext] = useState<ProjectXContextResponse | null>(null);
+  const [isXModalOpen, setIsXModalOpen] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
 
   const fetchRiskData = async () => {
@@ -25,29 +31,43 @@ export const Risk: React.FC = () => {
       setRiskSummary(null);
       setAssessments([]);
       setGraph(null);
+      setXContext(null);
       setLoading(false);
       return;
     }
 
     setLoading(true);
     try {
-      const [invRes, sumRes, scenRes, graphRes] = await Promise.allSettled([
+      const [invRes, sumRes, scenRes, graphRes, xRes] = await Promise.allSettled([
         inventoryService.getProjectInventory(currentProject.id),
         riskService.getRiskSummary(currentProject.id),
         riskService.listThreatScenarios(),
         graphService.getProjectGraph(currentProject.id),
+        getProjectXContext(currentProject.id),
       ]);
 
       if (invRes.status === 'fulfilled') setAssets(invRes.value || []);
       if (sumRes.status === 'fulfilled') setRiskSummary(sumRes.value || null);
       if (scenRes.status === 'fulfilled') setScenarios(scenRes.value || []);
       if (graphRes.status === 'fulfilled') setGraph(graphRes.value || null);
+      if (xRes.status === 'fulfilled') setXContext(xRes.value || null);
     } catch (err) {
       console.error('Failed to load risk data:', err);
     } finally {
       setLoading(false);
     }
   };
+
+  const handleSaveXContext = async (input: XContextUpdateInput) => {
+    if (!currentProject) return;
+    try {
+      const updated = await updateProjectXContext(currentProject.id, input);
+      setXContext(updated);
+    } catch (err) {
+      console.error('Failed to update X Context', err);
+    }
+  };
+
 
   useEffect(() => {
     fetchRiskData();
@@ -77,6 +97,13 @@ export const Risk: React.FC = () => {
         </button>
       </div>
 
+      {/* X Engine — Confidentiality Horizon Card */}
+      <XContextCard
+        xContext={xContext}
+        onOpenModal={() => setIsXModalOpen(true)}
+        isLoading={loading}
+      />
+
       {/* 3D Mosca Threat Horizon Visualization Card */}
       <div className="rounded-2xl border border-slate-800 bg-[#0B0F19] p-6 shadow-2xl space-y-4">
         <div className="flex items-center justify-between pb-3 border-b border-slate-800">
@@ -85,12 +112,12 @@ export const Risk: React.FC = () => {
             <h3 className="text-sm font-semibold text-slate-100 font-mono">3D Threat Horizon & Risk Exposure Space</h3>
           </div>
           <span className="text-xs font-mono text-cyan-300 bg-cyan-950/60 border border-cyan-800/60 px-2.5 py-1 rounded-full">
-            Theorem: X ({riskSummary?.mosca?.data_lifetime_years || 10}y) + Y ({riskSummary?.mosca?.migration_time_years || 3}y) &gt; Z ({riskSummary?.mosca?.quantum_threat_horizon || 2033})
+            Theorem: X ({xContext?.x_result?.value || riskSummary?.mosca?.data_lifetime_years || 20}y) + Y ({riskSummary?.mosca?.migration_time_years || 3}y) &gt; Z ({riskSummary?.mosca?.quantum_threat_horizon || 2033})
           </span>
         </div>
         <div className="h-[380px] w-full rounded-xl overflow-hidden bg-[#06080F]/90 border border-slate-800/60 relative">
           <MoscaGraph3D
-            dataLifetime={riskSummary?.mosca?.data_lifetime_years || 10}
+            dataLifetime={xContext?.x_result?.value || riskSummary?.mosca?.data_lifetime_years || 20}
             migrationTime={riskSummary?.mosca?.migration_time_years || 3}
             threatHorizon={riskSummary?.mosca?.quantum_threat_horizon || 2033}
             className="w-full h-full"
@@ -113,6 +140,15 @@ export const Risk: React.FC = () => {
         graph={graph}
         loading={loading}
       />
+
+      {/* X Context Override Modal */}
+      <XContextModal
+        isOpen={isXModalOpen}
+        onClose={() => setIsXModalOpen(false)}
+        xContext={xContext}
+        onSave={handleSaveXContext}
+      />
     </div>
   );
 };
+

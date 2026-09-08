@@ -27,13 +27,51 @@ class ProjectUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     repository_url: Optional[str] = None
+    user_x_years: Optional[int] = None
+    user_domain: Optional[str] = None
+    folder_contexts: Optional[Dict[str, Any]] = None
 
 class ProjectResponse(ProjectBase):
     id: str
+    user_x_years: Optional[int] = None
+    user_domain: Optional[str] = None
+    folder_contexts: Optional[Dict[str, Any]] = None
     created_at: datetime
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+# X Engine Schemas
+class XResultResponse(BaseModel):
+    value: int
+    unit: str = "years"
+    source: str  # "USER" | "DOMAIN_BASELINE" | "SYSTEM_DEFAULT"
+    domain: Optional[str] = None
+    domainTitle: Optional[str] = None
+    confidence: Optional[str] = None  # "HIGH" | "MEDIUM" | "LOW"
+    explanation: str
+    overrideAvailable: bool = True
+    userX: Optional[int] = None
+    estimatedDomainX: Optional[int] = None
+    contextLevel: str = "REPOSITORY"  # "REPOSITORY" | "FOLDER"
+    matchedIndicators: List[str] = Field(default_factory=list)
+
+class XContextUpdateRequest(BaseModel):
+    user_x_years: Optional[int] = None
+    user_domain: Optional[str] = None
+    folder_path: Optional[str] = None
+    folder_x_years: Optional[int] = None
+    folder_notes: Optional[str] = None
+    clear_user_x: bool = False
+
+class DomainBaselineSchema(BaseModel):
+    key: str
+    title: str
+    baseline_x_years: int
+    description: str
+    compliance_references: List[str]
+    keywords: List[str]
+
 
 # Scan Schemas
 class ScanCreate(BaseModel):

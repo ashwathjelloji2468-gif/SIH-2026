@@ -38,6 +38,35 @@ class ProjectRepository:
         self.db.refresh(db_obj)
         return db_obj
 
+    def update_x_context(
+        self,
+        project_id: str,
+        user_x_years: Optional[int] = None,
+        user_domain: Optional[str] = None,
+        folder_contexts: Optional[dict] = None,
+        clear_user_x: bool = False
+    ) -> Optional[Project]:
+        db_obj = self.get(project_id)
+        if not db_obj:
+            return None
+        
+        if clear_user_x:
+            db_obj.user_x_years = None
+        elif user_x_years is not None:
+            db_obj.user_x_years = user_x_years
+
+        if user_domain is not None:
+            db_obj.user_domain = user_domain
+
+        if folder_contexts is not None:
+            existing_fc = db_obj.folder_contexts or {}
+            existing_fc.update(folder_contexts)
+            db_obj.folder_contexts = existing_fc
+
+        self.db.commit()
+        self.db.refresh(db_obj)
+        return db_obj
+
     def delete(self, project_id: str) -> bool:
         db_obj = self.get(project_id)
         if db_obj:
@@ -45,3 +74,4 @@ class ProjectRepository:
             self.db.commit()
             return True
         return False
+
