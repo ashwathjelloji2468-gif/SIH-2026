@@ -16,7 +16,7 @@ export const DependencyGraph: React.FC<DependencyGraphProps> = ({ graph, loading
 
   const handleNodeClick = async (node: GraphNode) => {
     // Toggle selection if clicking already selected node
-    if (selectedNode?.id === node.id) {
+    if (selectedNode && String(selectedNode.id) === String(node.id)) {
       setSelectedNode(null);
       setBlastImpact(null);
       if (onNodeSelect) onNodeSelect(null);
@@ -68,24 +68,28 @@ export const DependencyGraph: React.FC<DependencyGraphProps> = ({ graph, loading
     return { ...node, x, y };
   });
 
-  const nodeMap = new Map(nodesWithPos.map((n) => [n.id, n]));
-  const impactedIds = new Set(blastImpact?.impacted_asset_ids || []);
+  const nodeMap = new Map(nodesWithPos.map((n) => [String(n.id), n]));
+  const impactedIds = new Set((blastImpact?.impacted_asset_ids || []).map(String));
 
-  const selectedId = selectedNode?.id;
+  const selectedId = selectedNode ? String(selectedNode.id) : null;
 
   // Compute 1-hop direct downstream dependents (PRIMARY -> DIRECT)
   const directIds = new Set<string>();
   if (selectedId) {
     graph.edges.forEach((edge) => {
-      if (edge.source === selectedId && edge.target !== selectedId) {
-        directIds.add(edge.target);
+      const sId = String(edge.source);
+      const tId = String(edge.target);
+      if (sId === selectedId && tId !== selectedId) {
+        directIds.add(tId);
       }
     });
     // Fallback if graph edge direction in dataset is target -> source
     if (directIds.size === 0) {
       graph.edges.forEach((edge) => {
-        if (edge.target === selectedId && edge.source !== selectedId) {
-          directIds.add(edge.source);
+        const sId = String(edge.source);
+        const tId = String(edge.target);
+        if (tId === selectedId && sId !== selectedId) {
+          directIds.add(sId);
         }
       });
     }
@@ -100,10 +104,12 @@ export const DependencyGraph: React.FC<DependencyGraphProps> = ({ graph, loading
     while (queue.length > 0) {
       const curr = queue.shift()!;
       graph.edges.forEach((edge) => {
-        if (edge.source === curr && !visited.has(edge.target)) {
-          visited.add(edge.target);
-          indirectIds.add(edge.target);
-          queue.push(edge.target);
+        const sId = String(edge.source);
+        const tId = String(edge.target);
+        if (sId === curr && !visited.has(tId)) {
+          visited.add(tId);
+          indirectIds.add(tId);
+          queue.push(tId);
         }
       });
     }
@@ -112,9 +118,10 @@ export const DependencyGraph: React.FC<DependencyGraphProps> = ({ graph, loading
   // Order node rendering: Unaffected -> Indirect -> Direct -> Primary (Primary renders on top)
   const sortedNodes = [...nodesWithPos].sort((a, b) => {
     const getOrder = (nId: string) => {
-      if (nId === selectedId) return 4;
-      if (directIds.has(nId)) return 3;
-      if (indirectIds.has(nId)) return 2;
+      const sNId = String(nId);
+      if (selectedId && sNId === selectedId) return 4;
+      if (directIds.has(sNId)) return 3;
+      if (indirectIds.has(sNId)) return 2;
       return 1;
     };
     return getOrder(a.id) - getOrder(b.id);
@@ -187,13 +194,15 @@ export const DependencyGraph: React.FC<DependencyGraphProps> = ({ graph, loading
         <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-96 select-none">
           {/* Edges */}
           {graph.edges.slice(0, 48).map((edge, idx) => {
-            const source = nodeMap.get(edge.source);
-            const target = nodeMap.get(edge.target);
+            const sId = String(edge.source);
+            const tId = String(edge.target);
+            const source = nodeMap.get(sId);
+            const target = nodeMap.get(tId);
             if (!source || !target) return null;
 
-            const isImpacted = impactedIds.has(edge.source) || impactedIds.has(edge.target);
-            const isPrimaryEdge = selectedId ? ((edge.source === selectedId && directIds.has(edge.target)) || (edge.target === selectedId && directIds.has(edge.source))) : false;
-            const isDirectToIndirectEdge = selectedId ? ((directIds.has(edge.source) && indirectIds.has(edge.target)) || (directIds.has(edge.target) && indirectIds.has(edge.source))) : false;
+            const isImpacted = impactedIds.has(sId) || impactedIds.has(tId);
+            const isPrimaryEdge = selectedId ? ((sId === selectedId && directIds.has(tId)) || (tId === selectedId && directIds.has(sId))) : false;
+            const isDirectToIndirectEdge = selectedId ? ((directIds.has(sId) && indirectIds.has(tId)) || (directIds.has(tId) && indirectIds.has(sId))) : false;
 
             let strokeColor = isImpacted ? '#F43F5E' : 'rgba(6, 182, 212, 0.22)';
             let strokeWidth = isImpacted ? '2' : '1';
@@ -233,11 +242,12 @@ export const DependencyGraph: React.FC<DependencyGraphProps> = ({ graph, loading
 
           {/* Nodes */}
           {sortedNodes.map((node) => {
-            const isSelected = selectedId === node.id;
-            const isDirect = selectedId ? directIds.has(node.id) : false;
-            const isIndirect = selectedId ? indirectIds.has(node.id) : false;
+            const nodeIdStr = String(node.id);
+            const isSelected = Boolean(selectedId && selectedId === nodeIdStr);
+            const isDirect = selectedId ? directIds.has(nodeIdStr) : false;
+            const isIndirect = selectedId ? indirectIds.has(nodeIdStr) : false;
             const isUnaffected = selectedId ? (!isSelected && !isDirect && !isIndirect) : false;
-            const isImpacted = impactedIds.has(node.id);
+            const isImpacted = impactedIds.has(nodeIdStr);
             const isVulnerable = node.algorithm === 'RSA' || node.algorithm === 'ECDSA' || node.algorithm === 'DSA';
 
             const baseSize = Math.max(8, Math.min(20, (node.centrality || 0.1) * 40));
@@ -255,9 +265,8 @@ export const DependencyGraph: React.FC<DependencyGraphProps> = ({ graph, loading
               ? 0.25
               : 0.88;
 
-            // Selected PRIMARY node MUST be bright Gold/Amber (#FACC15)
-            // Non-selected nodes retain original cryptographic classification colors
-            const baseColor = isSelected
+            // Authoritative nodeFill: ALWAYS bright Gold/Amber (#FACC15) for selected PRIMARY node!
+            const nodeFill = isSelected
               ? '#FACC15'
               : isVulnerable
               ? '#F43F5E'
@@ -272,15 +281,16 @@ export const DependencyGraph: React.FC<DependencyGraphProps> = ({ graph, loading
                 {/* Outer Glow & Halo Rings */}
                 {isSelected && (
                   <>
-                    {/* Outer Gold Glowing Pulse Ring */}
+                    {/* Outer Gold Glowing Pulse Ring (transform-origin centered on node) */}
                     <circle
                       cx={node.x}
                       cy={node.y}
                       r={nodeSize + 12}
-                      fill="rgba(250, 204, 21, 0.18)"
+                      fill="rgba(250, 204, 21, 0.2)"
                       stroke="#FACC15"
                       strokeWidth="2"
                       strokeDasharray="4,4"
+                      style={{ transformOrigin: `${node.x}px ${node.y}px` }}
                       className="animate-spin"
                     />
                     {/* Secondary Vulnerability Ring for Shor-vulnerable Primary Node */}
@@ -301,7 +311,7 @@ export const DependencyGraph: React.FC<DependencyGraphProps> = ({ graph, loading
                       r={nodeSize + 3}
                       fill="none"
                       stroke="#FACC15"
-                      strokeWidth="1.5"
+                      strokeWidth="2"
                     />
                   </>
                 )}
@@ -370,15 +380,15 @@ export const DependencyGraph: React.FC<DependencyGraphProps> = ({ graph, loading
                   </g>
                 )}
 
-                {/* Main Node Circle */}
+                {/* Authoritative Main Node Circle (PRIMARY Node is explicitly filled with Gold #FACC15) */}
                 <circle
                   cx={node.x}
                   cy={node.y}
                   r={nodeSize}
-                  fill={baseColor}
+                  fill={nodeFill}
                   stroke={isSelected ? '#FFFFFF' : isDirect ? '#06B6D4' : 'none'}
-                  strokeWidth={isSelected ? '2.5' : isDirect ? '1.5' : '0'}
-                  opacity={nodeOpacity}
+                  strokeWidth={isSelected ? '3' : isDirect ? '1.5' : '0'}
+                  opacity={isSelected ? 1.0 : nodeOpacity}
                 />
 
                 {/* Node Label Text */}
@@ -390,7 +400,7 @@ export const DependencyGraph: React.FC<DependencyGraphProps> = ({ graph, loading
                   fontFamily="JetBrains Mono"
                   textAnchor="middle"
                   fontWeight={isSelected ? '900' : isDirect ? '700' : '600'}
-                  opacity={nodeOpacity}
+                  opacity={isSelected ? 1.0 : nodeOpacity}
                   className="pointer-events-none"
                 >
                   {node.name || node.algorithm || node.id.slice(0, 6)}
