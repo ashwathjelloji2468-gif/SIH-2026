@@ -14,8 +14,10 @@ import { MetricCards } from '../components/Dashboard/MetricCards';
 import { AlgorithmChart } from '../components/Dashboard/AlgorithmChart';
 import { MoscaUrgencyCard } from '../components/Dashboard/MoscaUrgencyCard';
 import { PipelineStatus } from '../components/Dashboard/PipelineStatus';
-import { MigrationSummaryCard } from '../components/Dashboard/MigrationSummaryCard';
+import { TopMigrationPrioritiesCard } from '../components/Dashboard/TopMigrationPrioritiesCard';
+import { DataHandlingSecurityCard } from '../components/Dashboard/DataHandlingSecurityCard';
 import { ValidationSummaryCard } from '../components/Dashboard/ValidationSummaryCard';
+import { AssetDetailDrawer } from '../components/Inventory/AssetDetailDrawer';
 import { DisclaimerBanner } from '../components/Common/DisclaimerBanner';
 import { StatusBadge } from '../components/Common/StatusBadge';
 import { Link } from 'react-router-dom';
@@ -32,6 +34,7 @@ export const Home: React.FC = () => {
   const [validationSummary, setValidationSummary] = useState<ValidationSummary | null>(null);
   const [simulations, setSimulations] = useState<SimulationRecord[]>([]);
   const [recommendations, setRecommendations] = useState<Map<string, Recommendation[]>>(new Map());
+  const [selectedAsset, setSelectedAsset] = useState<CryptoAsset | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [apiError, setApiError] = useState<boolean>(false);
 
@@ -171,23 +174,27 @@ export const Home: React.FC = () => {
         </div>
       </div>
 
-      {/* Migration Priorities & Validation Status Grid */}
+      {/* Top Migration Priorities & Data Handling Security Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-7">
-          <MigrationSummaryCard
+          <TopMigrationPrioritiesCard
             assets={assets}
             recommendations={recommendations}
             loading={loading}
+            onSelectAsset={(asset) => setSelectedAsset(asset)}
           />
         </div>
         <div className="lg:col-span-5">
-          <ValidationSummaryCard
-            validationSummary={validationSummary}
-            simulations={simulations}
-            loading={loading}
-          />
+          <DataHandlingSecurityCard />
         </div>
       </div>
+
+      {/* Validation Summary Section */}
+      <ValidationSummaryCard
+        validationSummary={validationSummary}
+        simulations={simulations}
+        loading={loading}
+      />
 
       {/* Recent Scans Activity Section */}
       <div className="rounded-xl border border-slate-800 bg-[#0B0F19] p-6 shadow-xl space-y-4">
@@ -228,6 +235,9 @@ export const Home: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Interactive Asset Detail Drawer for Selected Priority Asset */}
+      <AssetDetailDrawer asset={selectedAsset} onClose={() => setSelectedAsset(null)} />
     </div>
   );
 };
