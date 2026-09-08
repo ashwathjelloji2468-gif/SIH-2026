@@ -6,12 +6,15 @@ import { graphService } from '../services/graphService';
 import { getProjectXContext, updateProjectXContext } from '../services/xEngineService';
 import { getProjectYContext, updateProjectYContext } from '../services/yEngineService';
 import { getProjectZContext } from '../services/zEngineService';
+import { getProjectMoscaContext } from '../services/moscaEngineService';
 import { CryptoAsset, RiskSummary, RiskAssessment, ThreatScenario, ProjectGraph } from '../types';
 import { ProjectXContextResponse, XContextUpdateInput } from '../types/xEngine';
 import { ProjectYContextResponse, YContextUpdateInput } from '../types/yEngine';
 import { ZProjectEvaluationResponse } from '../types/zEngine';
+import { MoscaProjectEvaluationResponse } from '../types/moscaEngine';
 import { RiskMatrix } from '../components/Risk/RiskMatrix';
 import { MoscaSimulator } from '../components/Risk/MoscaSimulator';
+import { MoscaComponentTable } from '../components/Risk/MoscaComponentTable';
 import { DependencyGraph } from '../components/Graph/DependencyGraph';
 import { MoscaGraph3D } from '../components/Three/MoscaGraph3D';
 import { XContextCard } from '../components/XEngine/XContextCard';
@@ -31,8 +34,10 @@ export const Risk: React.FC = () => {
   const [xContext, setXContext] = useState<ProjectXContextResponse | null>(null);
   const [yContext, setYContext] = useState<ProjectYContextResponse | null>(null);
   const [zContext, setZContext] = useState<ZProjectEvaluationResponse | null>(null);
+  const [moscaContext, setMoscaContext] = useState<MoscaProjectEvaluationResponse | null>(null);
   const [isXModalOpen, setIsXModalOpen] = useState<boolean>(false);
   const [isYModalOpen, setIsYModalOpen] = useState<boolean>(false);
+
   const [loading, setLoading] = useState<boolean>(true);
 
 
@@ -50,7 +55,7 @@ export const Risk: React.FC = () => {
 
     setLoading(true);
     try {
-      const [invRes, sumRes, scenRes, graphRes, xRes, yRes, zRes] = await Promise.allSettled([
+      const [invRes, sumRes, scenRes, graphRes, xRes, yRes, zRes, mRes] = await Promise.allSettled([
         inventoryService.getProjectInventory(currentProject.id),
         riskService.getRiskSummary(currentProject.id),
         riskService.listThreatScenarios(),
@@ -58,6 +63,7 @@ export const Risk: React.FC = () => {
         getProjectXContext(currentProject.id),
         getProjectYContext(currentProject.id),
         getProjectZContext(currentProject.id),
+        getProjectMoscaContext(currentProject.id),
       ]);
 
       if (invRes.status === 'fulfilled') setAssets(invRes.value || []);
@@ -67,6 +73,7 @@ export const Risk: React.FC = () => {
       if (xRes.status === 'fulfilled') setXContext(xRes.value || null);
       if (yRes.status === 'fulfilled') setYContext(yRes.value || null);
       if (zRes.status === 'fulfilled') setZContext(zRes.value || null);
+      if (mRes.status === 'fulfilled') setMoscaContext(mRes.value || null);
     } catch (err) {
       console.error('Failed to load risk data:', err);
     } finally {
@@ -143,6 +150,13 @@ export const Risk: React.FC = () => {
         zContext={zContext}
         isLoading={loading}
       />
+
+      {/* Integrated Mosca Engine Component Risk Table (M_i = X + Y - Z_i) */}
+      <MoscaComponentTable
+        moscaContext={moscaContext}
+        isLoading={loading}
+      />
+
 
 
       {/* 3D Mosca Threat Horizon Visualization Card */}

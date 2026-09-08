@@ -402,3 +402,29 @@ class ZProjectEvaluationResponse(BaseModel):
     components: List[ZResultResponse]
     explanation: str
 
+
+# Mosca Engine Integrated Schemas
+class MoscaComponentResultResponse(BaseModel):
+    component_id: str
+    algorithm: str
+    location: Optional[str] = None
+    x: Dict[str, Any]
+    y: Dict[str, Any]
+    z: Dict[str, Any]
+    mosca_score: Optional[float] = None
+    urgency: str
+    technical_urgency: str
+    business_priority: str
+    explanation: str
+
+
+class MoscaProjectEvaluationResponse(BaseModel):
+    project_id: str
+    project_name: str
+    total_components: int
+    critical_components: int
+    urgency_distribution: Dict[str, int]
+    components: List[MoscaComponentResultResponse]
+    explanation: str
+
+
