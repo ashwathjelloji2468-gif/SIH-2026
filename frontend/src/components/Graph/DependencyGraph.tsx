@@ -135,9 +135,9 @@ export const DependencyGraph: React.FC<DependencyGraphProps> = ({ graph, loading
 
           {/* Graph Context Status Line when a node is selected */}
           {selectedNode && (
-            <div className="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-slate-800/60 font-mono text-xs text-cyan-300">
-              <span className="flex items-center gap-1.5 bg-cyan-950/60 border border-cyan-800/60 px-3 py-1 rounded-full font-bold">
-                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+            <div className="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-slate-800/60 font-mono text-xs text-amber-300">
+              <span className="flex items-center gap-1.5 bg-amber-950/60 border border-amber-500/40 px-3 py-1 rounded-full font-bold text-amber-300 shadow-[0_0_12px_rgba(250,204,21,0.2)]">
+                <span className="w-2 h-2 rounded-full bg-[#FACC15] animate-pulse" />
                 Primary Asset: <span className="text-white ml-1">{selectedNode.name || selectedNode.algorithm || selectedNode.id}</span>
                 {selectedNode.location && <span className="text-slate-400 ml-1">· {selectedNode.location}</span>}
               </span>
@@ -162,9 +162,9 @@ export const DependencyGraph: React.FC<DependencyGraphProps> = ({ graph, loading
           </div>
           {selectedId && (
             <div className="flex items-center gap-2.5 pt-1 border-t border-slate-800/80 text-[10px] text-slate-400">
-              <span className="flex items-center gap-1 text-cyan-300 font-bold">
-                <span className="w-2 h-2 rounded-full border border-cyan-400 bg-cyan-500/20" />
-                <span>Primary</span>
+              <span className="flex items-center gap-1 text-amber-400 font-bold">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#FACC15] ring-2 ring-amber-400/40" />
+                <span>PRIMARY</span>
               </span>
               <span className="flex items-center gap-1 text-cyan-400 font-medium">
                 <span className="w-2 h-2 rounded-full bg-cyan-400" />
@@ -201,8 +201,8 @@ export const DependencyGraph: React.FC<DependencyGraphProps> = ({ graph, loading
 
             if (selectedId) {
               if (isPrimaryEdge) {
-                strokeColor = isImpacted ? '#F43F5E' : '#06B6D4';
-                strokeWidth = '3';
+                strokeColor = isImpacted ? '#F43F5E' : '#FACC15';
+                strokeWidth = '3.5';
                 strokeOpacity = 1.0;
               } else if (isDirectToIndirectEdge) {
                 strokeColor = isImpacted ? '#F43F5E' : 'rgba(6, 182, 212, 0.7)';
@@ -255,7 +255,13 @@ export const DependencyGraph: React.FC<DependencyGraphProps> = ({ graph, loading
               ? 0.25
               : 0.88;
 
-            const baseColor = isVulnerable ? '#F43F5E' : '#06B6D4';
+            // Selected PRIMARY node MUST be bright Gold/Amber (#FACC15)
+            // Non-selected nodes retain original cryptographic classification colors
+            const baseColor = isSelected
+              ? '#FACC15'
+              : isVulnerable
+              ? '#F43F5E'
+              : '#06B6D4';
 
             return (
               <g
@@ -266,23 +272,36 @@ export const DependencyGraph: React.FC<DependencyGraphProps> = ({ graph, loading
                 {/* Outer Glow & Halo Rings */}
                 {isSelected && (
                   <>
+                    {/* Outer Gold Glowing Pulse Ring */}
                     <circle
                       cx={node.x}
                       cy={node.y}
-                      r={nodeSize + 10}
-                      fill="rgba(6, 182, 212, 0.15)"
-                      stroke="#06B6D4"
+                      r={nodeSize + 12}
+                      fill="rgba(250, 204, 21, 0.18)"
+                      stroke="#FACC15"
                       strokeWidth="2"
                       strokeDasharray="4,4"
                       className="animate-spin"
                     />
+                    {/* Secondary Vulnerability Ring for Shor-vulnerable Primary Node */}
+                    {isVulnerable && (
+                      <circle
+                        cx={node.x}
+                        cy={node.y}
+                        r={nodeSize + 6}
+                        fill="none"
+                        stroke="#F43F5E"
+                        strokeWidth="2.5"
+                      />
+                    )}
+                    {/* Inner Gold Halo */}
                     <circle
                       cx={node.x}
                       cy={node.y}
-                      r={nodeSize + 4}
+                      r={nodeSize + 3}
                       fill="none"
-                      stroke="#06B6D4"
-                      strokeWidth="2"
+                      stroke="#FACC15"
+                      strokeWidth="1.5"
                     />
                   </>
                 )}
@@ -332,9 +351,10 @@ export const DependencyGraph: React.FC<DependencyGraphProps> = ({ graph, loading
                       width="50"
                       height="15"
                       rx="7.5"
-                      fill="#06B6D4"
+                      fill="#FACC15"
                       stroke="#FFFFFF"
-                      strokeWidth="1"
+                      strokeWidth="1.5"
+                      className="shadow-lg"
                     />
                     <text
                       x="0"
@@ -365,11 +385,11 @@ export const DependencyGraph: React.FC<DependencyGraphProps> = ({ graph, loading
                 <text
                   x={node.x}
                   y={node.y - nodeSize - (isSelected ? 25 : 5)}
-                  fill={isSelected ? '#22D3EE' : isDirect ? '#E2E8F0' : isUnaffected ? '#475569' : '#94A3B8'}
-                  fontSize={isSelected ? '11' : isDirect ? '10' : '9.5'}
+                  fill={isSelected ? '#FACC15' : isDirect ? '#E2E8F0' : isUnaffected ? '#475569' : '#94A3B8'}
+                  fontSize={isSelected ? '11.5' : isDirect ? '10' : '9.5'}
                   fontFamily="JetBrains Mono"
                   textAnchor="middle"
-                  fontWeight={isSelected ? '800' : isDirect ? '700' : '600'}
+                  fontWeight={isSelected ? '900' : isDirect ? '700' : '600'}
                   opacity={nodeOpacity}
                   className="pointer-events-none"
                 >
