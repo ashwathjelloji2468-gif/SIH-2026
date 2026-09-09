@@ -28,6 +28,7 @@ import { XContextModal } from '../components/XEngine/XContextModal';
 import { YContextCard } from '../components/YEngine/YContextCard';
 import { YContextModal } from '../components/YEngine/YContextModal';
 import { ZContextCard } from '../components/ZEngine/ZContextCard';
+import { ScrollNavControl } from '../components/Migration/ScrollNavControl';
 import { ShieldAlert, RefreshCw, Box, Play, ShieldCheck, Network, Download } from 'lucide-react';
 
 export const Risk: React.FC = () => {
@@ -404,6 +405,9 @@ export const Risk: React.FC = () => {
         yContext={yContext}
         onSave={handleSaveYContext}
       />
+
+      {/* Floating Scroll Top / Bottom Control */}
+      <ScrollNavControl />
     </div>
   );
 };
