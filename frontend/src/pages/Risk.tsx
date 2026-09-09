@@ -189,6 +189,7 @@ export const Risk: React.FC = () => {
       {/* Integrated Mosca Engine Component Risk Table (M_i = X + Y - Z_i) */}
       <MoscaComponentTable
         moscaContext={moscaContext}
+        projectId={currentProject?.id}
         isLoading={loading}
       />
 

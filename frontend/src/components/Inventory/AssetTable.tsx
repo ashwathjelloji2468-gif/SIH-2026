@@ -139,13 +139,13 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, loading, onRefre
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-900/80 text-slate-400 font-mono uppercase tracking-wider border-b border-slate-800 text-[11px]">
-              <tr>
-                <th className="py-3 px-4">Algorithm & Primitive</th>
-                <th className="py-3 px-4">Asset Type</th>
+              <tr className="border-b border-slate-800 text-slate-400 uppercase tracking-wider text-[11px]">
+                <th className="py-3 px-4">Algorithm / Asset</th>
+                <th className="py-3 px-4">Type</th>
+                <th className="py-3 px-4">Lifetime (X)</th>
+                <th className="py-3 px-4">Business Criticality</th>
                 <th className="py-3 px-4">Purpose</th>
-                <th className="py-3 px-4">Detector Engine</th>
                 <th className="py-3 px-4">Source Location</th>
-                <th className="py-3 px-4">Confidence</th>
                 <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
@@ -161,6 +161,10 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, loading, onRefre
                   const ev = asset.evidence_items && asset.evidence_items[0];
                   const confidence = ev ? ev.confidence_score : 0.95;
                   const detector = ev?.detector_name || (String(asset.asset_type) === 'DEPENDENCY' ? 'DependencyScanner' : String(asset.asset_type) === 'CERTIFICATE' ? 'CertificateScanner' : 'PythonASTDetector');
+
+                  const lifetimeYr = asset.data_lifetime_years ?? (asset.algorithm_name?.includes('RSA') || asset.algorithm_name?.includes('ECDSA') ? 10 : 7);
+                  const lifetimeLbl = asset.lifetime_label || (lifetimeYr >= 10 ? 'LONG_TERM' : 'MEDIUM_TERM');
+                  const critLbl = asset.business_criticality_label || (asset.quantum_safety === 'VULNERABLE' ? 'HIGH' : 'MEDIUM');
 
                   return (
                     <tr
@@ -189,22 +193,41 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, loading, onRefre
                         </div>
                       </td>
 
+                      {/* Type */}
                       <td className="py-3 px-4">
                         <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-slate-900 border border-slate-800 text-cyan-300">
                           {asset.asset_type || 'ALGORITHM'}
                         </span>
                       </td>
 
+                      {/* Lifetime X */}
+                      <td className="py-3 px-4">
+                        <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-cyan-950/60 border border-cyan-800/60 text-cyan-200">
+                          {lifetimeLbl} ({lifetimeYr}y)
+                        </span>
+                      </td>
+
+                      {/* Business Criticality */}
+                      <td className="py-3 px-4">
+                        <span
+                          className={`px-2 py-0.5 text-[10px] font-mono rounded border ${
+                            critLbl === 'CRITICAL'
+                              ? 'bg-rose-950/80 border-rose-800 text-rose-300'
+                              : critLbl === 'HIGH'
+                              ? 'bg-orange-950/80 border-orange-800 text-orange-300'
+                              : 'bg-amber-950/80 border-amber-800 text-amber-300'
+                          }`}
+                        >
+                          {critLbl}
+                        </span>
+                      </td>
+
+                      {/* Purpose */}
                       <td className="py-3 px-4">
                         <span className="text-slate-300">{asset.purpose}</span>
                       </td>
 
-                      <td className="py-3 px-4">
-                        <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-slate-950 border border-slate-800 text-slate-300">
-                          {detector}
-                        </span>
-                      </td>
-
+                      {/* Location */}
                       <td className="py-3 px-4 max-w-xs truncate text-slate-400">
                         <div className="flex items-center gap-1.5 truncate">
                           <FileCode className="w-3.5 h-3.5 text-slate-500 shrink-0" />

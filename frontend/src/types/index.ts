@@ -112,6 +112,11 @@ export interface CryptoAsset {
   review_status: ReviewStatus;
   created_at: string;
   evidence_items?: Evidence[];
+  data_lifetime_years?: number | null;
+  lifetime_label?: string | null;
+  business_criticality_label?: string | null;
+  business_criticality_score?: number | null;
+  classification_summary?: string | null;
 }
 
 // Coverage

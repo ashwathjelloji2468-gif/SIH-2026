@@ -31,6 +31,9 @@ def evaluate_mosca_component(
 @router.get("/projects/{project_id}/mosca-context", response_model=MoscaProjectEvaluationResponse)
 def get_project_mosca_context(
     project_id: str,
+    user_x_years: Optional[int] = Query(None),
+    user_domain: Optional[str] = Query(None),
+    user_y_scenario: Optional[str] = Query(None),
     quantum_horizon: Optional[int] = Query(None),
     db: Session = Depends(get_db)
 ):
@@ -50,5 +53,8 @@ def get_project_mosca_context(
     return engine.evaluate_project_mosca(
         project=project,
         assets=assets,
+        user_x_years=user_x_years,
+        user_domain=user_domain,
+        user_y_scenario=user_y_scenario,
         quantum_horizon=quantum_horizon
     )

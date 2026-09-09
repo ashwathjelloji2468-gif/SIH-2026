@@ -163,14 +163,17 @@ class MoscaEngine:
         self,
         project: Any,
         assets: List[Any],
+        user_x_years: Optional[int] = None,
+        user_domain: Optional[str] = None,
+        user_y_scenario: Optional[str] = None,
         quantum_horizon: Optional[int] = None
     ) -> Dict[str, Any]:
         """
         Evaluate project-wide component-wise Mosca risk.
         """
-        user_x_years = getattr(project, "user_x_years", None)
-        user_domain = getattr(project, "user_domain", None)
-        user_y_scenario = getattr(project, "user_y_scenario", None)
+        x_yr = user_x_years if user_x_years is not None else getattr(project, "user_x_years", None)
+        u_dom = user_domain if user_domain is not None else getattr(project, "user_domain", None)
+        y_scen = user_y_scenario if user_y_scenario is not None else getattr(project, "user_y_scenario", None)
         folder_contexts = getattr(project, "folder_contexts", None)
         project_name = getattr(project, "name", None)
         description = getattr(project, "description", None)
@@ -195,9 +198,9 @@ class MoscaEngine:
 
             c_res = self.evaluate_component_mosca(
                 component=comp_dict,
-                user_x_years=user_x_years,
-                user_domain=user_domain,
-                user_y_scenario=user_y_scenario,
+                user_x_years=x_yr,
+                user_domain=u_dom,
+                user_y_scenario=y_scen,
                 quantum_horizon=quantum_horizon,
                 project_name=project_name,
                 description=description,

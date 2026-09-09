@@ -251,6 +251,9 @@ export const AssetRiskTable: React.FC<AssetRiskTableProps> = ({
             <thead>
               <tr className="border-b border-slate-800 text-slate-400 uppercase tracking-wider text-[11px]">
                 <th className="py-3 px-4">Cryptographic Asset & Location</th>
+                <th className="py-3 px-4">Type</th>
+                <th className="py-3 px-4">Lifetime (X)</th>
+                <th className="py-3 px-4">Criticality</th>
                 <th className="py-3 px-4">Risk Score</th>
                 <th className="py-3 px-4">Risk Level</th>
                 <th className="py-3 px-4">Priority</th>
@@ -262,7 +265,7 @@ export const AssetRiskTable: React.FC<AssetRiskTableProps> = ({
             <tbody className="divide-y divide-slate-800/60">
               {filteredList.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-slate-500 font-mono">
+                  <td colSpan={10} className="py-8 text-center text-slate-500 font-mono">
                     No cryptographic assets match the selected filters.
                   </td>
                 </tr>
@@ -276,10 +279,17 @@ export const AssetRiskTable: React.FC<AssetRiskTableProps> = ({
                   const prio = (assessment.priority || lvl).toString().toUpperCase();
                   const qStat = (assessment.quantum_status || asset?.quantum_safety || 'UNKNOWN').toString();
 
+                  const typeStr = asset?.asset_type || 'ALGORITHM';
+                  const lifetimeYr = asset?.data_lifetime_years ?? (alg.includes('RSA') || alg.includes('ECDSA') ? 10 : 7);
+                  const lifetimeLbl = asset?.lifetime_label || (lifetimeYr >= 10 ? 'LONG_TERM' : 'MEDIUM_TERM');
+                  const critLbl = asset?.business_criticality_label || (qStat.includes('VULNERABLE') ? 'HIGH' : 'MEDIUM');
+
                   const shortExplanation = assessment.explanation || (assessment.rationale && assessment.rationale[0]) || 'Risk evaluated by RiskEngine.';
 
+                  const isHighOrCritical = lvl.includes('CRITICAL') || lvl.includes('HIGH') || score >= 50;
+
                   return (
-                    <tr key={assessment.asset_id || idx} className="hover:bg-slate-900/40 transition-colors">
+                    <tr key={assessment.asset_id || idx} className={`hover:bg-slate-900/60 transition-colors ${isHighOrCritical ? 'bg-rose-950/10' : ''}`}>
                       {/* Asset & Location */}
                       <td className="py-3 px-4">
                         <div className="font-semibold text-slate-100 text-sm">{alg}</div>
@@ -287,6 +297,35 @@ export const AssetRiskTable: React.FC<AssetRiskTableProps> = ({
                           <FileCode className="w-3 h-3 text-cyan-400" />
                           {loc}{lineNo ? `:${lineNo}` : ''}
                         </div>
+                      </td>
+
+                      {/* Type */}
+                      <td className="py-3 px-4">
+                        <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-slate-900 border border-slate-800 text-cyan-300">
+                          {typeStr}
+                        </span>
+                      </td>
+
+                      {/* Lifetime X */}
+                      <td className="py-3 px-4">
+                        <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-cyan-950/60 border border-cyan-800/60 text-cyan-200">
+                          {lifetimeLbl} ({lifetimeYr}y)
+                        </span>
+                      </td>
+
+                      {/* Business Criticality */}
+                      <td className="py-3 px-4">
+                        <span
+                          className={`px-2 py-0.5 text-[10px] font-mono rounded border ${
+                            critLbl === 'CRITICAL'
+                              ? 'bg-rose-950/80 border-rose-800 text-rose-300'
+                              : critLbl === 'HIGH'
+                              ? 'bg-orange-950/80 border-orange-800 text-orange-300'
+                              : 'bg-amber-950/80 border-amber-800 text-amber-300'
+                          }`}
+                        >
+                          {critLbl}
+                        </span>
                       </td>
 
                       {/* Risk Score */}

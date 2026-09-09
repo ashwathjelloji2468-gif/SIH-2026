@@ -26,4 +26,7 @@ export interface MoscaProjectEvaluationResponse {
   urgency_distribution: Record<MoscaUrgency, number>;
   components: MoscaComponentResultResponse[];
   explanation: string;
+  evaluated_x?: XResult;
+  evaluated_y?: YResult;
+  evaluated_z_horizon?: number;
 }
