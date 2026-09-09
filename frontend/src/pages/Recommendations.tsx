@@ -31,6 +31,7 @@ export const Recommendations: React.FC = () => {
   const [summary, setSummary] = useState<RecommendationSummaryResponse | null>(null);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [evaluating, setEvaluating] = useState<boolean>(false);
 
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
@@ -60,9 +61,42 @@ export const Recommendations: React.FC = () => {
     }
   };
 
+  const handleEvaluateProject = async () => {
+    if (!currentProject) return;
+    setEvaluating(true);
+    try {
+      const data = await recommendationService.evaluateProjectRecommendations(currentProject.id);
+      setSummary(data);
+      setRecommendations(data.recommendations || []);
+    } catch (err) {
+      console.error('Failed to evaluate project recommendations:', err);
+    } finally {
+      setEvaluating(false);
+    }
+  };
+
   useEffect(() => {
     fetchRecommendations();
   }, [currentProject]);
+
+  // Derived Summary Counts fallback
+  const categoryCounts = useMemo(() => {
+    let pqc = 0;
+    let retain = 0;
+    let manual = 0;
+    recommendations.forEach((rec) => {
+      const cat = (rec.category || '').toUpperCase();
+      if (cat.includes('PQC_REPLACEMENT') || cat.includes('MIGRATE')) pqc++;
+      else if (cat.includes('RETAIN')) retain++;
+      else manual++;
+    });
+
+    return {
+      pqc: summary?.category_summary?.pqc_replacement_count ?? pqc,
+      retain: summary?.category_summary?.retain_crypto_count ?? retain,
+      manual: summary?.category_summary?.manual_review_count ?? manual,
+    };
+  }, [recommendations, summary]);
 
   // Filtered List
   const filteredList = useMemo(() => {
@@ -77,7 +111,7 @@ export const Recommendations: React.FC = () => {
       const cat = (rec.category || '').toUpperCase();
       const matchesCategory =
         categoryFilter === 'ALL' ||
-        (categoryFilter === 'PQC_REPLACEMENT' && cat.includes('PQC_REPLACEMENT')) ||
+        (categoryFilter === 'PQC_REPLACEMENT' && (cat.includes('PQC_REPLACEMENT') || cat.includes('MIGRATE'))) ||
         (categoryFilter === 'HYBRID' && (cat.includes('HYBRID') || rec.alternative_algorithm?.includes('HYBRID'))) ||
         (categoryFilter === 'RETAIN' && cat.includes('RETAIN')) ||
         (categoryFilter === 'MANUAL_REVIEW' && cat.includes('MANUAL'));
@@ -101,7 +135,7 @@ export const Recommendations: React.FC = () => {
 
   const getCategoryBadge = (category?: string, altAlgo?: string) => {
     const catUpper = (category || '').toUpperCase();
-    if (catUpper.includes('PQC_REPLACEMENT')) {
+    if (catUpper.includes('PQC_REPLACEMENT') || catUpper.includes('MIGRATE')) {
       return <span className="px-2.5 py-1 text-xs font-mono font-bold rounded-md bg-cyan-950/90 border border-cyan-700/80 text-cyan-300 shadow-[0_0_10px_rgba(6,182,212,0.2)]">Pure PQC Replacement</span>;
     }
     if (catUpper.includes('HYBRID') || altAlgo?.includes('HYBRID')) {
@@ -144,6 +178,15 @@ export const Recommendations: React.FC = () => {
 
         <div className="flex items-center gap-3">
           <button
+            onClick={handleEvaluateProject}
+            disabled={evaluating || loading}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-slate-950 font-mono text-xs font-bold transition-all shadow-[0_0_15px_rgba(6,182,212,0.3)] cursor-pointer"
+          >
+            <Cpu className={`w-4 h-4 ${evaluating ? 'animate-spin' : ''}`} />
+            <span>{evaluating ? 'Evaluating Engine...' : 'Run Recommendation Engine'}</span>
+          </button>
+
+          <button
             onClick={() => setIsCatalogOpen(true)}
             className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-cyan-500/50 text-slate-300 hover:text-cyan-300 font-mono text-xs font-semibold transition-all cursor-pointer"
           >
@@ -155,7 +198,7 @@ export const Recommendations: React.FC = () => {
             className="p-2 rounded-xl border border-slate-800 hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
             title="Refresh Recommendations"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${loading || evaluating ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </div>
@@ -178,7 +221,7 @@ export const Recommendations: React.FC = () => {
             <span className="text-xs font-mono text-cyan-300 uppercase tracking-wider font-semibold">PQC Replacements</span>
             <ShieldCheck className="w-4 h-4 text-cyan-400" />
           </div>
-          <div className="text-3xl font-bold font-mono text-slate-100">{summary?.category_summary?.pqc_replacement_count || 0}</div>
+          <div className="text-3xl font-bold font-mono text-slate-100">{categoryCounts.pqc}</div>
           <p className="text-[11px] text-slate-400 font-mono">ML-KEM (FIPS 203) / ML-DSA (FIPS 204)</p>
         </div>
 
@@ -188,7 +231,7 @@ export const Recommendations: React.FC = () => {
             <span className="text-xs font-mono text-emerald-300 uppercase tracking-wider font-semibold">Retained Symmetric</span>
             <CheckCircle2 className="w-4 h-4 text-emerald-400" />
           </div>
-          <div className="text-3xl font-bold font-mono text-slate-100">{summary?.category_summary?.retain_crypto_count || 0}</div>
+          <div className="text-3xl font-bold font-mono text-slate-100">{categoryCounts.retain}</div>
           <p className="text-[11px] text-slate-400 font-mono">AES-256 / SHA-256 / HMAC retained</p>
         </div>
 
@@ -198,7 +241,7 @@ export const Recommendations: React.FC = () => {
             <span className="text-xs font-mono text-amber-300 uppercase tracking-wider font-semibold">Manual Reviews</span>
             <AlertTriangle className="w-4 h-4 text-amber-400" />
           </div>
-          <div className="text-3xl font-bold font-mono text-slate-100">{summary?.category_summary?.manual_review_count || 0}</div>
+          <div className="text-3xl font-bold font-mono text-slate-100">{categoryCounts.manual}</div>
           <p className="text-[11px] text-slate-400 font-mono">Custom or unclassified primitives</p>
         </div>
       </div>
@@ -275,10 +318,34 @@ export const Recommendations: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
-              {loading ? (
+              {loading || evaluating ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-500 font-mono">
-                    Evaluating PQC recommendations across codebase artifacts...
+                  <td colSpan={7} className="py-12 text-center text-slate-400 font-mono">
+                    <div className="flex flex-col items-center justify-center space-y-3">
+                      <Cpu className="w-6 h-6 text-cyan-400 animate-spin" />
+                      <span>Evaluating PQC recommendations across codebase artifacts...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : recommendations.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-slate-400 font-mono space-y-3">
+                    <div className="flex justify-center mb-2">
+                      <AlertTriangle className="w-8 h-8 text-amber-400" />
+                    </div>
+                    <div className="text-slate-200 font-bold text-sm">No recommendations evaluated yet for {currentProject?.name}</div>
+                    <div className="text-xs text-slate-400 max-w-md mx-auto">
+                      Run the NIST PQC Recommendation Engine to analyze all discovered cryptographic primitives and map them to FIPS 203/204/205 standards.
+                    </div>
+                    <div className="pt-2">
+                      <button
+                        onClick={handleEvaluateProject}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-mono text-xs font-bold transition-all shadow-md cursor-pointer"
+                      >
+                        <Cpu className="w-4 h-4" />
+                        <span>Run Recommendation Engine</span>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ) : filteredList.length === 0 ? (

@@ -56,7 +56,8 @@ class RecommendationService:
 
         detector_names = [e.detector_name for e in (getattr(asset, "evidence_items", []) or [])]
 
-        risk_level = ra.risk_level.value if (ra and hasattr(ra, "risk_level") and hasattr(ra.risk_level, "value")) else "LOW"
+        r_level_attr = getattr(ra, "risk_level", "LOW") if ra else "LOW"
+        risk_level = r_level_attr.value if hasattr(r_level_attr, "value") else str(r_level_attr or "LOW")
         risk_score = ra.risk_score if ra else 0.0
         complexity = getattr(ra, "migration_complexity_score", 50.0) if ra else 50.0
 
@@ -86,26 +87,95 @@ class RecommendationService:
             rec_eval["asset_name"] = asset.name
             return rec_eval
 
-    def recommend_project(self, project_id: str) -> List[Dict[str, Any]]:
+    def recommend_project(self, project_id: str, force_regeneration: bool = True) -> List[Dict[str, Any]]:
         if not self.asset_repo:
             raise RuntimeError("Database repository unavailable.")
         assets = self.asset_repo.get_by_project(project_id)
+        if not assets:
+            return []
+
+        asset_ids = [a.id for a in assets]
+        existing_map = {}
+        if not force_regeneration and self.rec_repo:
+            existing_recs = self.rec_repo.list_recommendations(project_id=project_id)
+            for r in existing_recs:
+                if r.asset_id not in existing_map:
+                    existing_map[r.asset_id] = r
+
+        risk_map = {}
+        threats_map = {}
+        if self.risk_repo:
+            from app.models.db_models import RiskAssessment, ThreatScenario
+            all_ras = self.db.query(RiskAssessment).filter(RiskAssessment.asset_id.in_(asset_ids)).all()
+            for ra in all_ras:
+                if ra.asset_id not in risk_map or (hasattr(ra, 'created_at') and getattr(ra, 'created_at') > getattr(risk_map[ra.asset_id], 'created_at')):
+                    risk_map[ra.asset_id] = ra
+
+            all_ts = self.db.query(ThreatScenario).filter(ThreatScenario.asset_id.in_(asset_ids)).all()
+            for ts in all_ts:
+                threats_map.setdefault(ts.asset_id, []).append(ts)
+
+        to_store = []
         results = []
+
         for asset in assets:
-            res = self.recommend_asset(asset.id, force_regeneration=True)
-            results.append(res)
+            ra = risk_map.get(asset.id)
+            threats = threats_map.get(asset.id, [])
+            threat_dict_list = [
+                {
+                    "id": getattr(ts, "id", None),
+                    "scenario_type": ts.scenario_type.value if hasattr(ts, "scenario_type") and hasattr(ts.scenario_type, "value") else str(getattr(ts, "scenario_type", "MODERATE")),
+                    "name": getattr(ts, "name", "Threat Scenario"),
+                    "description": getattr(ts, "description", "")
+                } for ts in threats
+            ]
+
+            if not force_regeneration and asset.id in existing_map:
+                existing = existing_map[asset.id]
+                results.append(self._recommendation_to_dict(existing, asset, ra, threat_dict_list))
+                continue
+
+            detector_names = [e.detector_name for e in (getattr(asset, "evidence_items", []) or [])]
+            r_level_attr = getattr(ra, "risk_level", "LOW") if ra else "LOW"
+            risk_level = r_level_attr.value if hasattr(r_level_attr, "value") else str(r_level_attr or "LOW")
+            risk_score = ra.risk_score if ra else 0.0
+            complexity = getattr(ra, "migration_complexity_score", 50.0) if ra else 50.0
+            comp_str = "HIGH" if complexity >= 75.0 else ("MEDIUM" if complexity >= 40.0 else "LOW")
+
+            rec_eval = self.engine.generate_recommendation(
+                algorithm_name=asset.algorithm_name,
+                purpose=asset.purpose,
+                quantum_safety=asset.quantum_safety,
+                risk_level=risk_level,
+                risk_score=risk_score,
+                threat_scenarios=threat_dict_list,
+                migration_complexity=comp_str,
+                detector_names=detector_names
+            )
+            to_store.append((asset.id, rec_eval, ra.id if ra else None, asset, ra, threat_dict_list))
+
+        if to_store and self.rec_repo and hasattr(self.rec_repo, "store_recommendations_bulk"):
+            bulk_payload = [(item[0], item[1], item[2]) for item in to_store]
+            rec_records = self.rec_repo.store_recommendations_bulk(bulk_payload)
+            for idx, rec_record in enumerate(rec_records):
+                item = to_store[idx]
+                results.append(self._recommendation_to_dict(rec_record, item[3], item[4], item[5]))
+        elif to_store:
+            for item in to_store:
+                rec_eval = item[1]
+                rec_eval["asset_id"] = item[0]
+                rec_eval["asset_name"] = item[3].name
+                results.append(rec_eval)
+
         return results
 
-    def get_project_recommendation_summary(self, project_id: str) -> Dict[str, Any]:
+    def get_project_recommendation_summary(self, project_id: str, force_regeneration: bool = False) -> Dict[str, Any]:
         if not self.asset_repo:
             raise RuntimeError("Database repository unavailable.")
         assets = self.asset_repo.get_by_project(project_id)
         total_assets = len(assets)
 
-        rec_list = []
-        for asset in assets:
-            rec = self.recommend_asset(asset.id, force_regeneration=False)
-            rec_list.append(rec)
+        rec_list = self.recommend_project(project_id, force_regeneration=force_regeneration)
 
         category_counts = {
             "pqc_replacement_count": 0,
@@ -132,7 +202,7 @@ class RecommendationService:
 
         for rec in rec_list:
             cat = str(rec.get("category", "")).upper()
-            if "PQC_REPLACEMENT" in cat:
+            if "PQC_REPLACEMENT" in cat or "MIGRATE" in cat:
                 category_counts["pqc_replacement_count"] += 1
             elif "HYBRID" in cat:
                 category_counts["hybrid_count"] += 1
@@ -143,7 +213,7 @@ class RecommendationService:
             else:
                 category_counts["no_action_required_count"] += 1
 
-            algo = str(rec.get("recommended_algorithm", ""))
+            algo = str(rec.get("recommended_algorithm", "") or rec.get("target_pqc_candidate", ""))
             if "ML-KEM" in algo:
                 algorithm_counts["ML-KEM"] += 1
             elif "ML-DSA" in algo:

@@ -39,6 +39,10 @@ export const recommendationService = {
     return api.get<RecommendationSummaryResponse>(`/projects/${projectId}/recommendations/summary`);
   },
 
+  evaluateProjectRecommendations: async (projectId: string): Promise<RecommendationSummaryResponse> => {
+    return api.post<RecommendationSummaryResponse>(`/projects/${projectId}/recommendations/evaluate`);
+  },
+
   getPqcCatalog: async (): Promise<Record<string, any>> => {
     return api.get<Record<string, any>>('/knowledge/pqc');
   },

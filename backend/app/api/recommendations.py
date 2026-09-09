@@ -50,6 +50,12 @@ def get_project_recommendations_summary(project_id: str, db: Session = Depends(g
     service = RecommendationService(db)
     return service.get_project_recommendation_summary(project_id)
 
+@router.post("/projects/{project_id}/recommendations/evaluate")
+def evaluate_project_recommendations(project_id: str, db: Session = Depends(get_db)):
+    """Force re-evaluation of PQC recommendations for all cryptographic assets in a project."""
+    service = RecommendationService(db)
+    return service.get_project_recommendation_summary(project_id, force_regeneration=True)
+
 @router.get("/knowledge/pqc")
 def get_pqc_knowledge():
     return PQC_CATALOG

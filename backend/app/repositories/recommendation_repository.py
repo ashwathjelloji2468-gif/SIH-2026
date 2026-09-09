@@ -58,6 +58,53 @@ class RecommendationRepository:
         self.db.refresh(rec)
         return rec
 
+    def store_recommendations_bulk(
+        self,
+        recs_data: List[tuple]
+    ) -> List[Recommendation]:
+        objs = []
+        for asset_id, rec_data, risk_assessment_id in recs_data:
+            cat_str = rec_data.get("category", "MANUAL_REVIEW")
+            if hasattr(cat_str, "value"):
+                cat_str = cat_str.value
+            try:
+                category = RecommendationCategory(cat_str)
+            except ValueError:
+                category = RecommendationCategory.MANUAL_REVIEW
+
+            std_status_str = rec_data.get("standard_status", "FINAL_STANDARD")
+            if hasattr(std_status_str, "value"):
+                std_status_str = std_status_str.value
+            try:
+                std_status = StandardStatus(std_status_str)
+            except ValueError:
+                std_status = StandardStatus.FINAL_STANDARD
+
+            rec = Recommendation(
+                asset_id=asset_id,
+                risk_assessment_id=risk_assessment_id,
+                target_pqc_candidate=rec_data.get("target_pqc_candidate", "ML-KEM"),
+                recommended_algorithm=rec_data.get("recommended_algorithm"),
+                alternative_algorithm=rec_data.get("alternative_algorithm"),
+                category=category,
+                priority=rec_data.get("priority", "LOW"),
+                standard_status=std_status,
+                rationale=rec_data.get("rationale", ""),
+                compatibility_notes=rec_data.get("compatibility_notes"),
+                performance_notes=rec_data.get("performance_notes"),
+                tradeoffs=rec_data.get("tradeoffs"),
+                threat_scenarios=rec_data.get("threat_scenarios"),
+                migration_notes=rec_data.get("migration_notes"),
+                migration_complexity=rec_data.get("migration_complexity", "MEDIUM"),
+                confidence=rec_data.get("confidence", 1.0),
+                kb_version=rec_data.get("kb_version", "2026.3.0-NIST-PQC")
+            )
+            objs.append(rec)
+
+        self.db.add_all(objs)
+        self.db.commit()
+        return objs
+
     def get(self, recommendation_id: str) -> Optional[Recommendation]:
         return self.db.query(Recommendation).filter(Recommendation.id == recommendation_id).first()
 

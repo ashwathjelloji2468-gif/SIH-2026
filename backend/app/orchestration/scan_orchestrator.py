@@ -119,6 +119,14 @@ class ScanOrchestrator:
             except Exception as e:
                 logger.warning(f"Scan {scan_id}: Pre-computing risk assessments warning: {e}")
 
+            try:
+                from app.recommend.service import RecommendationService
+                rec_service = RecommendationService(db)
+                rec_service.recommend_project(scan.project_id, force_regeneration=True)
+                logger.info(f"Scan {scan_id}: RecommendationEngine completed PQC evaluation for all assets in project {scan.project_id}.")
+            except Exception as e:
+                logger.warning(f"Scan {scan_id}: Pre-computing recommendations warning: {e}")
+
             scan_repo.update_status(scan_id, ScanStatus.COMPLETED, cbom_json=cbom_json)
             logger.info(f"Scan {scan_id} completed successfully with {len(created_assets)} assets detected.")
 
