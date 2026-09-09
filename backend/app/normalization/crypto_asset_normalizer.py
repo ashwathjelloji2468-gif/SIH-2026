@@ -1,41 +1,26 @@
 from typing import Dict, Any, Tuple, Optional
 from app.models.enums import AssetType, CryptoPurpose, QuantumSafety
-from app.knowledge.crypto_catalog import CRYPTO_CATALOG
+from app.knowledge.crypto_catalog import CRYPTO_CATALOG, evaluate_quantum_assessment
 
 
 def determine_quantum_safety(algorithm_name: str, key_size: Optional[int] = None) -> QuantumSafety:
-    if not algorithm_name:
+    if not algorithm_name or not str(algorithm_name).strip():
         return QuantumSafety.UNKNOWN
 
-    alg_upper = algorithm_name.strip().upper()
+    assessment = evaluate_quantum_assessment(algorithm_name, key_size)
+    q_status = assessment.get("quantum_status")
 
-    # Vulnerable Asymmetric
-    if any(pattern in alg_upper for pattern in ["RSA", "ECDSA", "ECDH", "DSA", "DH", "DIFFIE", "EC", "ECC", "ED25519", "X25519"]):
+    if q_status in ["CRITICAL", "VULNERABLE", "HIGH"]:
         return QuantumSafety.QUANTUM_VULNERABLE
-
-    # Legacy / Broken Hashing
-    if any(pattern in alg_upper for pattern in ["MD5", "SHA1", "SHA-1", "DES", "3DES", "RC4"]):
-        return QuantumSafety.QUANTUM_VULNERABLE
-
-    # Quantum Safe Post-Quantum Cryptography (NIST FIPS 203/204/205)
-    if any(pattern in alg_upper for pattern in ["ML-KEM", "ML-DSA", "SLH-DSA", "CRYSTALS", "FALCON", "SPHINCS", "PQC"]):
+    elif q_status in ["PARAMETER_DEPENDENT", "MODERATE"]:
+        return QuantumSafety.QUANTUM_RESISTANT_WITH_REDUCED_SECURITY_MARGIN
+    elif q_status == "LOW":
         return QuantumSafety.QUANTUM_SAFE
-
-    # Symmetric Ciphers
-    if "AES" in alg_upper:
-        if key_size and key_size < 256:
-            return QuantumSafety.QUANTUM_VULNERABLE
-        return QuantumSafety.QUANTUM_SAFE
-
-    # Hashes & Password Derivation
-    if any(pattern in alg_upper for pattern in ["SHA-256", "SHA-384", "SHA-512", "SHA3", "BLAKE2", "ARGON2", "BCRYPT"]):
-        return QuantumSafety.QUANTUM_SAFE
-
-    info = CRYPTO_CATALOG.get(alg_upper)
-    if info:
-        return QuantumSafety.QUANTUM_VULNERABLE if info.get("quantum_vulnerable") else QuantumSafety.QUANTUM_SAFE
+    elif q_status == "UNKNOWN":
+        return QuantumSafety.UNKNOWN
 
     return QuantumSafety.UNKNOWN
+
 
 
 def determine_asset_lifetime(
