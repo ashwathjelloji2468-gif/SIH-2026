@@ -93,6 +93,7 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
   const [patchError, setPatchError] = useState<string | null>(null);
   const [deployNotice, setDeployNotice] = useState<string | null>(null);
 
+  // Reset all downstream results when plan changes
   useEffect(() => {
     setSimulationResult(null);
     setValidationRun(null);
@@ -100,7 +101,19 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
     setValError(null);
     setPatchError(null);
     setDeployNotice(null);
+    setCurrentStep(1);
   }, [planId]);
+
+  // When user picks a different asset or pattern, invalidate prior simulation/validation
+  // so confidence scores cannot appear before the full 4-stage pipeline is re-run.
+  useEffect(() => {
+    setSimulationResult(null);
+    setValidationRun(null);
+    setSimError(null);
+    setValError(null);
+    setPatchError(null);
+    setDeployNotice(null);
+  }, [selectedAsset.id, pattern]);
 
   const handleRunSimulation = async () => {
     if (simulating) return;
@@ -230,8 +243,8 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
           </p>
         </div>
 
-        {/* Confidence Score Quick Badge */}
-        {validationRun && (
+        {/* Confidence Score Quick Badge — ONLY after Stage 4 validation completes */}
+        {currentStep === 4 && validationRun && typeof validationRun.confidence === 'number' && (
           <div className="px-4 py-2.5 rounded-2xl bg-[#1E293B] border border-[#22D3EE]/40 shadow-[0_0_15px_rgba(34,211,238,0.15)] flex items-center gap-3 shrink-0">
             <div className="h-10 w-10 rounded-xl bg-[#22D3EE]/20 border border-[#22D3EE]/50 flex items-center justify-center text-[#22D3EE]">
               <ShieldCheck className="w-5 h-5" />
@@ -239,7 +252,7 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
             <div>
               <div className="text-[10px] text-[#94A3B8] uppercase font-mono tracking-wider">Migration Confidence</div>
               <div className="text-base font-bold font-mono text-[#F8FAFC]">
-                {validationRun.confidence ? `${(validationRun.confidence * 100).toFixed(1)}%` : '98.4%'} Score
+                {(Math.min(validationRun.confidence, 0.99) * 100).toFixed(1)}% Score
               </div>
             </div>
           </div>
@@ -332,7 +345,12 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
                 <span className="text-xs font-mono text-[#94A3B8]">Target Pattern:</span>
                 <select
                   value={pattern}
-                  onChange={(e) => setPattern(e.target.value)}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setPattern(next);
+                    const match = CANDIDATE_ASSETS.find(a => a.transformationPattern === next);
+                    if (match) setSelectedAsset(match);
+                  }}
                   className="px-3.5 py-2 rounded-xl bg-[#0B0F19] border border-[#1E293B] text-xs font-mono text-[#22D3EE] focus:outline-none focus:border-[#22D3EE] cursor-pointer"
                 >
                   <option value="RSA_TO_ML_DSA">RSA Signature → ML-DSA-65 (NIST FIPS 204)</option>
@@ -692,7 +710,7 @@ def generate_keypair():
                       <div className={`text-sm font-bold font-mono mt-0.5 ${
                         validationRun.unit_tests_passed ? 'text-emerald-300' : 'text-rose-300'
                       }`}>
-                        {validationRun.unit_tests_passed ? '100% OK (42/42)' : 'FAILED (0/42)'}
+                        {validationRun.unit_tests_passed ? 'Pass (suite green)' : 'FAILED'}
                       </div>
                       <div className="text-[10px] text-[#94A3B8] mt-1">
                         {validationRun.unit_tests_passed ? 'All unit assertions verified' : 'Unit assertions failed'}
@@ -805,7 +823,9 @@ def generate_keypair():
                     <div className="w-28 h-28 rounded-full border-4 border-[#22D3EE]/20 flex items-center justify-center bg-[#0B1120] shadow-[0_0_25px_rgba(34,211,238,0.3)]">
                       <div className="text-center font-mono">
                         <div className="text-2xl font-extrabold text-[#F8FAFC]">
-                          {validationRun ? `${(validationRun.confidence * 100).toFixed(1)}%` : '98.4%'}
+                          {validationRun && typeof validationRun.confidence === 'number'
+                            ? `${(Math.min(validationRun.confidence, 0.99) * 100).toFixed(1)}%`
+                            : '—'}
                         </div>
                         <div className="text-[9px] text-[#22D3EE] uppercase tracking-wider font-bold">Confidence</div>
                       </div>
@@ -814,14 +834,16 @@ def generate_keypair():
 
                   <div className="space-y-1.5">
                     <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-mono text-[11px] font-bold border ${
-                      (validationRun?.status === 'SUCCESS' || !validationRun)
+                      validationRun && (validationRun.status === 'SUCCESS' || (validationRun.confidence ?? 0) >= 0.85)
                         ? 'bg-emerald-950/70 border-emerald-800 text-emerald-300'
-                        : 'bg-rose-950/70 border-rose-800 text-rose-300'
+                        : 'bg-amber-950/70 border-amber-800 text-amber-300'
                     }`}>
                       <CheckCircle2 className="w-3.5 h-3.5" />
-                      {(validationRun?.status === 'SUCCESS' || !validationRun)
-                        ? 'High Confidence — Production Ready'
-                        : 'Validation Review Required'}
+                      {validationRun
+                        ? ((validationRun.status === 'SUCCESS' || (validationRun.confidence ?? 0) >= 0.85)
+                            ? 'Validated — High Confidence'
+                            : 'Validation Review Required')
+                        : 'Pending Stage 3 Validation'}
                     </div>
                     <h4 className="text-xl font-bold font-mono text-[#F8FAFC]">NIST FIPS 203/204 Migration Validated</h4>
                     <p className="text-xs text-[#94A3B8] max-w-md leading-relaxed">
@@ -836,7 +858,9 @@ def generate_keypair():
                   <div className="p-3.5 rounded-2xl bg-[#0B0F19]/80 border border-slate-800">
                     <div className="text-[10px] text-[#94A3B8] uppercase">Residual Risk</div>
                     <div className="text-lg font-bold text-[#22D3EE]">
-                      {validationRun ? validationRun.residual_risk_score : 12} / 100
+                      {validationRun && typeof validationRun.residual_risk_score === 'number'
+                        ? validationRun.residual_risk_score
+                        : '—'} / 100
                     </div>
                     <div className="text-[10px] text-emerald-400 font-semibold">-88% Risk Reduction</div>
                   </div>
@@ -844,7 +868,9 @@ def generate_keypair():
                   <div className="p-3.5 rounded-2xl bg-[#0B0F19]/80 border border-slate-800">
                     <div className="text-[10px] text-[#94A3B8] uppercase">KAT Verification</div>
                     <div className="text-lg font-bold text-emerald-300">
-                      {validationRun?.crypto_tests_passed !== false ? '100% Pass' : 'Failed'}
+                      {validationRun
+                        ? (validationRun.crypto_tests_passed ? 'Pass' : 'Failed')
+                        : 'Pending'}
                     </div>
                     <div className="text-[10px] text-[#94A3B8]">FIPS 203 Vectors</div>
                   </div>
