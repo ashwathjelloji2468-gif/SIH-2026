@@ -150,11 +150,25 @@ class RiskService:
         total_assets = len(assets)
 
         assessed_list = []
-        for asset in assets:
-            ra = self.risk_repo.get_latest_for_asset(asset.id)
-            if ra:
-                threats = self.risk_repo.get_threat_scenarios_for_asset(asset.id)
-                assessed_list.append(self._assessment_to_dict(ra, asset, threats))
+        if assets:
+            asset_ids = [a.id for a in assets]
+            risk_map = {}
+            threats_map = {}
+            from app.models.db_models import RiskAssessment, ThreatScenario
+            all_ras = self.db.query(RiskAssessment).filter(RiskAssessment.asset_id.in_(asset_ids)).all()
+            for ra in all_ras:
+                if ra.asset_id not in risk_map or (hasattr(ra, 'created_at') and getattr(ra, 'created_at') > getattr(risk_map[ra.asset_id], 'created_at')):
+                    risk_map[ra.asset_id] = ra
+
+            all_ts = self.db.query(ThreatScenario).filter(ThreatScenario.asset_id.in_(asset_ids)).all()
+            for ts in all_ts:
+                threats_map.setdefault(ts.asset_id, []).append(ts)
+
+            for asset in assets:
+                ra = risk_map.get(asset.id)
+                if ra:
+                    threats = threats_map.get(asset.id, [])
+                    assessed_list.append(self._assessment_to_dict(ra, asset, threats))
 
         assessed_count = len(assessed_list)
         unassessed_count = total_assets - assessed_count
