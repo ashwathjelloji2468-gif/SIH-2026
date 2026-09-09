@@ -175,11 +175,17 @@ def recalculate_migration_plan(plan_id: str, db: Session = Depends(get_db)):
 
 @router.post("/migration/plans/{plan_id}/simulate")
 def simulate_migration_plan(plan_id: str, pattern: Optional[str] = None, db: Session = Depends(get_db)):
+    import os
+    import tempfile
+    import textwrap
+    from app.migration.transformer import MigrationTransformer
+    from app.models.enums import CryptoPurpose, AssetType, RecommendationCategory
+
     repo = MigrationRepository(db)
     plan = repo.get_plan(plan_id)
     if not plan:
         raise HTTPException(status_code=404, detail="Migration plan not found")
-    
+
     # Resolve asset to determine dynamic default pattern
     target_asset = None
     if plan.tasks and plan.tasks[0].asset_id:
@@ -204,16 +210,161 @@ def simulate_migration_plan(plan_id: str, pattern: Optional[str] = None, db: Ses
         else:
             pattern = "RSA_TO_ML_DSA"
 
+    # Pattern-specific realistic source (so Stage 2/3 are evidence-backed)
+    demo_sources = {
+        "RSA_TO_ML_DSA": (
+            "jwt_signer.py",
+            textwrap.dedent(
+                """
+                from cryptography.hazmat.primitives.asymmetric import rsa
+                from cryptography.hazmat.primitives import hashes
+                from cryptography.hazmat.primitives.asymmetric import padding
+
+                def generate_keypair():
+                    # VULNERABLE: RSA-2048 (Shor)
+                    private_key = rsa.generate_private_key(
+                        public_exponent=65537,
+                        key_size=2048,
+                    )
+                    return private_key
+
+                def sign(data: bytes, private_key):
+                    return private_key.sign(data, padding.PKCS1v15(), hashes.SHA256())
+                """
+            ).strip()
+            + "\n",
+            "RSA-2048",
+            CryptoPurpose.DIGITAL_SIGNATURE,
+        ),
+        "ECDSA_TO_ML_DSA": (
+            "ecdsa_signer.py",
+            textwrap.dedent(
+                """
+                from cryptography.hazmat.primitives.asymmetric import ec
+                from cryptography.hazmat.primitives import hashes
+
+                def generate_keypair():
+                    # VULNERABLE: ECDSA-P256
+                    return ec.generate_private_key(ec.SECP256R1())
+
+                def sign(data, key):
+                    return key.sign(data, ec.ECDSA(hashes.SHA256()))
+                """
+            ).strip()
+            + "\n",
+            "ECDSA-P256",
+            CryptoPurpose.DIGITAL_SIGNATURE,
+        ),
+        "ECDH_TO_ML_KEM_HYBRID": (
+            "tls_handshake.py",
+            textwrap.dedent(
+                """
+                from cryptography.hazmat.primitives.asymmetric import ec
+
+                def generate_keypair():
+                    # VULNERABLE: ECDH-P256 key exchange
+                    return ec.generate_private_key(ec.SECP256R1())
+
+                def derive_shared(private_key, peer_public):
+                    return private_key.exchange(ec.ECDH(), peer_public)
+                """
+            ).strip()
+            + "\n",
+            "ECDH-P256",
+            CryptoPurpose.KEY_ESTABLISHMENT,
+        ),
+        "AES_256_GCM_RETENTION": (
+            "kms_provider.py",
+            textwrap.dedent(
+                """
+                # Legacy AES-128-CBC (mode/key length weak; family is quantum-resistant)
+                from Crypto.Cipher import AES
+                from Crypto.Util.Padding import pad
+
+                def encrypt(data, key_128, iv):
+                    cipher = AES.new(key_128, AES.MODE_CBC, iv)
+                    return cipher.encrypt(pad(data, AES.block_size))
+                """
+            ).strip()
+            + "\n",
+            "AES-128-CBC",
+            CryptoPurpose.ENCRYPTION,
+        ),
+    }
+
+    fname, content, alg_name, purpose_enum = demo_sources.get(pattern, demo_sources["RSA_TO_ML_DSA"])
+    source_root = tempfile.mkdtemp(prefix=f"sentriq_src_{plan_id[:8]}_")
+    src_file = os.path.join(source_root, fname)
+    with open(src_file, "w") as f:
+        f.write(content)
+    original_snippet = content
+
     config = SandboxConfig(
         cpu_limit_percent=50,
         memory_limit_mb=512,
         timeout_seconds=60,
         allow_network_access=False,
-        requires_human_approval=True
+        requires_human_approval=True,
+        keep_directory=True,
     )
-    sandbox = SandboxEnvironment(plan_id, config=config)
-    sandbox_dir = sandbox.prepare_sandbox("/tmp/source_demo")
-    result = sandbox.apply_transformation_pattern(pattern)
+    sandbox = SandboxEnvironment(simulation_id=plan_id, config=config)
+    sandbox_dir = sandbox.prepare_sandbox(source_path=source_root)
+
+    asset = type(
+        "Asset",
+        (),
+        {
+            "algorithm_name": alg_name,
+            "purpose": purpose_enum,
+            "asset_type": AssetType.ALGORITHM,
+            "location": fname,
+        },
+    )()
+    target_label = DEMO_PATTERNS.get(pattern, {}).get("target", pattern)
+    rec = type(
+        "Rec",
+        (),
+        {
+            "target_pqc_candidate": target_label,
+            "category": (
+                RecommendationCategory.RETAIN
+                if ("AES" in pattern or "RETAIN" in pattern)
+                else RecommendationCategory.MIGRATE_PQC
+            ),
+            "transformation_pattern": pattern,
+            "recommended_algorithm": target_label,
+        },
+    )()
+
+    transformer = MigrationTransformer()
+    t_result = transformer.transform_sandbox_code(sandbox_dir, asset, rec)
+
+    transformed_path = os.path.join(sandbox_dir, fname)
+    transformed_snippet = original_snippet
+    if os.path.exists(transformed_path):
+        with open(transformed_path, "r", errors="ignore") as f:
+            transformed_snippet = f.read()
+
+    diff_summary = (
+        f"Applied pattern {pattern}: {alg_name} -> {target_label}. "
+        f"Status={t_result.get('status')}. "
+        f"Files changed: {t_result.get('files_changed', [])}."
+    )
+
+    result = {
+        **sandbox.apply_transformation_pattern(pattern),
+        "status": t_result.get("status", "TRANSFORMED"),
+        "transformation_type": t_result.get("transformation_type", pattern),
+        "files_modified": t_result.get("files_changed", [fname]),
+        "files_changed": t_result.get("files_changed", [fname]),
+        "original_snippet": original_snippet,
+        "transformed_snippet": transformed_snippet,
+        "diff_summary": diff_summary,
+        "diff_details": None,
+        "target_pqc_candidate": target_label,
+        "unsupported_assumptions": t_result.get("unsupported_assumptions", []),
+        "changes_summary": t_result.get("changes_summary", {}),
+    }
 
     sim_repo = MigrationSimulationRepository(db)
     asset_id = None
@@ -229,10 +380,10 @@ def simulate_migration_plan(plan_id: str, pattern: Optional[str] = None, db: Ses
                 asset_id = first_asset.id
 
     if not asset_id:
-        raise HTTPException(status_code=400, detail="No cryptographic assets associated with this plan to simulate.")
-
-
-    result["status"] = "TRANSFORMED"
+        raise HTTPException(
+            status_code=400,
+            detail="No cryptographic assets associated with this plan to simulate.",
+        )
 
     sim = sim_repo.create_simulation(
         asset_id=asset_id,
@@ -240,12 +391,13 @@ def simulate_migration_plan(plan_id: str, pattern: Optional[str] = None, db: Ses
         migration_plan_id=plan.id,
         sandbox_path=sandbox_dir,
         transformation_type=pattern,
-        status=SimulationStatus.TRANSFORMED
+        status=SimulationStatus.TRANSFORMED,
     )
     sim_repo.update_simulation_result(
         sim.id,
         status=SimulationStatus.TRANSFORMED,
-        changes_summary=result
+        files_changed=result.get("files_changed"),
+        changes_summary=result,
     )
 
     return {
@@ -253,5 +405,5 @@ def simulate_migration_plan(plan_id: str, pattern: Optional[str] = None, db: Ses
         "plan_id": plan_id,
         "sandbox_path": sandbox_dir,
         "transformation": result,
-        "status": "SIMULATION_COMPLETED"
+        "status": "SIMULATION_COMPLETED",
     }

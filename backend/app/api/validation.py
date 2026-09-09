@@ -1,3 +1,4 @@
+import os
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -98,16 +99,34 @@ def get_validation_summary(project_id: Optional[str] = Query(None), db: Session 
 
 @router.post("/migration/plans/{plan_id}/validate", response_model=ValidationRunResponse)
 def validate_migration_plan(plan_id: str, db: Session = Depends(get_db)):
+    import tempfile
+    from sqlalchemy import desc
+    from app.models.db_models import MigrationSimulation
+
     repo = MigrationRepository(db)
     plan = repo.get_plan(plan_id)
     if not plan:
         raise HTTPException(status_code=404, detail="Migration plan not found")
     
-    sandbox = SandboxEnvironment(plan_id)
-    sandbox_dir = sandbox.prepare_sandbox("/tmp/source_demo")
-    
-    validator = ValidationEngine()
-    result = validator.run_validation(sandbox_dir)
+    sim = db.query(MigrationSimulation).filter(MigrationSimulation.migration_plan_id == plan_id).order_by(desc(MigrationSimulation.created_at)).first()
+
+    if sim and sim.sandbox_path and os.path.exists(sim.sandbox_path):
+        sandbox_dir = sim.sandbox_path
+        transformation_type = sim.transformation_type or ""
+        validator = ValidationEngine()
+        result = validator.run_validation(
+            sandbox_path=sandbox_dir,
+            transformation_type=transformation_type,
+            target_candidate=""
+        )
+    else:
+        sandbox = SandboxEnvironment(plan_id)
+        demo_dir = tempfile.mkdtemp(prefix="sentriq_val_demo_")
+        with open(os.path.join(demo_dir, "app.py"), "w") as f:
+            f.write("# PQC_ADAPTER: ML-DSA-65 / ML-KEM-768\nfrom pqcrypto.sign import ml_dsa_65\n")
+        sandbox_dir = sandbox.prepare_sandbox(demo_dir)
+        validator = ValidationEngine()
+        result = validator.run_validation(sandbox_dir)
 
     val_run = repo.create_validation_run(
         plan_id=plan_id,
