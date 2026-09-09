@@ -89,8 +89,9 @@ export function clearApiCache(endpointPrefix?: string): void {
   } catch (_) {}
 }
 
-async function request<T>(endpoint: string, options: RequestInit = {}, timeoutMs = 15000): Promise<T> {
+async function request<T>(endpoint: string, options: RequestInit & { timeoutMs?: number } = {}, defaultTimeout = 60000): Promise<T> {
   const url = `${BASE_URL}${endpoint}`;
+  const effectiveTimeout = options.timeoutMs || defaultTimeout;
   
   const headers = new Headers(options.headers || {});
   if (!headers.has('Content-Type') && !(options.body instanceof FormData)) {
@@ -106,7 +107,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}, timeoutMs
       options.signal.addEventListener('abort', () => controller.abort(), { once: true });
     }
   }
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  const timeoutId = setTimeout(() => controller.abort(), effectiveTimeout);
 
   const config: RequestInit = {
     ...options,
@@ -150,13 +151,15 @@ async function request<T>(endpoint: string, options: RequestInit = {}, timeoutMs
   }
 }
 
+export type ApiRequestOptions = RequestInit & { skipCache?: boolean; timeoutMs?: number };
+
 export const api = {
   /**
    * Fast SWR GET Request:
    * Returns cached snapshot immediately if available (0ms delay),
    * while revalidating in background.
    */
-  get: async <T>(endpoint: string, options?: RequestInit & { skipCache?: boolean }): Promise<T> => {
+  get: async <T>(endpoint: string, options?: ApiRequestOptions): Promise<T> => {
     const skipCache = (options as any)?.skipCache;
     
     if (!skipCache) {
@@ -183,7 +186,7 @@ export const api = {
     }
   },
 
-  post: async <T>(endpoint: string, body?: any, options?: RequestInit): Promise<T> => {
+  post: async <T>(endpoint: string, body?: any, options?: ApiRequestOptions): Promise<T> => {
     clearApiCache();
     return request<T>(endpoint, { 
       ...options, 
@@ -192,7 +195,7 @@ export const api = {
     });
   },
 
-  patch: async <T>(endpoint: string, body?: any, options?: RequestInit): Promise<T> => {
+  patch: async <T>(endpoint: string, body?: any, options?: ApiRequestOptions): Promise<T> => {
     clearApiCache();
     return request<T>(endpoint, { 
       ...options, 
@@ -201,7 +204,7 @@ export const api = {
     });
   },
 
-  delete: async <T>(endpoint: string, options?: RequestInit): Promise<T> => {
+  delete: async <T>(endpoint: string, options?: ApiRequestOptions): Promise<T> => {
     clearApiCache();
     return request<T>(endpoint, { ...options, method: 'DELETE' });
   },

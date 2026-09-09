@@ -5,12 +5,12 @@ import { ScanGraph, BlastRadiusResult, TopBlastRadiusSummary, CryptoNode } from 
 import { InteractiveNetworkMap } from '../components/Graph/InteractiveNetworkMap';
 import { BlastRadiusSidePanel } from '../components/Graph/BlastRadiusSidePanel';
 import { BlastRadiusDashboardCards } from '../components/Graph/BlastRadiusDashboardCards';
-import { Network, Download, RefreshCw, ShieldAlert, ArrowLeft } from 'lucide-react';
+import { Network, Download, RefreshCw, ShieldAlert } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export const BlastRadiusPage: React.FC = () => {
   const navigate = useNavigate();
-  const { currentProject } = useProject();
+  const { currentProject, latestScan } = useProject();
 
   const [graphData, setGraphData] = useState<ScanGraph | null>(null);
   const [summaryData, setSummaryData] = useState<TopBlastRadiusSummary | null>(null);
@@ -27,51 +27,63 @@ export const BlastRadiusPage: React.FC = () => {
     setIsLoading(true);
     setError(null);
 
+    const scanId = latestScan?.id || currentProject.id;
+
     try {
-      // 1. Fetch Top Blast Radius Summary for project
-      const summary = await graphService.getProjectTopBlastRadius(currentProject.id);
-      setSummaryData(summary);
+      // Fetch graph and summary concurrently with resilient error handling
+      const [summaryRes, graphRes] = await Promise.allSettled([
+        graphService.getProjectTopBlastRadius(currentProject.id),
+        graphService.getProjectGraph(currentProject.id)
+      ]);
 
-      // 2. Fetch latest scan graph (or overall project graph)
-      const graph = await graphService.getProjectGraph(currentProject.id);
-      // Map legacy/ProjectGraph format to ScanGraph
-      const scanGraph: ScanGraph = {
-        scan_id: currentProject.id,
-        nodes: (graph.nodes || []).map((n: any) => ({
-          id: n.id,
-          scan_id: currentProject.id,
-          asset_id: n.id.startsWith('asset:') ? n.id.replace('asset:', '') : null,
-          artefact_type: n.type ? n.type.toUpperCase() : 'ALGORITHM',
-          name: n.label || n.id,
-          location: n.metadata?.location || null,
-          quantum_risk: n.metadata?.quantum_safety || (n.metadata?.algorithm_name?.includes('RSA') ? 'QUANTUM_VULNERABLE' : 'LOW'),
-          mosca_x: 10,
-          business_criticality: 50,
-          extra_metadata: n.metadata
-        })),
-        edges: (graph.edges || []).map((e: any, idx: number) => ({
-          id: `edge-${idx}`,
-          scan_id: currentProject.id,
-          source_node_id: e.source,
-          target_node_id: e.target,
-          relation_type: e.relationship || 'uses',
-          strength: 1.0
-        })),
-        total_nodes: graph.nodes?.length || 0,
-        total_edges: graph.edges?.length || 0,
-        single_points_of_failure: []
-      };
+      if (summaryRes.status === 'fulfilled') {
+        setSummaryData(summaryRes.value);
+      } else {
+        console.warn('Failed to load top blast radius summary:', summaryRes.reason);
+      }
 
-      setGraphData(scanGraph);
+      if (graphRes.status === 'fulfilled') {
+        const rawGraph = graphRes.value;
+        const scanGraph: ScanGraph = {
+          scan_id: scanId,
+          nodes: (rawGraph.nodes || []).map((n: any) => ({
+            id: n.id,
+            scan_id: scanId,
+            asset_id: n.id.startsWith('asset:') ? n.id.replace('asset:', '') : null,
+            artefact_type: n.type ? n.type.toUpperCase() : 'ALGORITHM',
+            name: n.label || n.id,
+            location: n.metadata?.location || null,
+            quantum_risk: n.metadata?.quantum_safety || (n.metadata?.algorithm_name?.includes('RSA') ? 'QUANTUM_VULNERABLE' : 'LOW'),
+            mosca_x: 10,
+            business_criticality: 50,
+            extra_metadata: n.metadata
+          })),
+          edges: (rawGraph.edges || []).map((e: any, idx: number) => ({
+            id: `edge-${idx}`,
+            scan_id: scanId,
+            source_node_id: e.source,
+            target_node_id: e.target,
+            relation_type: e.relationship || 'uses',
+            strength: 1.0
+          })),
+          total_nodes: rawGraph.nodes?.length || 0,
+          total_edges: rawGraph.edges?.length || 0,
+          single_points_of_failure: []
+        };
 
-      // Select first high-risk node by default if available
-      if (scanGraph.nodes.length > 0) {
-        const topNode = scanGraph.nodes.find(n => ['CRITICAL', 'HIGH', 'QUANTUM_VULNERABLE'].includes(n.quantum_risk.toUpperCase())) || scanGraph.nodes[0];
-        handleSelectNode(topNode.id, scanGraph.nodes);
+        setGraphData(scanGraph);
+
+        if (scanGraph.nodes.length > 0) {
+          const topNode = scanGraph.nodes.find(n => ['CRITICAL', 'HIGH', 'QUANTUM_VULNERABLE'].includes(n.quantum_risk.toUpperCase())) || scanGraph.nodes[0];
+          handleSelectNode(topNode.id, scanGraph.nodes);
+        }
+      } else {
+        const errObj = graphRes.reason;
+        setError(errObj?.message || 'Request timed out while connecting to backend.');
       }
     } catch (err: any) {
       console.error('Failed to load blast radius data:', err);
-      setError(err.message || 'Failed to load graph data.');
+      setError(err?.message || 'Failed to load graph data.');
     } finally {
       setIsLoading(false);
     }
@@ -79,7 +91,7 @@ export const BlastRadiusPage: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, [currentProject]);
+  }, [currentProject, latestScan]);
 
   const handleSelectNode = async (nodeId: string, currentNodes = graphData?.nodes || []) => {
     setSelectedNodeId(nodeId);
@@ -88,7 +100,8 @@ export const BlastRadiusPage: React.FC = () => {
 
     if (nodeId) {
       try {
-        const br = await graphService.getNodeBlastRadius(nodeId);
+        const scanId = latestScan?.id || currentProject?.id;
+        const br = await graphService.getNodeBlastRadius(nodeId, scanId);
         setBlastRadiusResult(br);
       } catch (err) {
         console.warn('Failed to calculate blast radius for node:', nodeId);
@@ -99,16 +112,22 @@ export const BlastRadiusPage: React.FC = () => {
   const handleRebuildGraph = async () => {
     if (!currentProject) return;
     setIsRebuilding(true);
+    setError(null);
     try {
+      const scanId = latestScan?.id || currentProject.id;
+      await graphService.buildScanGraph(scanId);
       await loadData();
+    } catch (err: any) {
+      console.error('Rebuild graph failed:', err);
+      setError(err?.message || 'Failed to rebuild graph.');
     } finally {
       setIsRebuilding(false);
     }
   };
 
   const handleDownloadGraph = () => {
-    if (!currentProject) return;
-    const url = graphService.getGraphDownloadUrl(currentProject.id);
+    const scanId = latestScan?.id || currentProject?.id || 'default';
+    const url = graphService.getGraphDownloadUrl(scanId);
     window.open(url, '_blank');
   };
 
@@ -157,9 +176,17 @@ export const BlastRadiusPage: React.FC = () => {
 
       {/* Error Banner */}
       {error && (
-        <div className="p-4 bg-rose-950/60 border border-rose-800 rounded-xl text-rose-300 text-xs flex items-center gap-3">
-          <ShieldAlert className="w-5 h-5 shrink-0" />
-          <span>{error}</span>
+        <div className="p-4 bg-rose-950/60 border border-rose-800 rounded-xl text-rose-300 text-xs flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <ShieldAlert className="w-5 h-5 shrink-0 text-rose-400" />
+            <span>{error}</span>
+          </div>
+          <button
+            onClick={loadData}
+            className="px-3 py-1 bg-rose-900 hover:bg-rose-800 text-white text-xs rounded-lg font-mono"
+          >
+            Retry
+          </button>
         </div>
       )}
 

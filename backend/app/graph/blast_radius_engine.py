@@ -219,15 +219,28 @@ class BlastRadiusEngine:
         logger.info(f"BlastRadiusEngine: Built graph for scan {scan_id} ({len(all_nodes)} nodes, {len(all_edges)} edges).")
         return {"scan_id": scan_id, "nodes": all_nodes, "edges": all_edges}
 
-    def calculate_blast_radius(self, root_node_id: str, scan_id: str, db: Session, max_hops: int = 3) -> Dict[str, Any]:
+    def calculate_blast_radius(
+        self,
+        root_node_id: str,
+        scan_id: str,
+        db: Session,
+        max_hops: int = 3,
+        preloaded_nodes: Optional[Dict[str, CryptoNode]] = None,
+        preloaded_adj: Optional[Dict[str, List[tuple]]] = None,
+        save_to_db: bool = True
+    ) -> Dict[str, Any]:
         """
         Performs BFS up to max_hops from root_node_id to compute reachable affected nodes,
         weighted impact score, affected systems, data classes, and estimated effort.
         """
-        root_node = db.query(CryptoNode).filter(CryptoNode.id == root_node_id).first()
+        node_map = preloaded_nodes
+        if node_map is None:
+            all_nodes_list = db.query(CryptoNode).filter(CryptoNode.scan_id == scan_id).all()
+            node_map = {n.id: n for n in all_nodes_list}
+
+        root_node = node_map.get(root_node_id)
         if not root_node:
-            # Try finding node by asset_id if root_node_id matches a CryptoAsset
-            root_node = db.query(CryptoNode).filter(CryptoNode.asset_id == root_node_id, CryptoNode.scan_id == scan_id).first()
+            root_node = next((n for n in node_map.values() if n.asset_id == root_node_id), None)
 
         if not root_node:
             return {
@@ -244,16 +257,13 @@ class BlastRadiusEngine:
                 "affected_systems": []
             }
 
-        # Build adjacency graph (bidirectional for blast propagation)
-        all_edges = db.query(CryptoEdge).filter(CryptoEdge.scan_id == scan_id).all()
-        adj: Dict[str, List[tuple]] = collections.defaultdict(list)
-        for e in all_edges:
-            adj[e.source_node_id].append((e.target_node_id, e.relation_type))
-            adj[e.target_node_id].append((e.source_node_id, f"reverse_{e.relation_type}"))
-
-        # Fetch all nodes into map
-        all_nodes_list = db.query(CryptoNode).filter(CryptoNode.scan_id == scan_id).all()
-        node_map = {n.id: n for n in all_nodes_list}
+        adj = preloaded_adj
+        if adj is None:
+            all_edges = db.query(CryptoEdge).filter(CryptoEdge.scan_id == scan_id).all()
+            adj = collections.defaultdict(list)
+            for e in all_edges:
+                adj[e.source_node_id].append((e.target_node_id, e.relation_type))
+                adj[e.target_node_id].append((e.source_node_id, f"reverse_{e.relation_type}"))
 
         # BFS Traversal
         visited: Dict[str, int] = {root_node.id: 0}  # node_id -> min_distance
@@ -265,10 +275,12 @@ class BlastRadiusEngine:
             if dist >= max_hops:
                 continue
 
-            for neighbor_id, rel in adj[curr_id]:
+            for neighbor_id, rel in adj.get(curr_id, []):
                 if neighbor_id not in visited:
                     visited[neighbor_id] = dist + 1
-                    new_path = path + [f"--({rel})--> {node_map.get(neighbor_id, CryptoNode(name='Node')).name}"]
+                    neighbor_node = node_map.get(neighbor_id)
+                    n_name = neighbor_node.name if neighbor_node else 'Node'
+                    new_path = path + [f"--({rel})--> {n_name}"]
                     paths[neighbor_id] = new_path
                     queue.append((neighbor_id, dist + 1, new_path))
 
@@ -353,26 +365,26 @@ class BlastRadiusEngine:
             "affected_systems": sorted(list(affected_systems))
         }
 
-        # Store or update BlastRadiusResult in DB
-        db.query(BlastRadiusResult).filter(
-            BlastRadiusResult.scan_id == scan_id,
-            BlastRadiusResult.root_node_id == root_node.id
-        ).delete()
+        if save_to_db:
+            db.query(BlastRadiusResult).filter(
+                BlastRadiusResult.scan_id == scan_id,
+                BlastRadiusResult.root_node_id == root_node.id
+            ).delete()
 
-        db_res = BlastRadiusResult(
-            scan_id=scan_id,
-            root_node_id=root_node.id,
-            radius_score=radius_score,
-            affected_nodes_count=len(affected_nodes_list),
-            systems_count=max(1, len(affected_systems)),
-            data_classes=sorted(list(affected_data_classes)),
-            estimated_migration_effort=round(estimated_effort, 1),
-            affected_nodes_json=affected_nodes_list
-        )
-        db.add(db_res)
-        db.commit()
+            db_res = BlastRadiusResult(
+                scan_id=scan_id,
+                root_node_id=root_node.id,
+                radius_score=radius_score,
+                affected_nodes_count=len(affected_nodes_list),
+                systems_count=max(1, len(affected_systems)),
+                data_classes=sorted(list(affected_data_classes)),
+                estimated_migration_effort=round(estimated_effort, 1),
+                affected_nodes_json=affected_nodes_list
+            )
+            db.add(db_res)
+            db.commit()
+            result_payload["id"] = db_res.id
 
-        result_payload["id"] = db_res.id
         return result_payload
 
     def get_top_blast_radii_for_project(self, project_id: str, db: Session) -> Dict[str, Any]:
@@ -388,26 +400,32 @@ class BlastRadiusEngine:
                 "single_points_of_failure": []
             }
 
-        nodes = db.query(CryptoNode).filter(CryptoNode.scan_id == latest_scan.id).all()
-        if not nodes:
+        all_nodes_list = db.query(CryptoNode).filter(CryptoNode.scan_id == latest_scan.id).all()
+        if not all_nodes_list:
             # Auto-build graph if missing
             self.build_graph_for_scan(latest_scan.id, db)
-            nodes = db.query(CryptoNode).filter(CryptoNode.scan_id == latest_scan.id).all()
+            all_nodes_list = db.query(CryptoNode).filter(CryptoNode.scan_id == latest_scan.id).all()
+
+        node_map = {n.id: n for n in all_nodes_list}
+        all_edges = db.query(CryptoEdge).filter(CryptoEdge.scan_id == latest_scan.id).all()
+        adj: Dict[str, List[tuple]] = collections.defaultdict(list)
+        for e in all_edges:
+            adj[e.source_node_id].append((e.target_node_id, e.relation_type))
+            adj[e.target_node_id].append((e.source_node_id, f"reverse_{e.relation_type}"))
 
         calculated_results = []
-        for n in nodes:
-            # Compute blast radius for each crypto asset or certificate node
-            res = self.calculate_blast_radius(n.id, latest_scan.id, db)
+        for n in all_nodes_list:
+            res = self.calculate_blast_radius(
+                n.id, latest_scan.id, db, max_hops=3,
+                preloaded_nodes=node_map, preloaded_adj=adj, save_to_db=False
+            )
             calculated_results.append(res)
 
         # Sort top blast radii by score descending
         top_blast_radii = sorted(calculated_results, key=lambda r: r["radius_score"], reverse=True)[:10]
 
         # Identify shared credentials with high impact
-        shared_edges = db.query(CryptoEdge).filter(
-            CryptoEdge.scan_id == latest_scan.id,
-            CryptoEdge.relation_type == "shares_key"
-        ).all()
+        shared_edges = [e for e in all_edges if e.relation_type == "shares_key"]
 
         shared_credentials = []
         processed_pairs = set()
