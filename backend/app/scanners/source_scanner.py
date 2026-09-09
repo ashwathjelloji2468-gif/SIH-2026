@@ -4,8 +4,10 @@ from typing import List
 from app.scanners.base import BaseScanner, RawFinding
 from app.scanners.parsers.python_parser import parse_python_file
 from app.scanners.parsers.javascript_parser import parse_javascript_file
+from app.scanners.parsers.java_parser import parse_java_file
 from app.models.enums import AssetType, CryptoPurpose, EvidenceType
 from app.core.logging import logger
+
 
 IGNORE_DIRS = {
     "node_modules", ".git", ".svn", ".hg",
@@ -104,17 +106,25 @@ class SourceScanner(BaseScanner):
                     ))
 
 
-            # 2. Run JS/TS parser on JavaScript and TypeScript files
+            # 2. Run JS/TS Tree-sitter parser
             elif file.endswith((".js", ".jsx", ".ts", ".tsx")):
                 js_results = parse_javascript_file(full_path)
                 for item in js_results:
                     alg = item["algorithm"]
-                    purpose_str = item["purpose"]
-                    purpose = CryptoPurpose[purpose_str] if purpose_str in CryptoPurpose.__members__ else CryptoPurpose.UNKNOWN
-                    asset_type = AssetType.DEPENDENCY if item["type"] == "IMPORT" else AssetType.API_CALL
+                    purpose = item["purpose"] if isinstance(item["purpose"], CryptoPurpose) else CryptoPurpose[str(item["purpose"])] if str(item["purpose"]) in CryptoPurpose.__members__ else CryptoPurpose.UNKNOWN
+                    asset_type = AssetType.DEPENDENCY if item.get("type") == "IMPORT" else AssetType.API_CALL
+
+                    extra_meta = {
+                        "api_call": item.get("api_call", ""),
+                        "library": item.get("library", ""),
+                        "mode": item.get("mode"),
+                        "detector": item.get("detector", "tree_sitter"),
+                        "parameters": item.get("parameters", {}),
+                        "evidence_type": item.get("evidence_type", "STRUCTURAL_API_CALL")
+                    }
 
                     findings.append(RawFinding(
-                        detector_name="JavaScriptParser",
+                        detector_name="JavaScriptTreeSitterDetector",
                         target_path=target_path,
                         file_path=rel_path,
                         line_number=item["line"],
@@ -122,10 +132,47 @@ class SourceScanner(BaseScanner):
                         algorithm_name=alg,
                         purpose=purpose,
                         matched_text=item["matched_text"],
-                        context=f"{item['description']} at line {item['line']}",
-                        confidence=0.95,
-                        evidence_type=EvidenceType.OBSERVED
+                        context=f"{item.get('description', 'JavaScript Tree-sitter match')} at line {item['line']}",
+                        confidence=item.get("confidence", 0.95),
+                        evidence_type=EvidenceType.OBSERVED,
+                        key_size=item.get("key_size"),
+                        extra_metadata=extra_meta
                     ))
+
+            # 3. Run Java Tree-sitter parser
+            elif file.endswith(".java"):
+                java_results = parse_java_file(full_path)
+                for item in java_results:
+                    alg = item["algorithm"]
+                    purpose = item["purpose"] if isinstance(item["purpose"], CryptoPurpose) else CryptoPurpose[str(item["purpose"])] if str(item["purpose"]) in CryptoPurpose.__members__ else CryptoPurpose.UNKNOWN
+                    asset_type = AssetType.DEPENDENCY if item.get("type") == "IMPORT" else AssetType.API_CALL
+
+                    extra_meta = {
+                        "api_call": item.get("api_call", ""),
+                        "library": item.get("library", ""),
+                        "mode": item.get("mode"),
+                        "padding": item.get("padding"),
+                        "detector": item.get("detector", "tree_sitter"),
+                        "parameters": item.get("parameters", {}),
+                        "evidence_type": item.get("evidence_type", "STRUCTURAL_API_CALL")
+                    }
+
+                    findings.append(RawFinding(
+                        detector_name="JavaTreeSitterDetector",
+                        target_path=target_path,
+                        file_path=rel_path,
+                        line_number=item["line"],
+                        asset_type=asset_type,
+                        algorithm_name=alg,
+                        purpose=purpose,
+                        matched_text=item["matched_text"],
+                        context=f"{item.get('description', 'Java Tree-sitter match')} at line {item['line']}",
+                        confidence=item.get("confidence", 0.95),
+                        evidence_type=EvidenceType.OBSERVED,
+                        key_size=item.get("key_size"),
+                        extra_metadata=extra_meta
+                    ))
+
 
             # 3. Run Regex scanner for known & unknown patterns
             try:

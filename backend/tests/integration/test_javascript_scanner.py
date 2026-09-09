@@ -16,7 +16,8 @@ def test_javascript_and_typescript_scanner():
     algorithms = set(f.algorithm_name for f in findings)
     detectors = set(f.detector_name for f in findings)
 
-    assert "JavaScriptParser" in detectors
+    assert "JavaScriptParser" in detectors or "JavaScriptTreeSitterDetector" in detectors
+
     assert "RSA" in algorithms
     assert "AES" in algorithms
     assert "SHA-256" in algorithms
