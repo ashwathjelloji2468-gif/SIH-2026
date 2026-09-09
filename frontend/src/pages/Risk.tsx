@@ -181,8 +181,7 @@ export const Risk: React.FC = () => {
 
   const handleDownloadGraph = () => {
     const scanId = latestScan?.id || currentProject?.id || 'default';
-    const url = graphService.getGraphDownloadUrl(scanId);
-    window.open(url, '_blank');
+    graphService.downloadGraphJson(scanId, scanGraphData);
   };
 
   const handleReassessProject = async () => {

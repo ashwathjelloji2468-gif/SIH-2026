@@ -36,7 +36,7 @@ export const CBOMViewer: React.FC<CBOMViewerProps> = ({ scanId, cbom }) => {
   };
 
   const handleDownload = () => {
-    window.open(reportService.getDownloadCBOMUrl(scanId), '_blank');
+    reportService.downloadScanCBOM(scanId, cbom);
   };
 
   if (!cbom) {
