@@ -271,7 +271,19 @@ export const AssetRiskTable: React.FC<AssetRiskTableProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
-              {filteredList.length === 0 ? (
+              {combinedList.length === 0 ? (
+                <tr>
+                  <td colSpan={10} className="py-12 text-center text-slate-400 font-mono space-y-2">
+                    <div className="flex justify-center mb-1">
+                      <AlertCircle className="w-8 h-8 text-cyan-400" />
+                    </div>
+                    <div className="text-slate-200 font-bold text-sm">No cryptographic assets found for evaluation</div>
+                    <div className="text-xs text-slate-400 max-w-md mx-auto">
+                      Run a new discovery scan to inspect your codebase primitives, or select a project with discovered assets.
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredList.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="py-8 text-center text-slate-500 font-mono">
                     No cryptographic assets match the selected filters.

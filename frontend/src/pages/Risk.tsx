@@ -41,8 +41,9 @@ export const Risk: React.FC = () => {
   const [isYModalOpen, setIsYModalOpen] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [reassessing, setReassessing] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const fetchRiskData = async () => {
+  const fetchRiskData = async (skipCache: boolean = false) => {
     if (!currentProject) {
       setAssets([]);
       setRiskSummary(null);
@@ -60,7 +61,7 @@ export const Risk: React.FC = () => {
     try {
       const [invRes, sumRes, scenRes, graphRes, xRes, yRes, zRes, mRes] = await Promise.allSettled([
         inventoryService.getProjectInventory(currentProject.id),
-        riskService.getRiskSummary(currentProject.id),
+        riskService.getRiskSummary(currentProject.id, { skipCache }),
         riskService.listThreatScenarios(),
         graphService.getProjectGraph(currentProject.id),
         getProjectXContext(currentProject.id),
@@ -92,11 +93,13 @@ export const Risk: React.FC = () => {
   const handleReassessProject = async () => {
     if (!currentProject) return;
     setReassessing(true);
+    setErrorMessage(null);
     try {
       await riskService.assessProjectRisk(currentProject.id);
-      await fetchRiskData();
-    } catch (err) {
+      await fetchRiskData(true);
+    } catch (err: any) {
       console.error('Failed to reassess project risk:', err);
+      setErrorMessage(err?.message || 'Failed to complete RiskEngine evaluation. Please check backend logs.');
     } finally {
       setReassessing(false);
     }
@@ -158,7 +161,7 @@ export const Risk: React.FC = () => {
             {reassessing ? 'Evaluating RiskEngine...' : 'Run Full Risk Assessment'}
           </button>
           <button
-            onClick={fetchRiskData}
+            onClick={() => fetchRiskData(true)}
             className="p-2 rounded-xl border border-slate-800 hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
             title="Refresh risk assessment"
           >
@@ -166,6 +169,21 @@ export const Risk: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {errorMessage && (
+        <div className="flex items-center justify-between p-4 rounded-xl bg-rose-950/60 border border-rose-800 text-xs font-mono text-rose-200">
+          <div className="flex items-center gap-2.5">
+            <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0" />
+            <span>{errorMessage}</span>
+          </div>
+          <button
+            onClick={() => setErrorMessage(null)}
+            className="text-slate-400 hover:text-white transition-colors text-xs cursor-pointer ml-4"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Main Asset Risk Assessment Table & Summary Cards */}
       <AssetRiskTable

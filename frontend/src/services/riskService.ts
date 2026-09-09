@@ -39,8 +39,8 @@ const DEMO_FALLBACK_SCENARIOS: ThreatScenario[] = [
 ];
 
 export const riskService = {
-  getRiskSummary: async (projectId: string): Promise<RiskSummary> => {
-    const data = await api.get<RiskSummary>(`/projects/${projectId}/risk/summary`);
+  getRiskSummary: async (projectId: string, options?: { skipCache?: boolean }): Promise<RiskSummary> => {
+    const data = await api.get<RiskSummary>(`/projects/${projectId}/risk/summary`, options);
     if (data) return data;
     throw new Error('Risk summary unavailable');
   },

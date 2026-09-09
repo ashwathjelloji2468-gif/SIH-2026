@@ -156,25 +156,26 @@ export const api = {
    * Returns cached snapshot immediately if available (0ms delay),
    * while revalidating in background.
    */
-  get: async <T>(endpoint: string, options?: RequestInit): Promise<T> => {
-    const cached = readCache<T>(endpoint);
+  get: async <T>(endpoint: string, options?: RequestInit & { skipCache?: boolean }): Promise<T> => {
+    const skipCache = (options as any)?.skipCache;
     
-    // If cached response exists, return instantly while triggering background update
-    if (cached) {
-      // Background revalidation
-      request<T>(endpoint, { ...options, method: 'GET' })
-        .then((fresh) => writeCache(endpoint, fresh))
-        .catch(() => {});
-      return cached;
+    if (!skipCache) {
+      const cached = readCache<T>(endpoint);
+      if (cached) {
+        request<T>(endpoint, { ...options, method: 'GET' })
+          .then((fresh) => writeCache(endpoint, fresh))
+          .catch(() => {});
+        return cached;
+      }
+    } else {
+      clearApiCache(endpoint);
     }
 
-    // No cache: perform fast fetch with fallback handling
     try {
       const fresh = await request<T>(endpoint, { ...options, method: 'GET' });
       writeCache(endpoint, fresh);
       return fresh;
     } catch (err) {
-      // If network fails or times out, check if any stale cache exists as last resort
       const staleKey = getCacheKey(endpoint);
       const stale = memoryCache.get(staleKey);
       if (stale) return stale.data as T;
