@@ -74,6 +74,91 @@ const CANDIDATE_ASSETS: TargetAssetCandidate[] = [
   },
 ];
 
+
+/** Honest before/after snippets keyed by transformation pattern — never show RSA→ML-KEM for AES retention. */
+function getDemoSnippets(asset: TargetAssetCandidate): { original: string; transformed: string } {
+  const file = asset.file;
+  switch (asset.transformationPattern) {
+    case 'RSA_TO_ML_DSA':
+      return {
+        original:
+          `# ${file}\n` +
+          `from cryptography.hazmat.primitives.asymmetric import rsa\n\n` +
+          `def generate_keypair():\n` +
+          `    # VULNERABLE: RSA-2048 vulnerable to Shor's algorithm\n` +
+          `    private_key = rsa.generate_private_key(\n` +
+          `        public_exponent=65537,\n` +
+          `        key_size=2048\n` +
+          `    )\n` +
+          `    return private_key`,
+        transformed:
+          `# ${file}\n` +
+          `from pqcrypto.sign import ml_dsa_65  # NIST FIPS 204\n\n` +
+          `def generate_keypair():\n` +
+          `    # QUANTUM SAFE: ML-DSA-65 lattice signature\n` +
+          `    public_key, secret_key = ml_dsa_65.generate_keypair()\n` +
+          `    return public_key, secret_key`,
+      };
+    case 'ECDH_TO_ML_KEM_HYBRID':
+      return {
+        original:
+          `# ${file}\n` +
+          `from cryptography.hazmat.primitives.asymmetric import ec\n\n` +
+          `def generate_keypair():\n` +
+          `    # VULNERABLE: ECDH-P256 (SECP256r1) — Shor's algorithm\n` +
+          `    private_key = ec.generate_private_key(ec.SECP256R1())\n` +
+          `    return private_key`,
+        transformed:
+          `# ${file}\n` +
+          `from pqcrypto.kem import ml_kem_768  # NIST FIPS 203 Hybrid\n\n` +
+          `def generate_keypair():\n` +
+          `    # QUANTUM SAFE: ML-KEM-768 Key Encapsulation\n` +
+          `    public_key, secret_key = ml_kem_768.generate_keypair()\n` +
+          `    return public_key, secret_key`,
+      };
+    case 'ECDSA_TO_ML_DSA':
+      return {
+        original:
+          `# ${file}\n` +
+          `from cryptography.hazmat.primitives.asymmetric import ec\n\n` +
+          `def sign(data, key):\n` +
+          `    # VULNERABLE: ECDSA-P256\n` +
+          `    return key.sign(data, ec.ECDSA(hashes.SHA256()))`,
+        transformed:
+          `# ${file}\n` +
+          `from pqcrypto.sign import ml_dsa_65  # NIST FIPS 204\n\n` +
+          `def sign(data, secret_key):\n` +
+          `    # QUANTUM SAFE: ML-DSA-65\n` +
+          `    return ml_dsa_65.sign(secret_key, data)`,
+      };
+    case 'AES_256_GCM_RETENTION':
+      return {
+        original:
+          `# ${file}\n` +
+          `# Legacy symmetric — AES-128-CBC (not quantum-broken, but weak mode/key length)\n` +
+          `from Crypto.Cipher import AES\n` +
+          `from Crypto.Util.Padding import pad\n\n` +
+          `def encrypt(data, key_128, iv):\n` +
+          `    cipher = AES.new(key_128, AES.MODE_CBC, iv)\n` +
+          `    return cipher.encrypt(pad(data, AES.block_size))`,
+        transformed:
+          `# ${file}\n` +
+          `# RETAINED + hardened: AES-256-GCM (symmetric is quantum-resistant)\n` +
+          `# No PQC algorithm replacement required — mode/key upgrade only\n` +
+          `from cryptography.hazmat.primitives.ciphers.aead import AESGCM\n\n` +
+          `def encrypt(data, key_256, nonce):\n` +
+          `    aesgcm = AESGCM(key_256)  # 256-bit key, GCM AEAD\n` +
+          `    return aesgcm.encrypt(nonce, data, None)`,
+      };
+    default:
+      return {
+        original: `# ${file}\n# Source snippet unavailable — manual review required`,
+        transformed: `# ${file}\n# Manual cryptographer review required`,
+      };
+  }
+}
+
+
 export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [selectedAsset, setSelectedAsset] = useState<TargetAssetCandidate>(CANDIDATE_ASSETS[0]);
@@ -181,13 +266,12 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
     }
 
     const targetFile = selectedAsset.file;
+    const demo = getDemoSnippets(selectedAsset);
     const originalSnippet =
-      simulationResult.transformation.original_snippet ||
-      `# ${targetFile}\nfrom cryptography.hazmat.primitives.asymmetric import rsa\n\ndef generate_keypair():\n    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)\n    return private_key`;
+      simulationResult.transformation.original_snippet || demo.original;
 
     const transformedSnippet =
-      simulationResult.transformation.transformed_snippet ||
-      `# ${targetFile}\nfrom pqcrypto.kem import ml_kem_768  # NIST FIPS 203 Standard\n\ndef generate_keypair():\n    public_key, secret_key = ml_kem_768.generate_keypair()\n    return public_key, secret_key`;
+      simulationResult.transformation.transformed_snippet || demo.transformed;
 
     const diffLines: string[] = [
       `--- a/${targetFile}`,
@@ -537,16 +621,7 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
                     </div>
                     <pre className="p-3 rounded-lg bg-slate-950/90 text-rose-200 text-[11px] overflow-x-auto whitespace-pre leading-relaxed border border-rose-950 font-mono">
                       {simulationResult.transformation.original_snippet ||
-                        `# ${selectedAsset.file}
-from cryptography.hazmat.primitives.asymmetric import rsa
-
-def generate_keypair():
-    # VULNERABLE: RSA-2048 vulnerable to Shor's algorithm
-    private_key = rsa.generate_private_key(
-        public_exponent=65537,
-        key_size=2048
-    )
-    return private_key`}
+                        getDemoSnippets(selectedAsset).original}
                     </pre>
                   </div>
 
@@ -560,13 +635,7 @@ def generate_keypair():
                     </div>
                     <pre className="p-3 rounded-lg bg-slate-950/90 text-emerald-200 text-[11px] overflow-x-auto whitespace-pre leading-relaxed border border-emerald-950 font-mono">
                       {simulationResult.transformation.transformed_snippet ||
-                        `# ${selectedAsset.file}
-from pqcrypto.kem import ml_kem_768  # NIST FIPS 203 Standard
-
-def generate_keypair():
-    # QUANTUM SAFE: ML-KEM-768 Key Encapsulation Mechanism
-    public_key, secret_key = ml_kem_768.generate_keypair()
-    return public_key, secret_key`}
+                        getDemoSnippets(selectedAsset).transformed}
                     </pre>
                   </div>
                 </div>
@@ -610,7 +679,7 @@ def generate_keypair():
                   Stage 3: Automated Validation Test Suite & Regression Matrix
                 </h3>
                 <p className="text-xs text-[#94A3B8]">
-                  Run automated compilation, unit test suites, NIST PQC KAT (Known Answer Tests), and regression verification.
+                  Sandbox checks: language-aware syntax, target-algorithm presence verification, and heuristic regression flags. Real KATs require a full PQC test harness.
                 </p>
               </div>
 
@@ -691,7 +760,9 @@ def generate_keypair():
                         {validationRun.build_passed ? 'PASSED (0 Errors)' : 'FAILED'}
                       </div>
                       <div className="text-[10px] text-[#94A3B8] mt-1">
-                        {validationRun.build_passed ? 'Zero AST compilation syntax errors' : 'Compilation error detected'}
+                        {validationRun.build_passed
+                          ? 'Syntax check passed in sandbox'
+                          : 'Syntax check failed or skipped (non-Python source)'}
                       </div>
                     </div>
                   </div>
@@ -713,7 +784,9 @@ def generate_keypair():
                         {validationRun.unit_tests_passed ? 'Pass (suite green)' : 'FAILED'}
                       </div>
                       <div className="text-[10px] text-[#94A3B8] mt-1">
-                        {validationRun.unit_tests_passed ? 'All unit assertions verified' : 'Unit assertions failed'}
+                        {validationRun.unit_tests_passed
+                          ? 'Heuristic unit flag green (syntax-linked)'
+                          : 'No unit suite executed or flag failed'}
                       </div>
                     </div>
                   </div>
@@ -728,14 +801,16 @@ def generate_keypair():
                       {validationRun.crypto_tests_passed ? <CheckCircle2 className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
                     </div>
                     <div>
-                      <div className="text-[11px] font-mono text-[#94A3B8] uppercase">PQC KAT Tests</div>
+                      <div className="text-[11px] font-mono text-[#94A3B8] uppercase">Crypto Target Check</div>
                       <div className={`text-sm font-bold font-mono mt-0.5 ${
                         validationRun.crypto_tests_passed ? 'text-emerald-300' : 'text-rose-300'
                       }`}>
                         {validationRun.crypto_tests_passed ? 'VERIFIED (FIPS 203)' : 'FAILED'}
                       </div>
                       <div className="text-[10px] text-[#94A3B8] mt-1">
-                        {validationRun.crypto_tests_passed ? 'Known Answer Test vectors match' : 'KAT vector mismatch'}
+                        {validationRun.crypto_tests_passed
+                          ? 'Target PQC/retain marker present in sandbox'
+                          : 'Target algorithm marker not found in transformed source'}
                       </div>
                     </div>
                   </div>
