@@ -71,20 +71,38 @@ class SourceScanner(BaseScanner):
                 ast_results = parse_python_file(full_path)
                 for item in ast_results:
                     alg = item["algorithm"]
-                    purpose = CryptoPurpose.SIGNATURE if alg in ["RSA", "ECDSA"] else (CryptoPurpose.ENCRYPTION if alg == "AES" else CryptoPurpose.HASHING)
+                    purpose = item.get("purpose")
+                    if isinstance(purpose, str):
+                        purpose = CryptoPurpose[purpose] if purpose in CryptoPurpose.__members__ else CryptoPurpose.UNKNOWN
+                    elif not purpose:
+                        purpose = CryptoPurpose.SIGNATURE if alg in ["RSA", "ECDSA"] else (CryptoPurpose.ENCRYPTION if alg == "AES" else CryptoPurpose.HASHING)
+
+                    asset_type = AssetType.DEPENDENCY if item.get("type") == "IMPORT" else AssetType.API_CALL
+                    key_size = item.get("key_size")
+
+                    extra_meta = {
+                        "api_call": item.get("api_call", ""),
+                        "resolved_library": item.get("resolved_library", ""),
+                        "parameters": item.get("parameters", {}),
+                        "evidence_type": item.get("evidence_type", "OBSERVED")
+                    }
+
                     findings.append(RawFinding(
                         detector_name="PythonASTDetector",
                         target_path=target_path,
                         file_path=rel_path,
                         line_number=item["line"],
-                        asset_type=AssetType.API_CALL,
+                        asset_type=asset_type,
                         algorithm_name=alg if alg != "HASHING" else "SHA-256",
                         purpose=purpose,
                         matched_text=item["matched_text"],
                         context=f"Python AST detected {item['matched_text']} at line {item['line']}",
-                        confidence=0.95,
-                        evidence_type=EvidenceType.OBSERVED
+                        confidence=item.get("confidence", 0.95),
+                        evidence_type=EvidenceType.OBSERVED,
+                        key_size=key_size,
+                        extra_metadata=extra_meta
                     ))
+
 
             # 2. Run JS/TS parser on JavaScript and TypeScript files
             elif file.endswith((".js", ".jsx", ".ts", ".tsx")):
