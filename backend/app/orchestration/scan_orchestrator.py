@@ -127,6 +127,14 @@ class ScanOrchestrator:
             except Exception as e:
                 logger.warning(f"Scan {scan_id}: Pre-computing recommendations warning: {e}")
 
+            try:
+                from app.graph.blast_radius_engine import BlastRadiusEngine
+                graph_engine = BlastRadiusEngine()
+                graph_engine.build_graph_for_scan(scan_id, db)
+                logger.info(f"Scan {scan_id}: BlastRadiusEngine completed graph construction and edge inference.")
+            except Exception as e:
+                logger.warning(f"Scan {scan_id}: Pre-computing blast radius graph warning: {e}")
+
             scan_repo.update_status(scan_id, ScanStatus.COMPLETED, cbom_json=cbom_json)
             logger.info(f"Scan {scan_id} completed successfully with {len(created_assets)} assets detected.")
 

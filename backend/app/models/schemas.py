@@ -427,4 +427,70 @@ class MoscaProjectEvaluationResponse(BaseModel):
     components: List[MoscaComponentResultResponse]
     explanation: str
 
+# Stage 8: Blast Radius & Network Dependence Schemas
+class CryptoNodeResponse(BaseModel):
+    id: str
+    scan_id: str
+    asset_id: Optional[str] = None
+    artefact_type: str
+    name: str
+    version: Optional[str] = None
+    location: Optional[str] = None
+    quantum_risk: str
+    mosca_x: float
+    business_criticality: float
+    extra_metadata: Optional[Dict[str, Any]] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+class CryptoEdgeResponse(BaseModel):
+    id: str
+    scan_id: str
+    source_node_id: str
+    target_node_id: str
+    relation_type: str
+    strength: float
+    extra_metadata: Optional[Dict[str, Any]] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+class ScanGraphResponse(BaseModel):
+    scan_id: str
+    nodes: List[CryptoNodeResponse]
+    edges: List[CryptoEdgeResponse]
+    total_nodes: int
+    total_edges: int
+    single_points_of_failure: List[Dict[str, Any]] = []
+
+class BlastRadiusAffectedNodeSchema(BaseModel):
+    node_id: str
+    name: str
+    artefact_type: str
+    location: Optional[str] = None
+    quantum_risk: str
+    distance: int
+    relation_path: List[str] = []
+    impact_score: float
+
+class BlastRadiusResponse(BaseModel):
+    id: Optional[str] = None
+    scan_id: str
+    root_node_id: str
+    root_node_name: str
+    root_node_type: str
+    radius_score: float
+    affected_nodes_count: int
+    systems_count: int
+    data_classes: List[str]
+    estimated_migration_effort: float
+    affected_nodes: List[BlastRadiusAffectedNodeSchema]
+    affected_systems: List[str] = []
+
+class TopBlastRadiusSummaryResponse(BaseModel):
+    project_id: str
+    top_blast_radii: List[BlastRadiusResponse]
+    shared_credentials_high_impact: List[Dict[str, Any]]
+    single_points_of_failure: List[Dict[str, Any]]
+
+
 

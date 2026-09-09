@@ -54,6 +54,9 @@ class Scan(Base):
     # Relationships
     project = relationship("Project", back_populates="scans")
     assets = relationship("CryptoAsset", back_populates="scan", cascade="all, delete-orphan")
+    nodes = relationship("CryptoNode", back_populates="scan", cascade="all, delete-orphan")
+    edges = relationship("CryptoEdge", back_populates="scan", cascade="all, delete-orphan")
+    blast_radius_results = relationship("BlastRadiusResult", back_populates="scan", cascade="all, delete-orphan")
 
 class CryptoAsset(Base):
     __tablename__ = "crypto_assets"
@@ -408,3 +411,62 @@ class BusinessCriticality(Base):
     id = Column(String, primary_key=True, default=generate_uuid)
     level_name = Column(String, nullable=False, unique=True)
     criticality_score = Column(Float, nullable=False)  # 0 to 100
+
+class CryptoNode(Base):
+    __tablename__ = "crypto_nodes"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    scan_id = Column(String, ForeignKey("scans.id", ondelete="CASCADE"), nullable=False, index=True)
+    asset_id = Column(String, ForeignKey("crypto_assets.id", ondelete="SET NULL"), nullable=True)
+    artefact_type = Column(String, nullable=False, default="ALGORITHM")
+    name = Column(String, nullable=False, index=True)
+    version = Column(String, nullable=True)
+    location = Column(String, nullable=True)
+    quantum_risk = Column(String, default="LOW", nullable=False)
+    mosca_x = Column(Float, default=10.0, nullable=False)
+    business_criticality = Column(Float, default=50.0, nullable=False)
+    extra_metadata = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    # Relationships
+    scan = relationship("Scan", back_populates="nodes")
+    asset = relationship("CryptoAsset")
+    outgoing_edges = relationship("CryptoEdge", foreign_keys="CryptoEdge.source_node_id", back_populates="source_node", cascade="all, delete-orphan")
+    incoming_edges = relationship("CryptoEdge", foreign_keys="CryptoEdge.target_node_id", back_populates="target_node", cascade="all, delete-orphan")
+    blast_radius_results = relationship("BlastRadiusResult", back_populates="root_node", cascade="all, delete-orphan")
+
+class CryptoEdge(Base):
+    __tablename__ = "crypto_edges"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    scan_id = Column(String, ForeignKey("scans.id", ondelete="CASCADE"), nullable=False, index=True)
+    source_node_id = Column(String, ForeignKey("crypto_nodes.id", ondelete="CASCADE"), nullable=False, index=True)
+    target_node_id = Column(String, ForeignKey("crypto_nodes.id", ondelete="CASCADE"), nullable=False, index=True)
+    relation_type = Column(String, nullable=False, default="uses")  # uses, depends_on, shares_key, protects, signs, issued_by
+    strength = Column(Float, default=1.0, nullable=False)
+    extra_metadata = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    # Relationships
+    scan = relationship("Scan", back_populates="edges")
+    source_node = relationship("CryptoNode", foreign_keys=[source_node_id], back_populates="outgoing_edges")
+    target_node = relationship("CryptoNode", foreign_keys=[target_node_id], back_populates="incoming_edges")
+
+class BlastRadiusResult(Base):
+    __tablename__ = "blast_radius_results"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    scan_id = Column(String, ForeignKey("scans.id", ondelete="CASCADE"), nullable=False, index=True)
+    root_node_id = Column(String, ForeignKey("crypto_nodes.id", ondelete="CASCADE"), nullable=False, index=True)
+    radius_score = Column(Float, nullable=False, default=0.0)
+    affected_nodes_count = Column(Integer, default=0, nullable=False)
+    systems_count = Column(Integer, default=0, nullable=False)
+    data_classes = Column(JSON, nullable=True)
+    estimated_migration_effort = Column(Float, default=0.0, nullable=False)
+    affected_nodes_json = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    # Relationships
+    scan = relationship("Scan", back_populates="blast_radius_results")
+    root_node = relationship("CryptoNode", back_populates="blast_radius_results")
+

@@ -378,3 +378,91 @@ export interface CBOMCycloneDX {
   metadata: Record<string, any>;
   components: any[];
 }
+
+// Stage 8: Blast Radius & Network Dependence
+export interface CryptoNode {
+  id: string;
+  scan_id: string;
+  asset_id?: string | null;
+  artefact_type: string;
+  name: string;
+  version?: string | null;
+  location?: string | null;
+  quantum_risk: string;
+  mosca_x: number;
+  business_criticality: number;
+  extra_metadata?: Record<string, any> | null;
+}
+
+export interface CryptoEdge {
+  id: string;
+  scan_id: string;
+  source_node_id: string;
+  target_node_id: string;
+  relation_type: string;
+  strength: number;
+  extra_metadata?: Record<string, any> | null;
+}
+
+export interface ScanGraph {
+  scan_id: string;
+  nodes: CryptoNode[];
+  edges: CryptoEdge[];
+  total_nodes: number;
+  total_edges: number;
+  single_points_of_failure: Array<{
+    node_id: string;
+    name: string;
+    artefact_type: string;
+    degree: number;
+    quantum_risk: string;
+  }>;
+}
+
+export interface BlastRadiusAffectedNode {
+  node_id: string;
+  name: string;
+  artefact_type: string;
+  location?: string | null;
+  quantum_risk: string;
+  distance: number;
+  relation_path: string[];
+  impact_score: number;
+}
+
+export interface BlastRadiusResult {
+  id?: string;
+  scan_id: string;
+  root_node_id: string;
+  root_node_name: string;
+  root_node_type: string;
+  radius_score: number;
+  affected_nodes_count: number;
+  systems_count: number;
+  data_classes: string[];
+  estimated_migration_effort: number;
+  affected_nodes: BlastRadiusAffectedNode[];
+  affected_systems: string[];
+}
+
+export interface TopBlastRadiusSummary {
+  project_id: string;
+  top_blast_radii: BlastRadiusResult[];
+  shared_credentials_high_impact: Array<{
+    credential_name: string;
+    source_location: string;
+    target_location: string;
+    shared_metadata?: Record<string, any>;
+    risk_level: string;
+    impact_description: string;
+  }>;
+  single_points_of_failure: Array<{
+    node_id: string;
+    node_name: string;
+    node_type: string;
+    radius_score: number;
+    affected_systems_count: number;
+    risk_level: string;
+  }>;
+}
+
