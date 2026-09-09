@@ -12,14 +12,14 @@ class BlastRadiusEngine:
     @staticmethod
     def _map_risk_weight(quantum_risk: str) -> float:
         risk_upper = str(quantum_risk).upper()
-        if risk_upper in ["CRITICAL", "QUANTUM_VULNERABLE", "VULNERABLE"]:
+        if any(term in risk_upper for term in ["CRITICAL", "QUANTUM_VULNERABLE", "SHOR", "VULNERABLE", "RSA", "ECC", "ECDSA"]):
             return 1.0
-        elif risk_upper == "HIGH":
+        elif "HIGH" in risk_upper:
             return 0.8
-        elif risk_upper in ["MODERATE", "MEDIUM"]:
+        elif any(term in risk_upper for term in ["MODERATE", "MEDIUM", "TRANSITIONAL"]):
             return 0.5
         else:
-            return 0.2
+            return 0.25
 
     @staticmethod
     def _infer_data_classes(node_name: str, location: str, extra_metadata: Dict[str, Any]) -> List[str]:
@@ -236,11 +236,29 @@ class BlastRadiusEngine:
         node_map = preloaded_nodes
         if node_map is None:
             all_nodes_list = db.query(CryptoNode).filter(CryptoNode.scan_id == scan_id).all()
+            if not all_nodes_list and scan_id:
+                # If scan_id was a project_id or scan_id matched 0 nodes, try querying via Scan -> project_id
+                all_nodes_list = (
+                    db.query(CryptoNode)
+                    .join(Scan, CryptoNode.scan_id == Scan.id)
+                    .filter(Scan.project_id == scan_id)
+                    .all()
+                )
             node_map = {n.id: n for n in all_nodes_list}
 
         root_node = node_map.get(root_node_id)
         if not root_node:
             root_node = next((n for n in node_map.values() if n.asset_id == root_node_id), None)
+
+        if not root_node:
+            # Fallback: Direct DB query for root_node by id or asset_id across all scans
+            root_node = db.query(CryptoNode).filter(
+                (CryptoNode.id == root_node_id) | (CryptoNode.asset_id == root_node_id)
+            ).first()
+            if root_node:
+                scan_id = root_node.scan_id
+                all_nodes_list = db.query(CryptoNode).filter(CryptoNode.scan_id == scan_id).all()
+                node_map = {n.id: n for n in all_nodes_list}
 
         if not root_node:
             return {
@@ -294,7 +312,7 @@ class BlastRadiusEngine:
         # Include root node characteristics in data classes and effort
         root_data_classes = self._infer_data_classes(root_node.name, root_node.location or "", root_node.extra_metadata or {})
         affected_data_classes.update(root_data_classes)
-        estimated_effort += 1.5 if "VULNERABLE" in str(root_node.quantum_risk).upper() else 0.5
+        estimated_effort += 1.5 if any(k in str(root_node.quantum_risk).upper() for k in ["VULNERABLE", "SHOR", "CRITICAL", "HIGH"]) else 0.5
 
         for node_id, dist in visited.items():
             if node_id == root_node.id:
@@ -339,17 +357,20 @@ class BlastRadiusEngine:
 
             # Effort estimation
             if n.artefact_type in ["ALGORITHM", "KEY", "CERTIFICATE"]:
-                estimated_effort += 2.0 if "VULNERABLE" in str(n.quantum_risk).upper() else 0.5
+                estimated_effort += 2.0 if any(k in str(n.quantum_risk).upper() for k in ["VULNERABLE", "SHOR", "CRITICAL", "HIGH"]) else 0.5
             elif n.artefact_type in ["FILE", "COMPONENT"]:
                 estimated_effort += 1.0
 
         # Overall blast radius score (0 - 100 scale)
         if len(affected_nodes_list) == 0:
-            radius_score = round(min(100.0, self._map_risk_weight(root_node.quantum_risk) * 30.0), 1)
+            risk_w = self._map_risk_weight(root_node.quantum_risk)
+            crit_w = (root_node.business_criticality or 50.0) / 100.0
+            mosca_w = max(0.5, min(2.0, (root_node.mosca_x or 10.0) / 5.0))
+            radius_score = round(min(100.0, max(5.0, risk_w * crit_w * mosca_w * 80.0)), 1)
         else:
             avg_impact = total_weighted_impact / len(affected_nodes_list)
             volume_multiplier = min(2.5, 1.0 + (len(affected_nodes_list) * 0.15))
-            radius_score = round(min(100.0, avg_impact * volume_multiplier), 1)
+            radius_score = round(min(100.0, max(5.0, avg_impact * volume_multiplier)), 1)
 
         result_payload = {
             "scan_id": scan_id,

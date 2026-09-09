@@ -94,19 +94,22 @@ def get_node_blast_radius(
     """
     Calculates blast radius for a given node using directional BFS traversal.
     """
-    if not scan_id:
-        node = db.query(CryptoNode).filter(CryptoNode.id == node_id).first()
-        if node:
-            scan_id = node.scan_id
-        else:
-            # Check if asset_id passed as node_id
-            from app.models.db_models import CryptoAsset
-            asset = db.query(CryptoAsset).filter(CryptoAsset.id == node_id).first()
-            if asset:
-                scan_id = asset.scan_id
+    # Resolve node first to get its authoritative scan_id
+    node = db.query(CryptoNode).filter(
+        (CryptoNode.id == node_id) | (CryptoNode.asset_id == node_id)
+    ).first()
+
+    if node:
+        scan_id = node.scan_id
+    elif scan_id:
+        # Check if passed scan_id is actually a project_id or scan_id
+        scan_obj = db.query(Scan).filter(Scan.id == scan_id).first()
+        if not scan_obj:
+            latest = db.query(Scan).filter(Scan.project_id == scan_id, Scan.status == "COMPLETED").order_by(Scan.created_at.desc()).first()
+            if latest:
+                scan_id = latest.id
 
     if not scan_id:
-        # Fallback to latest scan
         latest_scan = db.query(Scan).filter(Scan.status == "COMPLETED").order_by(Scan.created_at.desc()).first()
         if latest_scan:
             scan_id = latest_scan.id
