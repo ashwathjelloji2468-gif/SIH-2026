@@ -226,10 +226,30 @@ class CertificateScanner(BaseScanner):
 
     def scan(self, target_path: str) -> List[RawFinding]:
         findings: List[RawFinding] = []
-        if not os.path.isdir(target_path):
+        if not os.path.exists(target_path):
             return findings
 
         valid_exts = (".crt", ".cer", ".pem")
+
+        if os.path.isfile(target_path):
+            rel_path = os.path.basename(target_path)
+            try:
+                with open(target_path, "rb") as f:
+                    data = f.read()
+                file_findings = []
+                if b"-----BEGIN CERTIFICATE-----" in data:
+                    parts = data.split(b"-----END CERTIFICATE-----")
+                    for part in parts:
+                        if b"-----BEGIN CERTIFICATE-----" not in part:
+                            continue
+                        pem = part + b"-----END CERTIFICATE-----\n"
+                        file_findings.extend(self._parse_certificate(pem, rel_path))
+                else:
+                    file_findings.extend(self._parse_certificate(data, rel_path))
+                findings.extend(file_findings)
+            except Exception:
+                pass
+            return findings
 
         for root, _, files in os.walk(target_path):
             for file in files:

@@ -279,8 +279,7 @@ class BinaryScanner(BaseScanner):
         # Single file target or directory walk
         target_files: List[Tuple[str, str]] = []
         if os.path.isfile(target_path):
-            if target_path.endswith(self.BINARY_EXTS):
-                target_files.append((target_path, os.path.basename(target_path)))
+            target_files.append((target_path, os.path.basename(target_path)))
         else:
             for root, _, files in os.walk(target_path):
                 for file in files:

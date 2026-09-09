@@ -1,5 +1,5 @@
 from typing import List, Optional
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from app.models.db_models import CryptoAsset
 from app.models.enums import AssetType, CryptoPurpose, QuantumSafety, ReviewStatus
 
@@ -45,13 +45,14 @@ class AssetRepository:
         return db_obj
 
     def get(self, asset_id: str) -> Optional[CryptoAsset]:
-        return self.db.query(CryptoAsset).filter(CryptoAsset.id == asset_id).first()
+        return self.db.query(CryptoAsset).options(joinedload(CryptoAsset.evidence_items)).filter(CryptoAsset.id == asset_id).first()
 
     def get_by_scan(self, scan_id: str) -> List[CryptoAsset]:
-        return self.db.query(CryptoAsset).filter(CryptoAsset.scan_id == scan_id).all()
+        return self.db.query(CryptoAsset).options(joinedload(CryptoAsset.evidence_items)).filter(CryptoAsset.scan_id == scan_id).all()
 
     def get_by_project(self, project_id: str) -> List[CryptoAsset]:
-        return self.db.query(CryptoAsset).join(CryptoAsset.scan).filter(CryptoAsset.scan.has(project_id=project_id)).all()
+        return self.db.query(CryptoAsset).options(joinedload(CryptoAsset.evidence_items)).join(CryptoAsset.scan).filter(CryptoAsset.scan.has(project_id=project_id)).all()
+
 
     def get_unknowns_by_project(self, project_id: str) -> List[CryptoAsset]:
         return self.db.query(CryptoAsset).join(CryptoAsset.scan).filter(

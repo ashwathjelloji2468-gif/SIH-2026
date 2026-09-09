@@ -1,5 +1,5 @@
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.repositories.scan_repository import ScanRepository
@@ -55,3 +55,26 @@ def input_source_scan(scan_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Scan not found")
     dispatch_scan_job(scan_id)
     return scan
+
+@router.post("/projects/{project_id}/scans/upload-binary", response_model=ScanResponse, status_code=status.HTTP_201_CREATED)
+async def upload_binary_and_start_scan(
+    project_id: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    import os, uuid
+    upload_dir = os.path.join(os.getcwd(), "uploads")
+    os.makedirs(upload_dir, exist_ok=True)
+
+    safe_filename = f"{uuid.uuid4().hex[:8]}_{file.filename}"
+    file_path = os.path.join(upload_dir, safe_filename)
+
+    contents = await file.read()
+    with open(file_path, "wb") as f:
+        f.write(contents)
+
+    repo = ScanRepository(db)
+    scan = repo.create(project_id=project_id, target_path=file_path, scan_type="binary")
+    dispatch_scan_job(scan.id)
+    return scan
+

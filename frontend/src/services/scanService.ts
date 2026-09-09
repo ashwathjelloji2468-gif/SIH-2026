@@ -24,4 +24,11 @@ export const scanService = {
   rerunScan: async (scanId: string): Promise<Scan> => {
     return api.post<Scan>(`/scans/${scanId}/rerun`);
   },
+
+  uploadBinaryAndScan: async (projectId: string, file: File): Promise<Scan> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post<Scan>(`/projects/${projectId}/scans/upload-binary`, formData);
+  },
 };
+

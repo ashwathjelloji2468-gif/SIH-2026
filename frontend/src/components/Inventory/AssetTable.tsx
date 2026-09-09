@@ -131,8 +131,9 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, loading, onRefre
             <thead className="bg-slate-900/80 text-slate-400 font-mono uppercase tracking-wider border-b border-slate-800 text-[11px]">
               <tr>
                 <th className="py-3 px-4">Algorithm & Primitive</th>
+                <th className="py-3 px-4">Asset Type</th>
                 <th className="py-3 px-4">Purpose</th>
-                <th className="py-3 px-4">Quantum Safety</th>
+                <th className="py-3 px-4">Detector Engine</th>
                 <th className="py-3 px-4">Source Location</th>
                 <th className="py-3 px-4">Confidence</th>
                 <th className="py-3 px-4 text-right">Actions</th>
@@ -141,7 +142,7 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, loading, onRefre
             <tbody className="divide-y divide-slate-800/60 font-mono">
               {paginatedAssets.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-500 font-sans">
+                  <td colSpan={7} className="py-12 text-center text-slate-500 font-sans">
                     No cryptographic assets match the selected criteria.
                   </td>
                 </tr>
@@ -149,6 +150,7 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, loading, onRefre
                 paginatedAssets.map((asset) => {
                   const ev = asset.evidence_items && asset.evidence_items[0];
                   const confidence = ev ? ev.confidence_score : 0.95;
+                  const detector = ev?.detector_name || (String(asset.asset_type) === 'DEPENDENCY' ? 'DependencyScanner' : String(asset.asset_type) === 'CERTIFICATE' ? 'CertificateScanner' : 'PythonASTDetector');
 
                   return (
                     <tr
@@ -178,11 +180,19 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, loading, onRefre
                       </td>
 
                       <td className="py-3 px-4">
+                        <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-slate-900 border border-slate-800 text-cyan-300">
+                          {asset.asset_type || 'ALGORITHM'}
+                        </span>
+                      </td>
+
+                      <td className="py-3 px-4">
                         <span className="text-slate-300">{asset.purpose}</span>
                       </td>
 
                       <td className="py-3 px-4">
-                        <StatusBadge type="quantum" value={asset.quantum_safety} />
+                        <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-slate-950 border border-slate-800 text-slate-300">
+                          {detector}
+                        </span>
                       </td>
 
                       <td className="py-3 px-4 max-w-xs truncate text-slate-400">

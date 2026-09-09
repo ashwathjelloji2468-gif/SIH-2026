@@ -1,3 +1,7 @@
+import os
+import shutil
+import tempfile
+import subprocess
 from sqlalchemy.orm import Session
 from app.repositories.scan_repository import ScanRepository
 from app.repositories.asset_repository import AssetRepository
@@ -26,8 +30,26 @@ class ScanOrchestrator:
             logger.error(f"Scan {scan_id} not found.")
             return
 
+        temp_dir = None
+        target_dir = scan.target_path
+
         try:
             scan_repo.update_status(scan_id, ScanStatus.RUNNING)
+
+            # Check if target_path is a Git repository URL
+            if target_dir.startswith(("http://", "https://", "git@")):
+                logger.info(f"Cloning Git repository '{target_dir}' for scan {scan_id}...")
+                temp_dir = tempfile.mkdtemp(prefix="sentriq_git_")
+                clone_res = subprocess.run(
+                    ["git", "clone", "--depth", "1", target_dir, temp_dir],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    timeout=120
+                )
+                if clone_res.returncode != 0:
+                    err_msg = clone_res.stderr.decode("utf-8", errors="ignore") or "Git clone failed"
+                    raise RuntimeError(f"Failed to clone Git repository '{target_dir}': {err_msg}")
+                target_dir = temp_dir
 
             scanners = [
                 SourceScanner(),
@@ -40,7 +62,7 @@ class ScanOrchestrator:
             ]
             raw_findings = []
             for scanner in scanners:
-                raw_findings.extend(scanner.scan(scan.target_path))
+                raw_findings.extend(scanner.scan(target_dir))
 
             unique_findings = deduplicate_findings(raw_findings)
 
@@ -86,3 +108,7 @@ class ScanOrchestrator:
         except Exception as e:
             logger.exception(f"Scan {scan_id} failed: {e}")
             scan_repo.update_status(scan_id, ScanStatus.FAILED, error_message=str(e))
+        finally:
+            if temp_dir and os.path.exists(temp_dir):
+                shutil.rmtree(temp_dir, ignore_errors=True)
+
