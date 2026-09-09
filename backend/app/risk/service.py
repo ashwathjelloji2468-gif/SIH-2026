@@ -92,22 +92,55 @@ class RiskService:
         if not self.asset_repo:
             raise RuntimeError("Database repository unavailable.")
         assets = self.asset_repo.get_by_project(project_id)
-        results = []
+        if not assets:
+            return []
         
         # Calculate dynamic Y for the repository
         from app.risk.mosca import estimate_migration_time_from_assets
         dynamic_y = estimate_migration_time_from_assets(assets)
 
+        to_eval = []
         for asset in assets:
-            res = self.assess_asset(
-                asset_id=asset.id,
+            detector_names = [e.detector_name for e in (getattr(asset, "evidence_items", []) or [])]
+            excerpts = [e.excerpt for e in (getattr(asset, "evidence_items", []) or []) if e.excerpt]
+
+            eval_result = self.engine.evaluate_asset_risk(
+                algorithm_name=asset.algorithm_name,
+                quantum_safety=asset.quantum_safety,
+                purpose=asset.purpose,
+                asset_type=asset.asset_type.value if hasattr(asset.asset_type, "value") else str(asset.asset_type),
+                detector_names=detector_names,
                 data_sensitivity_label=data_sensitivity_label,
                 business_criticality_label=business_criticality_label,
+                data_lifetime_years=10.0,
                 migration_time_years=dynamic_y,
                 quantum_threat_horizon_year=quantum_threat_horizon_year,
-                force_reassessment=True
+                evidence_excerpts=excerpts
             )
-            results.append(res)
+            to_eval.append((asset, eval_result))
+
+        if to_eval and self.risk_repo and hasattr(self.risk_repo, "store_assessments_bulk"):
+            bulk_payload = [(item[0].id, item[1]) for item in to_eval]
+            ra_records = self.risk_repo.store_assessments_bulk(bulk_payload)
+            results = []
+            for idx, item in enumerate(to_eval):
+                asset = item[0]
+                ra = ra_records[idx]
+                threats = self.risk_repo.get_threat_scenarios_for_asset(asset.id)
+                results.append(self._assessment_to_dict(ra, asset, threats))
+            return results
+
+        results = []
+        for item in to_eval:
+            asset = item[0]
+            eval_result = item[1]
+            ra = self.risk_repo.store_assessment(asset.id, eval_result) if self.risk_repo else None
+            threats = self.risk_repo.get_threat_scenarios_for_asset(asset.id) if self.risk_repo else []
+            if ra:
+                results.append(self._assessment_to_dict(ra, asset, threats))
+            else:
+                eval_result["asset_id"] = asset.id
+                results.append(eval_result)
         return results
 
     def get_project_risk_summary(self, project_id: str) -> Dict[str, Any]:
@@ -124,6 +157,12 @@ class RiskService:
                 assessed_list.append(self._assessment_to_dict(ra, asset, threats))
 
         assessed_count = len(assessed_list)
+
+        # Auto-assess project if assets exist but have not been risk-assessed in DB yet
+        if assessed_count == 0 and total_assets > 0:
+            assessed_list = self.assess_project(project_id)
+            assessed_count = len(assessed_list)
+
         unassessed_count = total_assets - assessed_count
 
         # Categorize risk level counts

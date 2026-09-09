@@ -68,14 +68,20 @@ export const AssetRiskTable: React.FC<AssetRiskTableProps> = ({
     return list;
   }, [assets, riskSummary, assessments]);
 
-  // Compute Summary Card counts directly from RiskEngine riskSummary if available, else from combinedList
+  // Compute Summary Card counts directly from RiskEngine riskSummary if non-zero, else compute directly from combinedList
   const counts = useMemo(() => {
-    if (riskSummary?.risk_counts) {
+    const sumCritical = riskSummary?.risk_counts?.critical || 0;
+    const sumHigh = riskSummary?.risk_counts?.high || 0;
+    const sumMedium = (riskSummary?.risk_counts?.moderate || 0) + ((riskSummary?.risk_counts as any)?.medium || 0);
+    const sumLow = riskSummary?.risk_counts?.low || 0;
+    const totalFromSummary = sumCritical + sumHigh + sumMedium + sumLow;
+
+    if (totalFromSummary > 0) {
       return {
-        critical: riskSummary.risk_counts.critical || 0,
-        high: riskSummary.risk_counts.high || 0,
-        medium: riskSummary.risk_counts.moderate || 0,
-        low: riskSummary.risk_counts.low || 0,
+        critical: sumCritical,
+        high: sumHigh,
+        medium: sumMedium,
+        low: sumLow,
       };
     }
 

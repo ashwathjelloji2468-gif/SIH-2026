@@ -72,6 +72,68 @@ class RiskRepository:
 
         return ra
 
+    def store_assessments_bulk(self, assessments_data: List[tuple]) -> List[RiskAssessment]:
+        ra_objs = []
+        ts_objs = []
+        for asset_id, eval_result in assessments_data:
+            factors = eval_result.get("factors", {})
+            mosca = eval_result.get("mosca", {})
+            
+            level_str = eval_result.get("risk_level", "LOW")
+            try:
+                r_level = RiskLevel(level_str)
+            except ValueError:
+                r_level = RiskLevel.LOW
+
+            ra = RiskAssessment(
+                asset_id=asset_id,
+                risk_score=eval_result.get("risk_score", 0.0),
+                risk_level=r_level,
+                quantum_exposure=factors.get("quantum_exposure", 0.0),
+                quantum_vulnerability_score=factors.get("quantum_exposure", 0.0),
+                data_sensitivity_score=factors.get("data_sensitivity", 0.0),
+                business_criticality_score=factors.get("business_criticality", 0.0),
+                mosca_factor_score=factors.get("mosca_score", 0.0),
+                exposure_score=factors.get("quantum_exposure", 0.0),
+                migration_complexity_score=factors.get("migration_complexity", 0.0),
+                lifetime_exposure_score=factors.get("lifetime_exposure", 0.0),
+                confidence_score=eval_result.get("confidence_score", 1.0),
+                quantum_status=eval_result.get("quantum_status"),
+                crypto_purpose=eval_result.get("crypto_purpose"),
+                mosca_status=mosca.get("mosca_status"),
+                quantum_threat_horizon=mosca.get("quantum_threat_horizon", 2033),
+                priority=eval_result.get("priority", "LOW"),
+                explanation=eval_result.get("explanation"),
+                rationale=eval_result.get("rationale"),
+                factors=factors
+            )
+            ra_objs.append(ra)
+
+            for sc in eval_result.get("threat_scenarios", []):
+                stype_str = sc.get("scenario_type", "MODERATE")
+                try:
+                    stype = ThreatScenarioType(stype_str)
+                except ValueError:
+                    stype = ThreatScenarioType.MODERATE
+
+                ts = ThreatScenario(
+                    asset_id=asset_id,
+                    name=sc.get("name", "Threat Scenario"),
+                    scenario_type=stype,
+                    quantum_threat_horizon_year=mosca.get("quantum_threat_horizon", 2033),
+                    severity=sc.get("severity", "HIGH"),
+                    urgency=sc.get("urgency", "HIGH"),
+                    description=sc.get("description"),
+                    rationale=sc.get("rationale"),
+                    evidence=sc.get("evidence", [])
+                )
+                ts_objs.append(ts)
+
+        self.db.add_all(ra_objs)
+        self.db.add_all(ts_objs)
+        self.db.commit()
+        return ra_objs
+
     def get(self, assessment_id: str) -> Optional[RiskAssessment]:
         return self.db.query(RiskAssessment).filter(RiskAssessment.id == assessment_id).first()
 
