@@ -157,12 +157,6 @@ class RiskService:
                 assessed_list.append(self._assessment_to_dict(ra, asset, threats))
 
         assessed_count = len(assessed_list)
-
-        # Auto-assess project if assets exist but have not been risk-assessed in DB yet
-        if assessed_count == 0 and total_assets > 0:
-            assessed_list = self.assess_project(project_id)
-            assessed_count = len(assessed_list)
-
         unassessed_count = total_assets - assessed_count
 
         # Categorize risk level counts
