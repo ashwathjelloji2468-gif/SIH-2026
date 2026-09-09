@@ -111,9 +111,33 @@ export const ScanModal: React.FC = () => {
         )}
 
         {success && (
-          <div className="flex items-center gap-2.5 p-3 rounded-lg bg-emerald-950/40 border border-emerald-800/60 text-xs text-emerald-300">
-            <CheckCircle2 className="w-4 h-4 shrink-0" />
-            <span>Scan job dispatched! Redirecting to Live Inventory...</span>
+          <div className="space-y-2 p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-800/60 text-xs text-emerald-300">
+            <div className="flex items-center gap-2.5">
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <span>Discovery scan launched! Real scanners and RiskEngine evaluating target...</span>
+            </div>
+            <div className="flex items-center gap-2 pt-1 font-mono">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsScanModalOpen(false);
+                  navigate('/inventory');
+                }}
+                className="px-3 py-1.5 rounded-lg bg-emerald-900/60 hover:bg-emerald-800 text-emerald-200 font-semibold transition-colors cursor-pointer"
+              >
+                View Asset Inventory →
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsScanModalOpen(false);
+                  navigate('/risk');
+                }}
+                className="px-3 py-1.5 rounded-lg bg-rose-950/80 hover:bg-rose-900 text-rose-200 border border-rose-800 font-semibold transition-colors cursor-pointer"
+              >
+                View Risk Assessment →
+              </button>
+            </div>
           </div>
         )}
 

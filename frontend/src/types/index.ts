@@ -160,6 +160,8 @@ export interface RiskSummary {
     rationale?: string;
     urgency_level?: string;
   };
+  priority_list?: RiskAssessment[];
+  highest_risk_assets?: RiskAssessment[];
 }
 
 
@@ -167,18 +169,49 @@ export interface RiskAssessment {
   id?: string;
   asset_id: string;
   asset_name?: string;
+  algorithm_name?: string;
+  location?: string;
+  quantum_status?: string;
+  crypto_purpose?: string;
   risk_score: number;
-  risk_level: RiskLevel;
-  quantum_vulnerability_score: number;
-  data_sensitivity_score: number;
-  business_criticality_score: number;
-  mosca_factor_score: number;
-  exposure_score: number;
-  migration_complexity_score: number;
+  risk_level: RiskLevel | string;
+  priority?: string;
+  quantum_vulnerability_score?: number;
+  data_sensitivity_score?: number;
+  business_criticality_score?: number;
+  mosca_factor_score?: number;
+  exposure_score?: number;
+  migration_complexity_score?: number;
   explanation?: string | null;
   confidence_score: number;
   risk_model_version?: string;
   created_at?: string;
+  factors?: {
+    quantum_exposure?: number;
+    data_sensitivity?: number;
+    business_criticality?: number;
+    migration_complexity?: number;
+    lifetime_exposure?: number;
+    mosca_score?: number;
+  };
+  mosca?: {
+    mosca_status?: string;
+    quantum_threat_horizon?: number;
+    rationale?: string;
+    x?: number;
+    y?: number;
+    z?: number;
+  };
+  threat_scenarios?: Array<{
+    id?: string;
+    scenario_type?: string;
+    name?: string;
+    severity?: string;
+    urgency?: string;
+    description?: string;
+    rationale?: string;
+  }>;
+  rationale?: string[];
 }
 
 // Threat Scenario & Mosca

@@ -12,7 +12,7 @@ import { ProjectXContextResponse, XContextUpdateInput } from '../types/xEngine';
 import { ProjectYContextResponse, YContextUpdateInput } from '../types/yEngine';
 import { ZProjectEvaluationResponse } from '../types/zEngine';
 import { MoscaProjectEvaluationResponse } from '../types/moscaEngine';
-import { RiskMatrix } from '../components/Risk/RiskMatrix';
+import { AssetRiskTable } from '../components/Risk/AssetRiskTable';
 import { MoscaSimulator } from '../components/Risk/MoscaSimulator';
 import { MoscaComponentTable } from '../components/Risk/MoscaComponentTable';
 import { DependencyGraph } from '../components/Graph/DependencyGraph';
@@ -22,7 +22,7 @@ import { XContextModal } from '../components/XEngine/XContextModal';
 import { YContextCard } from '../components/YEngine/YContextCard';
 import { YContextModal } from '../components/YEngine/YContextModal';
 import { ZContextCard } from '../components/ZEngine/ZContextCard';
-import { ShieldAlert, RefreshCw, Cpu, Network, Box } from 'lucide-react';
+import { ShieldAlert, RefreshCw, Box, Play } from 'lucide-react';
 
 export const Risk: React.FC = () => {
   const { currentProject } = useProject();
@@ -37,9 +37,8 @@ export const Risk: React.FC = () => {
   const [moscaContext, setMoscaContext] = useState<MoscaProjectEvaluationResponse | null>(null);
   const [isXModalOpen, setIsXModalOpen] = useState<boolean>(false);
   const [isYModalOpen, setIsYModalOpen] = useState<boolean>(false);
-
   const [loading, setLoading] = useState<boolean>(true);
-
+  const [reassessing, setReassessing] = useState<boolean>(false);
 
   const fetchRiskData = async () => {
     if (!currentProject) {
@@ -49,6 +48,8 @@ export const Risk: React.FC = () => {
       setGraph(null);
       setXContext(null);
       setYContext(null);
+      setZContext(null);
+      setMoscaContext(null);
       setLoading(false);
       return;
     }
@@ -67,7 +68,12 @@ export const Risk: React.FC = () => {
       ]);
 
       if (invRes.status === 'fulfilled') setAssets(invRes.value || []);
-      if (sumRes.status === 'fulfilled') setRiskSummary(sumRes.value || null);
+      if (sumRes.status === 'fulfilled' && sumRes.value) {
+        setRiskSummary(sumRes.value);
+        if (sumRes.value.priority_list) {
+          setAssessments(sumRes.value.priority_list);
+        }
+      }
       if (scenRes.status === 'fulfilled') setScenarios(scenRes.value || []);
       if (graphRes.status === 'fulfilled') setGraph(graphRes.value || null);
       if (xRes.status === 'fulfilled') setXContext(xRes.value || null);
@@ -78,6 +84,19 @@ export const Risk: React.FC = () => {
       console.error('Failed to load risk data:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleReassessProject = async () => {
+    if (!currentProject) return;
+    setReassessing(true);
+    try {
+      await riskService.assessProjectRisk(currentProject.id);
+      await fetchRiskData();
+    } catch (err) {
+      console.error('Failed to reassess project risk:', err);
+    } finally {
+      setReassessing(false);
     }
   };
 
@@ -101,8 +120,6 @@ export const Risk: React.FC = () => {
     }
   };
 
-
-
   useEffect(() => {
     fetchRiskData();
   }, [currentProject]);
@@ -116,20 +133,38 @@ export const Risk: React.FC = () => {
             <ShieldAlert className="w-4 h-4" />
             <span>Quantum Risk & Exposure Modeling</span>
           </div>
-          <h1 className="text-2xl font-bold font-mono text-slate-100">Quantum Vulnerability Assessment</h1>
+          <h1 className="text-2xl font-bold font-mono text-slate-100">Quantum Risk Assessment Console</h1>
           <p className="text-xs text-slate-400 mt-1">
-            Project: <span className="text-cyan-300 font-mono">{currentProject?.name}</span> • Risk Model Version: <span className="text-slate-200 font-mono">2.0-MOSCA</span>
+            Project: <span className="text-cyan-300 font-mono">{currentProject?.name}</span> • Risk Engine: <span className="text-slate-200 font-mono">RiskEngine v2.0</span>
           </p>
         </div>
 
-        <button
-          onClick={fetchRiskData}
-          className="p-2 rounded-xl border border-slate-800 hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer self-start sm:self-auto"
-          title="Refresh risk assessment"
-        >
-          <RefreshCw className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleReassessProject}
+            disabled={reassessing || loading}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-mono text-xs font-semibold transition-all cursor-pointer shadow-lg shadow-cyan-500/20 disabled:opacity-50"
+          >
+            <Play className={`w-3.5 h-3.5 ${reassessing ? 'animate-spin' : ''}`} />
+            {reassessing ? 'Evaluating RiskEngine...' : 'Run Full Risk Assessment'}
+          </button>
+          <button
+            onClick={fetchRiskData}
+            className="p-2 rounded-xl border border-slate-800 hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+            title="Refresh risk assessment"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
       </div>
+
+      {/* Main Asset Risk Assessment Table & Summary Cards */}
+      <AssetRiskTable
+        assets={assets}
+        riskSummary={riskSummary}
+        assessments={assessments}
+        isLoading={loading}
+      />
 
       {/* Confidentiality & Migration Time Engines (X & Y) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -157,8 +192,6 @@ export const Risk: React.FC = () => {
         isLoading={loading}
       />
 
-
-
       {/* 3D Mosca Threat Horizon Visualization Card */}
       <div className="rounded-2xl border border-slate-800 bg-[#0B0F19] p-6 shadow-2xl space-y-4">
         <div className="flex items-center justify-between pb-3 border-b border-slate-800">
@@ -182,13 +215,6 @@ export const Risk: React.FC = () => {
 
       {/* Interactive Mosca Theorem Simulator */}
       <MoscaSimulator scenarios={scenarios} />
-
-      {/* Risk Severity Posture Matrix */}
-      <RiskMatrix
-        assets={assets}
-        riskSummary={riskSummary}
-        assessments={assessments}
-      />
 
       {/* Cryptographic Topology & Centrality Graph */}
       <DependencyGraph
@@ -214,4 +240,3 @@ export const Risk: React.FC = () => {
     </div>
   );
 };
-

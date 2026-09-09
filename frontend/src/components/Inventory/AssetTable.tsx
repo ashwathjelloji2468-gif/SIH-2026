@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Filter, ChevronLeft, ChevronRight, Eye, AlertCircle, FileCode, CheckCircle2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Search, Filter, ChevronLeft, ChevronRight, Eye, AlertCircle, FileCode, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { CryptoAsset, QuantumSafety, CryptoPurpose } from '../../types';
 import { StatusBadge } from '../Common/StatusBadge';
 import { ConfidenceBadge } from '../Common/ConfidenceBadge';
@@ -13,6 +14,7 @@ interface AssetTableProps {
 }
 
 export const AssetTable: React.FC<AssetTableProps> = ({ assets, loading, onRefresh }) => {
+  const navigate = useNavigate();
   const [search, setSearch] = useState<string>('');
   const [safetyFilter, setSafetyFilter] = useState<string>('ALL');
   const [purposeFilter, setPurposeFilter] = useState<string>('ALL');
@@ -121,6 +123,14 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, loading, onRefre
             <AlertCircle className="w-3.5 h-3.5" />
             <span>Needs Review</span>
           </button>
+
+          <button
+            onClick={() => navigate('/risk')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-800/80 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 text-xs font-mono font-semibold transition-colors cursor-pointer"
+          >
+            <ShieldAlert className="w-3.5 h-3.5" />
+            View Risk Assessment
+          </button>
         </div>
       </div>
 
@@ -219,6 +229,14 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, loading, onRefre
                               Triage
                             </button>
                           )}
+                          <button
+                            onClick={() => navigate('/risk')}
+                            className="px-2 py-1 rounded bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 border border-rose-800/60 text-[11px] font-mono font-semibold transition-colors cursor-pointer flex items-center gap-1"
+                            title="View Risk Engine Assessment"
+                          >
+                            <ShieldAlert className="w-3 h-3" />
+                            Risk
+                          </button>
                           <button
                             onClick={() => setSelectedAsset(asset)}
                             className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-cyan-300 transition-colors cursor-pointer"

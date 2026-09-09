@@ -111,6 +111,14 @@ class ScanOrchestrator:
                 )
 
             cbom_json = generate_cbom_json(scan, created_assets)
+            try:
+                from app.risk.service import RiskService
+                risk_service = RiskService(db)
+                risk_service.assess_project(scan.project_id)
+                logger.info(f"Scan {scan_id}: RiskEngine completed assessment for all assets in project {scan.project_id}.")
+            except Exception as e:
+                logger.warning(f"Scan {scan_id}: Pre-computing risk assessments warning: {e}")
+
             scan_repo.update_status(scan_id, ScanStatus.COMPLETED, cbom_json=cbom_json)
             logger.info(f"Scan {scan_id} completed successfully with {len(created_assets)} assets detected.")
 
