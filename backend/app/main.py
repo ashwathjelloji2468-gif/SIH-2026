@@ -11,8 +11,10 @@ from app.knowledge.knowledge_loader import init_knowledge_base
 from app.api import (
     health, auth, projects, scans, inventory, findings,
     risk, scenarios, recommendations, graph, migration,
-    validation, reports, knowledge, audit, x_engine, y_engine, z_engine, mosca_engine
+    validation, reports, knowledge, audit, x_engine, y_engine, z_engine, mosca_engine,
+    prioritization
 )
+
 
 
 
@@ -86,6 +88,8 @@ app.include_router(x_engine.router, prefix=api_v1_prefix)
 app.include_router(y_engine.router, prefix=api_v1_prefix)
 app.include_router(z_engine.router, prefix=api_v1_prefix)
 app.include_router(mosca_engine.router, prefix=api_v1_prefix)
+app.include_router(prioritization.router, prefix=api_v1_prefix)
+
 
 
 
