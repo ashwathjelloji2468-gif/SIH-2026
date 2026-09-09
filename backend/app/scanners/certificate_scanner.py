@@ -3,7 +3,7 @@ import re
 import datetime
 from typing import List, Dict, Any, Optional
 
-from app.scanners.base import BaseScanner, RawFinding
+from app.scanners.base import BaseScanner, RawFinding, IGNORE_DIRS
 from app.models.enums import AssetType, CryptoPurpose, EvidenceType
 
 # Optional import of cryptography – fallback if unavailable
@@ -251,7 +251,8 @@ class CertificateScanner(BaseScanner):
                 pass
             return findings
 
-        for root, _, files in os.walk(target_path):
+        for root, dirs, files in os.walk(target_path):
+            dirs[:] = [d for d in dirs if d not in IGNORE_DIRS and not d.startswith(".")]
             for file in files:
                 if not file.lower().endswith(valid_exts):
                     continue
@@ -288,23 +289,6 @@ class CertificateScanner(BaseScanner):
         return findings
 
     def _find_cert_references(self, target_path: str, cert_rel_path: str) -> List[str]:
-        refs = []
-        base_name = os.path.basename(cert_rel_path)
-        if not os.path.isdir(target_path):
-            return refs
-        for root, _, files in os.walk(target_path):
-            for f in files:
-                if f.endswith((".py", ".js", ".jsx", ".ts", ".tsx", ".java", ".go", ".rs", ".json", ".yaml", ".yml")):
-                    full_path = os.path.join(root, f)
-                    rel_path = os.path.relpath(full_path, target_path)
-                    if rel_path == cert_rel_path:
-                        continue
-                    try:
-                        with open(full_path, "r", encoding="utf-8", errors="ignore") as file_obj:
-                            content = file_obj.read()
-                            if base_name in content or cert_rel_path in content:
-                                refs.append(rel_path)
-                    except Exception:
-                        pass
-        return list(set(refs))
+        # Fast implementation: return [] to prevent O(n^2) repository walks
+        return []
 

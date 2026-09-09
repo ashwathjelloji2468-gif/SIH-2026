@@ -12,7 +12,7 @@ except ImportError:
     except ImportError:
         tomllib = None
 
-from app.scanners.base import BaseScanner, RawFinding
+from app.scanners.base import BaseScanner, RawFinding, IGNORE_DIRS
 from app.models.enums import AssetType, CryptoPurpose, EvidenceType
 
 
@@ -340,7 +340,8 @@ class DependencyScanner(BaseScanner):
         if not os.path.isdir(target_path):
             return findings
 
-        for root, _, files in os.walk(target_path):
+        for root, dirs, files in os.walk(target_path):
+            dirs[:] = [d for d in dirs if d not in IGNORE_DIRS and not d.startswith(".")]
             for file in files:
                 full_path = os.path.join(root, file)
 

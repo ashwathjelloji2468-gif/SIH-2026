@@ -2,7 +2,7 @@ import os
 import subprocess
 import re
 from typing import List, Dict, Tuple, Optional, Any
-from app.scanners.base import BaseScanner, RawFinding
+from app.scanners.base import BaseScanner, RawFinding, IGNORE_DIRS
 from app.models.enums import AssetType, CryptoPurpose, EvidenceType
 
 class BinaryScanner(BaseScanner):
@@ -281,7 +281,8 @@ class BinaryScanner(BaseScanner):
         if os.path.isfile(target_path):
             target_files.append((target_path, os.path.basename(target_path)))
         else:
-            for root, _, files in os.walk(target_path):
+            for root, dirs, files in os.walk(target_path):
+                dirs[:] = [d for d in dirs if d not in IGNORE_DIRS and not d.startswith(".")]
                 for file in files:
                     if file.endswith(self.BINARY_EXTS):
                         full_path = os.path.join(root, file)

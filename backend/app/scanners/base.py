@@ -3,6 +3,16 @@ from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Any
 from app.models.enums import AssetType, CryptoPurpose, EvidenceType
 
+IGNORE_DIRS = {
+    "node_modules", ".git", ".svn", ".hg",
+    "dist", "build", "out", ".next", ".nuxt",
+    "vendor", "__pycache__", ".pytest_cache",
+    "coverage", ".nyc_output", "target",
+    "bin", "obj", ".idea", ".vscode",
+    "venv", ".venv", "env",
+    "Pods", "Carthage", "bower_components"
+}
+
 @dataclass
 class RawFinding:
     detector_name: str

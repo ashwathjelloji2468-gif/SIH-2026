@@ -1,4 +1,5 @@
 import os
+import time
 import shutil
 import tempfile
 import subprocess
@@ -61,10 +62,18 @@ class ScanOrchestrator:
                 VendorScanner()
             ]
             raw_findings = []
+            scan_start_time = time.time()
             for scanner in scanners:
-                raw_findings.extend(scanner.scan(target_dir))
+                scanner_name = scanner.__class__.__name__
+                logger.info(f"Scan {scan_id}: Starting {scanner_name} on '{target_dir}'...")
+                step_start = time.time()
+                findings = scanner.scan(target_dir)
+                raw_findings.extend(findings)
+                elapsed = time.time() - step_start
+                logger.info(f"Scan {scan_id}: {scanner_name} completed in {elapsed:.2f}s (findings: {len(findings)}, total raw: {len(raw_findings)})")
 
             unique_findings = deduplicate_findings(raw_findings)
+            logger.info(f"Scan {scan_id}: Deduplicated {len(raw_findings)} raw findings down to {len(unique_findings)} unique findings in {time.time() - scan_start_time:.2f}s total.")
 
             created_assets = []
             for raw in unique_findings:

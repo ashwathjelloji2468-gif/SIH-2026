@@ -5,7 +5,7 @@ import shutil
 import re
 from typing import List, Optional, Dict, Any, Tuple
 
-from app.scanners.base import BaseScanner, RawFinding
+from app.scanners.base import BaseScanner, RawFinding, IGNORE_DIRS
 from app.models.enums import AssetType, CryptoPurpose, EvidenceType
 
 # Comprehensive registry of crypto-related packages, libraries, tools, and language packages
@@ -309,7 +309,8 @@ class ContainerScanner(BaseScanner):
             if "dockerfile" in filename or "containerfile" in filename:
                 dockerfiles.append(target_path)
         else:
-            for root, _, files in os.walk(target_path):
+            for root, dirs, files in os.walk(target_path):
+                dirs[:] = [d for d in dirs if d not in IGNORE_DIRS and not d.startswith(".")]
                 for file in files:
                     lowered = file.lower()
                     if "dockerfile" in lowered or "containerfile" in lowered:

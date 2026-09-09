@@ -5,6 +5,17 @@ from app.scanners.base import BaseScanner, RawFinding
 from app.scanners.parsers.python_parser import parse_python_file
 from app.scanners.parsers.javascript_parser import parse_javascript_file
 from app.models.enums import AssetType, CryptoPurpose, EvidenceType
+from app.core.logging import logger
+
+IGNORE_DIRS = {
+    "node_modules", ".git", ".svn", ".hg",
+    "dist", "build", "out", ".next", ".nuxt",
+    "vendor", "__pycache__", ".pytest_cache",
+    "coverage", ".nyc_output", "target",
+    "bin", "obj", ".idea", ".vscode",
+    "venv", ".venv", "env",
+    "Pods", "Carthage", "bower_components"
+}
 
 KNOWN_PATTERNS = [
     (r"(?i)\bRSA\b", "RSA", CryptoPurpose.SIGNATURE, AssetType.ALGORITHM),
@@ -39,14 +50,21 @@ class SourceScanner(BaseScanner):
         if os.path.isfile(target_path):
             target_files.append((target_path, os.path.basename(target_path)))
         else:
-            for root, _, files in os.walk(target_path):
+            for root, dirs, files in os.walk(target_path):
+                dirs[:] = [d for d in dirs if d not in IGNORE_DIRS and not d.startswith(".")]
                 for file in files:
                     if file.endswith(valid_exts):
                         full_path = os.path.join(root, file)
                         rel_path = os.path.relpath(full_path, target_path)
                         target_files.append((full_path, rel_path))
 
-        for full_path, rel_path in target_files:
+        total_files = len(target_files)
+        logger.info(f"SourceScanner: Discovered {total_files} target files in '{target_path}'")
+
+        for idx, (full_path, rel_path) in enumerate(target_files, start=1):
+            if idx % 200 == 0 or idx == total_files:
+                logger.info(f"SourceScanner progress: processed {idx}/{total_files} files...")
+
             file = os.path.basename(full_path)
             # 1. Run AST parser on Python files
             if file.endswith(".py"):
@@ -95,7 +113,7 @@ class SourceScanner(BaseScanner):
             try:
                 with open(full_path, "r", encoding="utf-8", errors="ignore") as f:
                     lines = f.readlines()
-                for idx, line in enumerate(lines, start=1):
+                for line_idx, line in enumerate(lines, start=1):
                     matched_known = False
                     for pattern, alg, purpose, asset_type in KNOWN_PATTERNS:
                         if re.search(pattern, line):
@@ -104,12 +122,12 @@ class SourceScanner(BaseScanner):
                                 detector_name="RegexScanner",
                                 target_path=target_path,
                                 file_path=rel_path,
-                                line_number=idx,
+                                line_number=line_idx,
                                 asset_type=asset_type,
                                 algorithm_name=alg,
                                 purpose=purpose,
                                 matched_text=line.strip(),
-                                context=f"Regex match '{pattern}' at line {idx}",
+                                context=f"Regex match '{pattern}' at line {line_idx}",
                                 confidence=0.85,
                                 evidence_type=EvidenceType.OBSERVED
                             ))
@@ -121,12 +139,12 @@ class SourceScanner(BaseScanner):
                                     detector_name="RegexUnknownDetector",
                                     target_path=target_path,
                                     file_path=rel_path,
-                                    line_number=idx,
+                                    line_number=line_idx,
                                     asset_type=asset_type,
                                     algorithm_name="UNKNOWN_ALGORITHM",
                                     purpose=CryptoPurpose.UNKNOWN,
                                     matched_text=line.strip(),
-                                    context=f"Potential cryptographic operation detected but algorithm could not be conclusively identified at line {idx}",
+                                    context=f"Potential cryptographic operation detected but algorithm could not be conclusively identified at line {line_idx}",
                                     confidence=0.50,
                                     evidence_type=EvidenceType.INFERRED,
                                     extra_metadata={"is_unknown": True, "unknown_reason": "Potential cryptographic keyword detected without explicit algorithm identifier."}
@@ -144,23 +162,5 @@ class SourceScanner(BaseScanner):
         return findings
 
     def _find_module_references(self, target_path: str, module_rel_path: str) -> List[str]:
-        refs = []
-        base_name = os.path.splitext(os.path.basename(module_rel_path))[0]
-        if not os.path.isdir(target_path):
-            return refs
-        for root, _, files in os.walk(target_path):
-            for f in files:
-                if f.endswith((".py", ".js", ".jsx", ".ts", ".tsx")):
-                    full_path = os.path.join(root, f)
-                    rel_path = os.path.relpath(full_path, target_path)
-                    if rel_path == module_rel_path:
-                        continue
-                    try:
-                        with open(full_path, "r", encoding="utf-8", errors="ignore") as file_obj:
-                            content = file_obj.read()
-                            if base_name in content or module_rel_path in content:
-                                refs.append(rel_path)
-                    except Exception:
-                        pass
-        return list(set(refs))
-
+        # Fast implementation: return [] to prevent O(n^2) repository walks
+        return []

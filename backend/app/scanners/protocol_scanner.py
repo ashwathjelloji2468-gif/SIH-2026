@@ -2,7 +2,7 @@ import os
 import re
 from typing import List, Dict, Any, Optional, Set, Tuple
 
-from app.scanners.base import BaseScanner, RawFinding
+from app.scanners.base import BaseScanner, RawFinding, IGNORE_DIRS
 from app.models.enums import AssetType, CryptoPurpose, EvidenceType
 
 
@@ -52,7 +52,8 @@ class ProtocolScanner(BaseScanner):
         compiled_rules = [(re.compile(pattern), name, ver, status, is_weak, purpose)
                           for pattern, name, ver, status, is_weak, purpose in PROTOCOL_RULES]
 
-        for root, _, files in os.walk(target_path):
+        for root, dirs, files in os.walk(target_path):
+            dirs[:] = [d for d in dirs if d not in IGNORE_DIRS and not d.startswith(".")]
             for file in files:
                 if not file.lower().endswith(SUPPORTED_EXTENSIONS):
                     continue
