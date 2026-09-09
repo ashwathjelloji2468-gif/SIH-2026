@@ -8,7 +8,10 @@ import { getProjectXContext, updateProjectXContext } from '../services/xEngineSe
 import { getProjectYContext, updateProjectYContext } from '../services/yEngineService';
 import { getProjectZContext } from '../services/zEngineService';
 import { getProjectMoscaContext } from '../services/moscaEngineService';
-import { CryptoAsset, RiskSummary, RiskAssessment, ThreatScenario, ProjectGraph } from '../types';
+import {
+  CryptoAsset, RiskSummary, RiskAssessment, ThreatScenario, ProjectGraph,
+  ScanGraph, BlastRadiusResult, TopBlastRadiusSummary, CryptoNode
+} from '../types';
 import { ProjectXContextResponse, XContextUpdateInput } from '../types/xEngine';
 import { ProjectYContextResponse, YContextUpdateInput } from '../types/yEngine';
 import { ZProjectEvaluationResponse } from '../types/zEngine';
@@ -16,18 +19,20 @@ import { MoscaProjectEvaluationResponse } from '../types/moscaEngine';
 import { AssetRiskTable } from '../components/Risk/AssetRiskTable';
 import { MoscaSimulator } from '../components/Risk/MoscaSimulator';
 import { MoscaComponentTable } from '../components/Risk/MoscaComponentTable';
-import { DependencyGraph } from '../components/Graph/DependencyGraph';
+import { InteractiveNetworkMap } from '../components/Graph/InteractiveNetworkMap';
+import { BlastRadiusSidePanel } from '../components/Graph/BlastRadiusSidePanel';
+import { BlastRadiusDashboardCards } from '../components/Graph/BlastRadiusDashboardCards';
 import { MoscaGraph3D } from '../components/Three/MoscaGraph3D';
 import { XContextCard } from '../components/XEngine/XContextCard';
 import { XContextModal } from '../components/XEngine/XContextModal';
 import { YContextCard } from '../components/YEngine/YContextCard';
 import { YContextModal } from '../components/YEngine/YContextModal';
 import { ZContextCard } from '../components/ZEngine/ZContextCard';
-import { ShieldAlert, RefreshCw, Box, Play, ShieldCheck } from 'lucide-react';
+import { ShieldAlert, RefreshCw, Box, Play, ShieldCheck, Network, Download } from 'lucide-react';
 
 export const Risk: React.FC = () => {
   const navigate = useNavigate();
-  const { currentProject } = useProject();
+  const { currentProject, latestScan } = useProject();
   const [assets, setAssets] = useState<CryptoAsset[]>([]);
   const [riskSummary, setRiskSummary] = useState<RiskSummary | null>(null);
   const [assessments, setAssessments] = useState<RiskAssessment[]>([]);
@@ -37,6 +42,15 @@ export const Risk: React.FC = () => {
   const [yContext, setYContext] = useState<ProjectYContextResponse | null>(null);
   const [zContext, setZContext] = useState<ZProjectEvaluationResponse | null>(null);
   const [moscaContext, setMoscaContext] = useState<MoscaProjectEvaluationResponse | null>(null);
+
+  // Stage 8 Blast Radius State
+  const [summaryData, setSummaryData] = useState<TopBlastRadiusSummary | null>(null);
+  const [scanGraphData, setScanGraphData] = useState<ScanGraph | null>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedGraphNode, setSelectedGraphNode] = useState<CryptoNode | null>(null);
+  const [blastRadiusResult, setBlastRadiusResult] = useState<BlastRadiusResult | null>(null);
+  const [isRebuildingGraph, setIsRebuildingGraph] = useState<boolean>(false);
+
   const [isXModalOpen, setIsXModalOpen] = useState<boolean>(false);
   const [isYModalOpen, setIsYModalOpen] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
@@ -49,6 +63,8 @@ export const Risk: React.FC = () => {
       setRiskSummary(null);
       setAssessments([]);
       setGraph(null);
+      setSummaryData(null);
+      setScanGraphData(null);
       setXContext(null);
       setYContext(null);
       setZContext(null);
@@ -58,8 +74,10 @@ export const Risk: React.FC = () => {
     }
 
     setLoading(true);
+    const scanId = latestScan?.id || currentProject.id;
+
     try {
-      const [invRes, sumRes, scenRes, graphRes, xRes, yRes, zRes, mRes] = await Promise.allSettled([
+      const [invRes, sumRes, scenRes, graphRes, xRes, yRes, zRes, mRes, topBrRes] = await Promise.allSettled([
         inventoryService.getProjectInventory(currentProject.id),
         riskService.getRiskSummary(currentProject.id, { skipCache }),
         riskService.listThreatScenarios(),
@@ -68,6 +86,7 @@ export const Risk: React.FC = () => {
         getProjectYContext(currentProject.id),
         getProjectZContext(currentProject.id),
         getProjectMoscaContext(currentProject.id),
+        graphService.getProjectTopBlastRadius(currentProject.id),
       ]);
 
       if (invRes.status === 'fulfilled') setAssets(invRes.value || []);
@@ -78,16 +97,92 @@ export const Risk: React.FC = () => {
         }
       }
       if (scenRes.status === 'fulfilled') setScenarios(scenRes.value || []);
-      if (graphRes.status === 'fulfilled') setGraph(graphRes.value || null);
+
+      if (graphRes.status === 'fulfilled' && graphRes.value) {
+        const rawGraph = graphRes.value;
+        setGraph(rawGraph);
+
+        // Convert ProjectGraph to ScanGraph for InteractiveNetworkMap
+        const sGraph: ScanGraph = {
+          scan_id: scanId,
+          nodes: (rawGraph.nodes || []).map((n: any) => ({
+            id: n.id,
+            scan_id: scanId,
+            asset_id: n.id.startsWith('asset:') ? n.id.replace('asset:', '') : null,
+            artefact_type: n.type ? n.type.toUpperCase() : 'ALGORITHM',
+            name: n.label || n.id,
+            location: n.metadata?.location || null,
+            quantum_risk: n.metadata?.quantum_safety || (n.metadata?.algorithm_name?.includes('RSA') ? 'QUANTUM_VULNERABLE' : 'LOW'),
+            mosca_x: 10,
+            business_criticality: 50,
+            extra_metadata: n.metadata
+          })),
+          edges: (rawGraph.edges || []).map((e: any, idx: number) => ({
+            id: `edge-${idx}`,
+            scan_id: scanId,
+            source_node_id: e.source,
+            target_node_id: e.target,
+            relation_type: e.relationship || 'uses',
+            strength: 1.0
+          })),
+          total_nodes: rawGraph.nodes?.length || 0,
+          total_edges: rawGraph.edges?.length || 0,
+          single_points_of_failure: []
+        };
+        setScanGraphData(sGraph);
+
+        if (sGraph.nodes.length > 0 && !selectedNodeId) {
+          const topNode = sGraph.nodes.find(n => ['CRITICAL', 'HIGH', 'QUANTUM_VULNERABLE'].includes(n.quantum_risk.toUpperCase())) || sGraph.nodes[0];
+          handleSelectGraphNode(topNode.id, sGraph.nodes);
+        }
+      }
+
       if (xRes.status === 'fulfilled') setXContext(xRes.value || null);
       if (yRes.status === 'fulfilled') setYContext(yRes.value || null);
       if (zRes.status === 'fulfilled') setZContext(zRes.value || null);
       if (mRes.status === 'fulfilled') setMoscaContext(mRes.value || null);
+      if (topBrRes.status === 'fulfilled') setSummaryData(topBrRes.value || null);
     } catch (err) {
       console.error('Failed to load risk data:', err);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSelectGraphNode = async (nodeId: string, currentNodes = scanGraphData?.nodes || []) => {
+    setSelectedNodeId(nodeId);
+    const n = currentNodes.find(item => item.id === nodeId || item.asset_id === nodeId) || null;
+    setSelectedGraphNode(n);
+
+    if (nodeId) {
+      try {
+        const scanId = latestScan?.id || currentProject?.id;
+        const br = await graphService.getNodeBlastRadius(nodeId, scanId);
+        setBlastRadiusResult(br);
+      } catch (err) {
+        console.warn('Failed to calculate blast radius for node:', nodeId);
+      }
+    }
+  };
+
+  const handleRebuildGraph = async () => {
+    if (!currentProject) return;
+    setIsRebuildingGraph(true);
+    try {
+      const scanId = latestScan?.id || currentProject.id;
+      await graphService.buildScanGraph(scanId);
+      await fetchRiskData(true);
+    } catch (err) {
+      console.error('Rebuild graph failed:', err);
+    } finally {
+      setIsRebuildingGraph(false);
+    }
+  };
+
+  const handleDownloadGraph = () => {
+    const scanId = latestScan?.id || currentProject?.id || 'default';
+    const url = graphService.getGraphDownloadUrl(scanId);
+    window.open(url, '_blank');
   };
 
   const handleReassessProject = async () => {
@@ -127,7 +222,7 @@ export const Risk: React.FC = () => {
 
   useEffect(() => {
     fetchRiskData();
-  }, [currentProject]);
+  }, [currentProject, latestScan]);
 
   return (
     <div className="space-y-8 pb-12">
@@ -138,7 +233,7 @@ export const Risk: React.FC = () => {
             <ShieldAlert className="w-4 h-4" />
             <span>Quantum Risk & Exposure Modeling</span>
           </div>
-          <h1 className="text-2xl font-bold font-mono text-slate-100">Quantum Risk Assessment Console</h1>
+          <h1 className="text-2xl font-bold font-mono text-slate-100">Quantum Risk Assessment & Blast Radius Console</h1>
           <p className="text-xs text-slate-400 mt-1">
             Project: <span className="text-cyan-300 font-mono">{currentProject?.name}</span> • Risk Engine: <span className="text-slate-200 font-mono">RiskEngine v2.0</span>
           </p>
@@ -193,6 +288,57 @@ export const Risk: React.FC = () => {
         isLoading={loading}
       />
 
+      {/* Single Authoritative Cryptographic Interdependencies & Blast Radius Console */}
+      <div className="space-y-6 pt-6 border-t border-slate-800">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 text-cyan-400 font-mono text-xs uppercase tracking-wider font-semibold mb-1">
+              <Network className="w-4 h-4" />
+              <span>Cryptographic Topology & Blast Radius</span>
+            </div>
+            <h3 className="text-xl font-bold font-mono text-slate-100">Cryptographic Interdependencies & Blast Radius Analysis</h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Analyze downstream system impact, shared key dependencies, and single points of failure across your post-quantum migration graph.
+            </p>
+          </div>
+          <button
+            onClick={handleDownloadGraph}
+            className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 rounded-xl text-xs font-mono font-semibold transition-all shrink-0 cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Export dependency-graph.json</span>
+          </button>
+        </div>
+
+        {/* Executive Blast Radius Dashboard Cards (Top 10 Blast Radii, Shared Keys, Single Points of Failure) */}
+        <BlastRadiusDashboardCards
+          summary={summaryData}
+          onSelectNode={(nodeId) => handleSelectGraphNode(nodeId)}
+        />
+
+        {/* Main Interactive Network Map & Blast Radius Side Panel */}
+        <div className="flex flex-col lg:flex-row gap-6 items-start">
+          <div className="flex-1 w-full min-w-0">
+            <InteractiveNetworkMap
+              nodes={scanGraphData?.nodes || []}
+              edges={scanGraphData?.edges || []}
+              selectedNodeId={selectedNodeId}
+              onSelectNode={(nodeId) => handleSelectGraphNode(nodeId)}
+              onRebuildGraph={handleRebuildGraph}
+              isLoading={loading || isRebuildingGraph}
+            />
+          </div>
+
+          <BlastRadiusSidePanel
+            node={selectedGraphNode}
+            blastRadius={blastRadiusResult}
+            onClose={() => { setSelectedNodeId(null); setSelectedGraphNode(null); setBlastRadiusResult(null); }}
+            onSimulateMigration={(assetId) => navigate('/migration', { state: { selectedAssetId: assetId } })}
+            isLoading={loading}
+          />
+        </div>
+      </div>
+
       {/* Confidentiality & Migration Time Engines (X & Y) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <XContextCard
@@ -243,12 +389,6 @@ export const Risk: React.FC = () => {
 
       {/* Interactive Mosca Theorem Simulator */}
       <MoscaSimulator scenarios={scenarios} />
-
-      {/* Cryptographic Topology & Centrality Graph */}
-      <DependencyGraph
-        graph={graph}
-        loading={loading}
-      />
 
       {/* X Context Override Modal */}
       <XContextModal

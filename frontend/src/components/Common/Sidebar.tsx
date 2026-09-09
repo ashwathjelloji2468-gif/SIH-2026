@@ -13,7 +13,6 @@ import {
   ShieldCheck,
   ChevronRight,
   ExternalLink,
-  Network,
 } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 
@@ -34,7 +33,6 @@ export const Sidebar: React.FC = () => {
       title: 'Risk & Threat Science',
       items: [
         { name: 'Risk & Mosca Theorem', path: '/risk', icon: ShieldAlert },
-        { name: 'Blast Radius & Topology', path: '/blast-radius', icon: Network },
       ],
     },
     {
