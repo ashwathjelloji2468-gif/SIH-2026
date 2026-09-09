@@ -17,9 +17,13 @@ import {
   ExternalLink,
   ShieldAlert,
   Zap,
+  RefreshCw,
 } from 'lucide-react';
+import { useProject } from '../../context/ProjectContext';
 import { migrationService } from '../../services/migrationService';
 import { validationService } from '../../services/validationService';
+import { inventoryService } from '../../services/inventoryService';
+import { recommendationService } from '../../services/recommendationService';
 import { SandboxSimulationResult, ValidationRun } from '../../types';
 
 interface MigrationWizardProps {
@@ -38,7 +42,7 @@ interface TargetAssetCandidate {
   transformationPattern: string;
 }
 
-const CANDIDATE_ASSETS: TargetAssetCandidate[] = [
+const FALLBACK_CANDIDATE_ASSETS: TargetAssetCandidate[] = [
   {
     id: 'asset-1',
     name: 'Authentication JWT Key Signer',
@@ -160,9 +164,12 @@ function getDemoSnippets(asset: TargetAssetCandidate): { original: string; trans
 
 
 export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
+  const { currentProject } = useProject();
   const [currentStep, setCurrentStep] = useState<number>(1);
-  const [selectedAsset, setSelectedAsset] = useState<TargetAssetCandidate>(CANDIDATE_ASSETS[0]);
+  const [candidates, setCandidates] = useState<TargetAssetCandidate[]>(FALLBACK_CANDIDATE_ASSETS);
+  const [selectedAsset, setSelectedAsset] = useState<TargetAssetCandidate>(FALLBACK_CANDIDATE_ASSETS[0]);
   const [pattern, setPattern] = useState<string>('RSA_TO_ML_DSA');
+  const [loadingDbAssets, setLoadingDbAssets] = useState<boolean>(false);
 
   // Simulation state
   const [simulationResult, setSimulationResult] = useState<SandboxSimulationResult | null>(null);
@@ -178,6 +185,87 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
   const [patchError, setPatchError] = useState<string | null>(null);
   const [deployNotice, setDeployNotice] = useState<string | null>(null);
 
+  // Fetch dynamic database assets & PQC recommendations on project/plan change
+  useEffect(() => {
+    async function fetchDbCandidates() {
+      if (!currentProject) return;
+      setLoadingDbAssets(true);
+      try {
+        const [assetsRes, recsRes] = await Promise.allSettled([
+          inventoryService.getProjectInventory(currentProject.id),
+          recommendationService.getProjectRecommendations(currentProject.id),
+        ]);
+
+        const dbAssets = assetsRes.status === 'fulfilled' ? assetsRes.value : [];
+        const dbRecs = recsRes.status === 'fulfilled' ? recsRes.value : [];
+
+        if (dbAssets && dbAssets.length > 0) {
+          const recMap = new Map<string, any>();
+          dbRecs.forEach((r) => {
+            if (r.asset_id) recMap.set(r.asset_id, r);
+          });
+
+          const dynamicCandidates: TargetAssetCandidate[] = dbAssets.map((asset, idx) => {
+            const rec = recMap.get(asset.id);
+            const algUpper = (asset.algorithm_name || '').toUpperCase();
+            const purpose = (asset.purpose || '').toUpperCase();
+
+            let target = rec?.target_pqc_candidate || rec?.recommended_algorithm;
+            let std = 'FIPS 204';
+            let patternType = 'RSA_TO_ML_DSA';
+
+            if (purpose.includes('KEY') || algUpper.includes('ECDH') || algUpper.includes('DH')) {
+              target = target || 'ML-KEM-768 Hybrid (NIST FIPS 203)';
+              std = 'FIPS 203';
+              patternType = 'ECDH_TO_ML_KEM_HYBRID';
+            } else if (purpose.includes('ENCRYPT') || algUpper.includes('AES')) {
+              target = target || 'AES-256-GCM (Symmetric Retained)';
+              std = 'AES-256';
+              patternType = 'AES_256_GCM_RETENTION';
+            } else if (algUpper.includes('ECDSA')) {
+              target = target || 'ML-DSA-65 (NIST FIPS 204)';
+              std = 'FIPS 204';
+              patternType = 'ECDSA_TO_ML_DSA';
+            } else {
+              target = target || 'ML-DSA-65 (NIST FIPS 204)';
+              std = 'FIPS 204';
+              patternType = 'RSA_TO_ML_DSA';
+            }
+
+            const urgency: 'CRITICAL' | 'HIGH' | 'MEDIUM' =
+              asset.quantum_safety === 'VULNERABLE'
+                ? 'CRITICAL'
+                : asset.quantum_safety === 'TRANSITIONAL'
+                ? 'HIGH'
+                : 'MEDIUM';
+
+            return {
+              id: asset.id || `db-asset-${idx}`,
+              name: asset.name || `${asset.algorithm_name} Discovered Primitive`,
+              file: asset.location || 'src/crypto/asset.py',
+              currentAlgorithm: `${asset.algorithm_name}${asset.key_size ? ` (${asset.key_size}-bit)` : ''}`,
+              recommendedTarget: target,
+              standard: std,
+              urgency,
+              complexity: asset.quantum_safety === 'VULNERABLE' ? 'Moderate (2 Person-Days)' : 'Low (1 Person-Day)',
+              transformationPattern: patternType,
+            };
+          });
+
+          setCandidates(dynamicCandidates);
+          setSelectedAsset(dynamicCandidates[0]);
+          setPattern(dynamicCandidates[0].transformationPattern);
+        }
+      } catch (err) {
+        console.warn('Could not fetch DB assets for migration wizard:', err);
+      } finally {
+        setLoadingDbAssets(false);
+      }
+    }
+
+    fetchDbCandidates();
+  }, [currentProject?.id, planId]);
+
   // Reset all downstream results when plan changes
   useEffect(() => {
     setSimulationResult(null);
@@ -190,7 +278,6 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
   }, [planId]);
 
   // When user picks a different asset or pattern, invalidate prior simulation/validation
-  // so confidence scores cannot appear before the full 4-stage pipeline is re-run.
   useEffect(() => {
     setSimulationResult(null);
     setValidationRun(null);
@@ -204,7 +291,7 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
     if (simulating) return;
     setSimulating(true);
     setSimError(null);
-    setValidationRun(null); // Force Stage 3 to validate the new simulation
+    setValidationRun(null);
     setPatchError(null);
     setDeployNotice(null);
     try {
@@ -301,7 +388,6 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
     );
   };
 
-  // Helper for step click
   const goToStep = (step: number) => {
     setCurrentStep(step);
   };
@@ -432,7 +518,7 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
                   onChange={(e) => {
                     const next = e.target.value;
                     setPattern(next);
-                    const match = CANDIDATE_ASSETS.find(a => a.transformationPattern === next);
+                    const match = candidates.find(a => a.transformationPattern === next);
                     if (match) setSelectedAsset(match);
                   }}
                   className="px-3.5 py-2 rounded-xl bg-[#0B0F19] border border-[#1E293B] text-xs font-mono text-[#22D3EE] focus:outline-none focus:border-[#22D3EE] cursor-pointer"
@@ -445,9 +531,16 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
               </div>
             </div>
 
+            {loadingDbAssets && (
+              <div className="flex items-center gap-2 text-xs font-mono text-[#22D3EE]">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Loading discovered cryptographic assets from database...</span>
+              </div>
+            )}
+
             {/* Candidate Asset Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {CANDIDATE_ASSETS.map((asset) => {
+              {candidates.map((asset) => {
                 const isSelected = selectedAsset.id === asset.id;
                 return (
                   <div
@@ -847,7 +940,7 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
                         <span>Automated Test Runner Output Log</span>
                       </div>
                       <span className={`text-[10px] font-bold ${
-                        validationRun.status === 'SUCCESS' ? 'text-emerald-400' : 'text-rose-400'
+                        validationRun.status === 'SUCCESS' || (validationRun.status as string) === 'PASSED' ? 'text-emerald-400' : 'text-rose-400'
                       }`}>
                         Execution Status: {validationRun.status}
                       </span>
@@ -909,13 +1002,13 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
 
                   <div className="space-y-1.5">
                     <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-mono text-[11px] font-bold border ${
-                      validationRun && (validationRun.status === 'SUCCESS' || (validationRun.confidence ?? 0) >= 0.85)
+                      validationRun && (validationRun.status === 'SUCCESS' || (validationRun.status as string) === 'PASSED' || (validationRun.confidence ?? 0) >= 0.85)
                         ? 'bg-emerald-950/70 border-emerald-800 text-emerald-300'
                         : 'bg-amber-950/70 border-amber-800 text-amber-300'
                     }`}>
                       <CheckCircle2 className="w-3.5 h-3.5" />
                       {validationRun
-                        ? ((validationRun.status === 'SUCCESS' || (validationRun.confidence ?? 0) >= 0.85)
+                        ? ((validationRun.status === 'SUCCESS' || (validationRun.status as string) === 'PASSED' || (validationRun.confidence ?? 0) >= 0.85)
                             ? 'Validated — High Confidence'
                             : 'Validation Review Required')
                         : 'Pending Stage 3 Validation'}
