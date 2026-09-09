@@ -39,6 +39,7 @@ export const Navbar: React.FC = () => {
     '/scan': 'Scan Orchestrator',
     '/inventory': 'Cryptographic Inventory',
     '/risk': 'Mosca Urgency & Risk',
+    '/recommendations': 'PQC Recommendations',
     '/migration': 'PQC Migration Planner',
     '/reports': 'CBOM & Assessment',
     '/settings': 'Telemetry & Audit',

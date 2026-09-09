@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Filter, ShieldAlert, AlertTriangle, AlertCircle, CheckCircle2, Eye, FileCode } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Search, Filter, ShieldAlert, AlertTriangle, AlertCircle, CheckCircle2, Eye, FileCode, ShieldCheck } from 'lucide-react';
 import { CryptoAsset, RiskAssessment, RiskSummary } from '../../types';
 import { AssetRiskDetailModal } from './AssetRiskDetailModal';
 
@@ -16,6 +17,7 @@ export const AssetRiskTable: React.FC<AssetRiskTableProps> = ({
   assessments,
   isLoading = false,
 }) => {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [levelFilter, setLevelFilter] = useState<string>('ALL');
   const [quantumFilter, setQuantumFilter] = useState<string>('ALL');
@@ -367,13 +369,23 @@ export const AssetRiskTable: React.FC<AssetRiskTableProps> = ({
 
                       {/* Actions */}
                       <td className="py-3 px-4 text-right">
-                        <button
-                          onClick={() => handleOpenDetail(asset, assessment)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-cyan-800/80 bg-cyan-950/40 hover:bg-cyan-900/60 text-cyan-300 text-xs transition-colors cursor-pointer"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          View Risk Detail
-                        </button>
+                        <div className="inline-flex items-center gap-2">
+                          <button
+                            onClick={() => navigate('/recommendations')}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-800 bg-slate-900 hover:bg-slate-800 text-cyan-300 text-xs font-mono transition-colors cursor-pointer"
+                            title="View PQC Recommendations"
+                          >
+                            <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
+                            PQC Recs
+                          </button>
+                          <button
+                            onClick={() => handleOpenDetail(asset, assessment)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-cyan-800/80 bg-cyan-950/40 hover:bg-cyan-900/60 text-cyan-300 text-xs transition-colors cursor-pointer"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            View Risk Detail
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

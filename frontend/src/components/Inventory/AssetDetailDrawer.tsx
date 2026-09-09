@@ -307,6 +307,17 @@ export const AssetDetailDrawer: React.FC<AssetDetailDrawerProps> = ({ asset, onC
                         <strong className="text-[#F8FAFC]">Footprint Overhead:</strong> {primaryRec.performance_notes}
                       </div>
                     )}
+                    <div className="pt-2 flex justify-end">
+                      <button
+                        onClick={() => {
+                          onClose();
+                          navigate('/recommendations');
+                        }}
+                        className="px-3 py-1.5 rounded-lg border border-cyan-800 bg-cyan-950/60 hover:bg-cyan-900/80 text-cyan-300 text-xs font-mono font-semibold transition-colors cursor-pointer"
+                      >
+                        Explore All Recommendations & Trade-offs →
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <p className="text-xs text-[#94A3B8] font-sans">

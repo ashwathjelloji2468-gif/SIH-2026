@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useProject } from '../context/ProjectContext';
 import { riskService } from '../services/riskService';
 import { inventoryService } from '../services/inventoryService';
@@ -22,9 +23,10 @@ import { XContextModal } from '../components/XEngine/XContextModal';
 import { YContextCard } from '../components/YEngine/YContextCard';
 import { YContextModal } from '../components/YEngine/YContextModal';
 import { ZContextCard } from '../components/ZEngine/ZContextCard';
-import { ShieldAlert, RefreshCw, Box, Play } from 'lucide-react';
+import { ShieldAlert, RefreshCw, Box, Play, ShieldCheck } from 'lucide-react';
 
 export const Risk: React.FC = () => {
+  const navigate = useNavigate();
   const { currentProject } = useProject();
   const [assets, setAssets] = useState<CryptoAsset[]>([]);
   const [riskSummary, setRiskSummary] = useState<RiskSummary | null>(null);
@@ -140,6 +142,13 @@ export const Risk: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate('/recommendations')}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-cyan-500/50 text-slate-300 hover:text-cyan-300 font-mono text-xs font-semibold transition-all cursor-pointer"
+          >
+            <ShieldCheck className="w-4 h-4 text-cyan-400" />
+            <span>PQC Recommendations</span>
+          </button>
           <button
             onClick={handleReassessProject}
             disabled={reassessing || loading}

@@ -12,6 +12,7 @@ import { Scan } from './pages/Scan';
 import { Inventory } from './pages/Inventory';
 import { Risk } from './pages/Risk';
 import { Migration } from './pages/Migration';
+import { Recommendations } from './pages/Recommendations';
 import { Reports } from './pages/Reports';
 import { Settings } from './pages/Settings';
 
@@ -60,6 +61,7 @@ export const App: React.FC = () => {
           <Route path="/scan" element={<AppLayout><Scan /></AppLayout>} />
           <Route path="/inventory" element={<AppLayout><Inventory /></AppLayout>} />
           <Route path="/risk" element={<AppLayout><Risk /></AppLayout>} />
+          <Route path="/recommendations" element={<AppLayout><Recommendations /></AppLayout>} />
           <Route path="/migration" element={<AppLayout><Migration /></AppLayout>} />
           <Route path="/reports" element={<AppLayout><Reports /></AppLayout>} />
           <Route path="/settings" element={<AppLayout><Settings /></AppLayout>} />

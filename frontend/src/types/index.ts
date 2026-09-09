@@ -235,15 +235,35 @@ export interface ThreatScenario {
 export interface Recommendation {
   id?: string;
   asset_id: string;
+  asset_name?: string;
+  algorithm_name?: string;
+  location?: string;
+  line_number?: number | null;
+  crypto_purpose?: string;
+  quantum_status?: string;
   target_pqc_candidate: string;
+  recommended_algorithm?: string;
+  alternative_algorithm?: string;
+  transformation_pattern?: string;
+  category?: string;
+  priority?: string;
   standard_status: StandardStatus;
   rationale: string;
   compatibility_notes?: string | null;
   performance_notes?: string | null;
+  latency_impact?: string;
+  cost_impact?: string;
+  latency_level?: 'LOW' | 'MODERATE' | 'HIGH' | 'UNKNOWN';
+  cost_level?: 'LOW' | 'MEDIUM' | 'HIGH' | 'UNKNOWN';
+  tradeoffs?: Record<string, any>;
+  threat_scenarios?: Array<any>;
+  migration_notes?: string;
   migration_complexity: string;
   confidence: number;
   kb_version?: string;
   created_at?: string;
+  risk_score?: number;
+  risk_level?: string;
 }
 
 // Graph

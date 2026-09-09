@@ -38,6 +38,7 @@ export const Sidebar: React.FC = () => {
     {
       title: 'Transition & Action',
       items: [
+        { name: 'PQC Recommendations', path: '/recommendations', icon: ShieldCheck },
         { name: 'Migration & Sandbox', path: '/migration', icon: GitFork },
       ],
     },

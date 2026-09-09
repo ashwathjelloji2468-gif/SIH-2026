@@ -175,6 +175,8 @@ class RecommendationService:
             "asset_id": rec.asset_id,
             "asset_name": asset.name if asset else "Unknown Asset",
             "algorithm_name": asset.algorithm_name if asset else "Unknown",
+            "location": asset.location if asset else "",
+            "line_number": asset.line_number if asset else None,
             "crypto_purpose": asset.purpose.value if (asset and hasattr(asset.purpose, "value")) else "UNKNOWN",
             "quantum_status": asset.quantum_safety.value if (asset and hasattr(asset.quantum_safety, "value")) else "UNKNOWN",
             "risk_assessment_id": rec.risk_assessment_id or (ra.id if ra else None),
