@@ -14,6 +14,18 @@ export const reportService = {
     return `/api/v1/scans/${scanId}/cbom/download`;
   },
 
+  getProjectCBOMDownloadUrl: (projectId: string): string => {
+    return `/api/v1/projects/${projectId}/cbom/download`;
+  },
+
+  getExecutiveReportDownloadUrl: (projectId: string): string => {
+    return `/api/v1/projects/${projectId}/reports/executive/download`;
+  },
+
+  getExecutiveReport: async (projectId: string): Promise<Record<string, any>> => {
+    return api.get<Record<string, any>>(`/projects/${projectId}/reports/executive`);
+  },
+
   generateProjectReport: async (projectId: string): Promise<Record<string, any>> => {
     return api.post<Record<string, any>>(`/projects/${projectId}/reports`);
   },

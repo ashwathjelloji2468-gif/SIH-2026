@@ -8,7 +8,7 @@ import { CBOMCycloneDX, CryptoAsset, RiskSummary, Scan } from '../types';
 import { CBOMViewer } from '../components/Reports/CBOMViewer';
 import { PDFReportPreview } from '../components/Reports/PDFReportPreview';
 import { PQCCatalogModal } from '../components/Recommendations/PQCCatalogModal';
-import { FileSpreadsheet, FileText, BookOpen, RefreshCw } from 'lucide-react';
+import { FileSpreadsheet, FileText, BookOpen, RefreshCw, Download } from 'lucide-react';
 
 export const Reports: React.FC = () => {
   const { currentProject, latestScan } = useProject();
@@ -78,6 +78,18 @@ export const Reports: React.FC = () => {
     }
   };
 
+  const handleDownloadProjectCBOM = () => {
+    if (currentProject) {
+      window.open(reportService.getProjectCBOMDownloadUrl(currentProject.id), '_blank');
+    }
+  };
+
+  const handleDownloadExecutiveReport = () => {
+    if (currentProject) {
+      window.open(reportService.getExecutiveReportDownloadUrl(currentProject.id), '_blank');
+    }
+  };
+
   return (
     <div className="space-y-6 pb-12">
       {/* Header */}
@@ -93,13 +105,31 @@ export const Reports: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={handleDownloadProjectCBOM}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-cyan-800/80 bg-cyan-950/60 hover:bg-cyan-900/80 text-cyan-300 text-xs font-mono font-bold transition-all cursor-pointer shadow-md shadow-cyan-950/50"
+            title="Download CycloneDX 1.6 JSON"
+          >
+            <Download className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Export CBOM JSON</span>
+          </button>
+
+          <button
+            onClick={handleDownloadExecutiveReport}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-mono font-bold transition-all cursor-pointer"
+            title="Download HTML Executive Report"
+          >
+            <FileText className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Executive Report</span>
+          </button>
+
           <button
             onClick={() => setPqcModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-slate-800 bg-slate-900/80 hover:bg-slate-800 text-slate-300 text-xs font-medium transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-800 bg-slate-900/80 hover:bg-slate-800 text-slate-300 text-xs font-medium transition-colors cursor-pointer"
           >
             <BookOpen className="w-4 h-4 text-cyan-400" />
-            <span>NIST Standards Catalog</span>
+            <span className="hidden md:inline">NIST Standards</span>
           </button>
 
           <button

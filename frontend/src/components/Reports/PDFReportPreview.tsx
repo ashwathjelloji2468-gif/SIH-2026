@@ -31,6 +31,12 @@ export const PDFReportPreview: React.FC<PDFReportPreviewProps> = ({ assets, risk
     window.print();
   };
 
+  const handleDownloadHTML = () => {
+    if (currentProject) {
+      window.open(reportService.getExecutiveReportDownloadUrl(currentProject.id), '_blank');
+    }
+  };
+
   const vulnerableCount = assets.filter((a) => a.quantum_safety === 'VULNERABLE').length;
   const safeCount = assets.filter((a) => a.quantum_safety === 'SAFE').length;
 
@@ -50,7 +56,15 @@ export const PDFReportPreview: React.FC<PDFReportPreviewProps> = ({ assets, risk
             className="px-3.5 py-1.5 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 transition-colors cursor-pointer flex items-center gap-1.5"
           >
             {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-400" /> : <FileText className="w-3.5 h-3.5 text-cyan-400" />}
-            <span>{reportData ? 'Regenerate Report' : 'Generate Full Report'}</span>
+            <span>{reportData ? 'Regenerate Summary' : 'Generate Full Summary'}</span>
+          </button>
+
+          <button
+            onClick={handleDownloadHTML}
+            className="px-3.5 py-1.5 rounded-lg border border-cyan-800/80 bg-cyan-950/60 hover:bg-cyan-900/80 text-cyan-300 text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5"
+          >
+            <Download className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Download HTML Report</span>
           </button>
 
           <button
@@ -58,7 +72,7 @@ export const PDFReportPreview: React.FC<PDFReportPreviewProps> = ({ assets, risk
             className="px-4 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs shadow-md shadow-cyan-950/50 transition-all cursor-pointer flex items-center gap-1.5"
           >
             <Printer className="w-3.5 h-3.5" />
-            <span>Print / Export PDF</span>
+            <span>Print / Save PDF</span>
           </button>
         </div>
       </div>

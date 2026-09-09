@@ -116,7 +116,7 @@ export const ScanModal: React.FC = () => {
               <CheckCircle2 className="w-4 h-4 shrink-0" />
               <span>Discovery scan launched! Real scanners and RiskEngine evaluating target...</span>
             </div>
-            <div className="flex items-center gap-2 pt-1 font-mono">
+            <div className="flex flex-wrap items-center gap-2 pt-1 font-mono">
               <button
                 type="button"
                 onClick={() => {
@@ -125,7 +125,7 @@ export const ScanModal: React.FC = () => {
                 }}
                 className="px-3 py-1.5 rounded-lg bg-emerald-900/60 hover:bg-emerald-800 text-emerald-200 font-semibold transition-colors cursor-pointer"
               >
-                View Asset Inventory →
+                View Inventory →
               </button>
               <button
                 type="button"
@@ -136,6 +136,16 @@ export const ScanModal: React.FC = () => {
                 className="px-3 py-1.5 rounded-lg bg-rose-950/80 hover:bg-rose-900 text-rose-200 border border-rose-800 font-semibold transition-colors cursor-pointer"
               >
                 View Risk Assessment →
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsScanModalOpen(false);
+                  navigate('/reports');
+                }}
+                className="px-3 py-1.5 rounded-lg bg-cyan-950/80 hover:bg-cyan-900 text-cyan-200 border border-cyan-800 font-semibold transition-colors cursor-pointer"
+              >
+                Export CBOM & Reports →
               </button>
             </div>
           </div>

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Filter, ChevronLeft, ChevronRight, Eye, AlertCircle, FileCode, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { Search, Filter, ChevronLeft, ChevronRight, Eye, AlertCircle, FileCode, CheckCircle2, ShieldAlert, ShieldCheck, FileSpreadsheet } from 'lucide-react';
 import { CryptoAsset, QuantumSafety, CryptoPurpose } from '../../types';
 import { StatusBadge } from '../Common/StatusBadge';
 import { ConfidenceBadge } from '../Common/ConfidenceBadge';
@@ -129,7 +129,23 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, loading, onRefre
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-800/80 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 text-xs font-mono font-semibold transition-colors cursor-pointer"
           >
             <ShieldAlert className="w-3.5 h-3.5" />
-            View Risk Assessment
+            <span>View Risk Assessment</span>
+          </button>
+
+          <button
+            onClick={() => navigate('/recommendations')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-cyan-800/80 bg-cyan-950/40 hover:bg-cyan-900/60 text-cyan-300 text-xs font-mono font-semibold transition-colors cursor-pointer"
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
+            <span>PQC Recommendations</span>
+          </button>
+
+          <button
+            onClick={() => navigate('/reports')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-mono font-semibold transition-colors cursor-pointer"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Export CBOM</span>
           </button>
         </div>
       </div>

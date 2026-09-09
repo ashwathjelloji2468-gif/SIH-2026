@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useProject } from '../context/ProjectContext';
 import { migrationService } from '../services/migrationService';
 import { MigrationPlan } from '../types';
@@ -7,9 +8,10 @@ import { TaskTimeline } from '../components/Migration/TaskTimeline';
 import { MigrationWizard } from '../components/Migration/MigrationWizard';
 import { ScrollNavControl } from '../components/Migration/ScrollNavControl';
 import { Lock3D } from '../components/Three/Lock3D';
-import { GitFork, Layers, RefreshCw, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { GitFork, Layers, RefreshCw, CheckCircle2, ShieldCheck, FileSpreadsheet } from 'lucide-react';
 
 export const Migration: React.FC = () => {
+  const navigate = useNavigate();
   const { currentProject } = useProject();
   const [plans, setPlans] = useState<MigrationPlan[]>([]);
   const [selectedPlan, setSelectedPlan] = useState<MigrationPlan | null>(null);
@@ -56,13 +58,17 @@ export const Migration: React.FC = () => {
           <p className="text-xs text-slate-400 leading-relaxed">
             Quantify transition person-days, execute side-by-side AST code transformation simulations from classical RSA/ECDSA to NIST FIPS 203/204 ML-KEM candidates, and run validation.
           </p>
-          <div className="flex items-center gap-3 pt-2 text-xs font-mono">
+          <div className="flex flex-wrap items-center gap-3 pt-2 text-xs font-mono">
             <span className="bg-emerald-950/60 border border-emerald-800/60 text-emerald-300 px-2.5 py-1 rounded-full flex items-center gap-1.5">
               <ShieldCheck className="w-3.5 h-3.5" /> NIST FIPS 203 Ready
             </span>
-            <span className="bg-cyan-950/60 border border-cyan-800/60 text-cyan-300 px-2.5 py-1 rounded-full">
-              Automated Refactoring Active
-            </span>
+            <button
+              onClick={() => navigate('/reports')}
+              className="bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-800/80 text-cyan-300 px-3 py-1 rounded-full flex items-center gap-1.5 transition-colors cursor-pointer font-semibold"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Export CBOM & Reports →</span>
+            </button>
           </div>
         </div>
 
