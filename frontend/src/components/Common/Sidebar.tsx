@@ -46,6 +46,7 @@ export const Sidebar: React.FC = () => {
       title: 'Governance & Compliance',
       items: [
         { name: 'CBOM & Reports', path: '/reports', icon: FileSpreadsheet },
+        { name: 'Business Criticality Factors', path: '/business-criticality', icon: Sliders },
         { name: 'Telemetry & Audit', path: '/settings', icon: Sliders },
       ],
     },
