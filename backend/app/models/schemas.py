@@ -153,11 +153,10 @@ class CryptoAssetResponse(BaseModel):
     is_unknown: bool = False
     unknown_reason: Optional[str] = None
     review_status: ReviewStatus = ReviewStatus.RESOLVED
-    created_at: datetime
-    data_lifetime_years: Optional[float] = 10.0
-    lifetime_label: Optional[str] = "LONG_TERM"
-    business_criticality_label: Optional[str] = "HIGH"
-    business_criticality_score: Optional[float] = 75.0
+    data_lifetime_years: Optional[float] = None
+    lifetime_label: Optional[str] = None
+    business_criticality_label: Optional[str] = None
+    business_criticality_score: Optional[float] = None
     classification_summary: Optional[str] = None
     evidence_items: List[EvidenceResponse] = []
 

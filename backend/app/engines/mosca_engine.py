@@ -81,8 +81,7 @@ class MoscaEngine:
 
         # 3. Layer 3 & 4: Z Engine Evaluation
         z_result = self.z_engine.evaluate_component(component, quantum_horizon=quantum_horizon)
-        z_val = z_result.get("z_value") if z_result.get("status") != "NO_IMMEDIATE_QUANTUM_DEADLINE" else None
-        z_horizon = z_result.get("z_planning_horizon_years") or z_val
+        z_val = z_result.get("z_value")
 
         # 4. Layer 5: Mosca Calculation M_i = X + Y - Z_i
         mosca_score: Optional[float] = None

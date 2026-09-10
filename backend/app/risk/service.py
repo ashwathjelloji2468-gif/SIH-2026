@@ -271,7 +271,9 @@ class RiskService:
             "algorithm_name": asset.algorithm_name if asset else "UNKNOWN",
             "key_size": getattr(asset, "key_size", None),
             "location": asset.location if asset else "",
-            "purpose": asset.purpose.value if asset and hasattr(asset.purpose, "value") else str(getattr(asset, "purpose", "")) if asset else ""
+            "purpose": asset.purpose.value if asset and hasattr(asset.purpose, "value") else str(getattr(asset, "purpose", "")) if asset else "",
+            "execution_environment": getattr(asset, "execution_environment", None) if asset else None,
+            "cryptoRefArray": getattr(asset, "cryptoRefArray", None) or getattr(asset, "dependencies", None) if asset else None,
         }
         project = getattr(asset, "project", None) if asset else None
         

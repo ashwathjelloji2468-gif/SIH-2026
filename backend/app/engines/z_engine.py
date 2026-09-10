@@ -337,6 +337,9 @@ class ZEngine:
                 "algorithm_name": getattr(asset, "algorithm_name", ""),
                 "key_size": getattr(asset, "key_size", None),
                 "location": getattr(asset, "location", ""),
+                "purpose": getattr(asset, "purpose", ""),
+                "execution_environment": getattr(asset, "execution_environment", None) or getattr(asset, "environment", None),
+                "cryptoRefArray": getattr(asset, "cryptoRefArray", None) or getattr(asset, "dependencies", None),
                 "asset_type": str(getattr(asset, "asset_type", ""))
             }
         elif isinstance(asset, dict):
