@@ -130,6 +130,8 @@ export interface CryptoAsset {
   created_at: string;
   evidence_items?: Evidence[];
   data_lifetime_years?: number | null;
+  migration_time_years?: number | null;
+  quantum_threat_horizon?: number | null;
   lifetime_label?: string | null;
   business_criticality_label?: string | null;
   business_criticality_score?: number | null;

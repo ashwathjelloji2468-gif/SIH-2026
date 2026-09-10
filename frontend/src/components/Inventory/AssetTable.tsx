@@ -158,17 +158,20 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, loading, onRefre
               <tr className="border-b border-slate-800 text-slate-400 uppercase tracking-wider text-[11px]">
                 <th className="py-3 px-4">Algorithm / Asset</th>
                 <th className="py-3 px-4">Type</th>
-                <th className="py-3 px-4">Lifetime (X)</th>
+                <th className="py-3 px-4">Data Lifetime (X)</th>
+                <th className="py-3 px-4">Migration Time (Y)</th>
+                <th className="py-3 px-4">Threat Horizon (Z)</th>
                 <th className="py-3 px-4">Business Criticality</th>
                 <th className="py-3 px-4">Purpose</th>
                 <th className="py-3 px-4">Source Location</th>
+                <th className="py-3 px-4">Confidence</th>
                 <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60 font-mono">
               {paginatedAssets.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-500 font-sans">
+                  <td colSpan={10} className="py-12 text-center text-slate-500 font-sans">
                     No cryptographic assets match the selected criteria.
                   </td>
                 </tr>
@@ -180,6 +183,8 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, loading, onRefre
 
                   const lifetimeYr = asset.data_lifetime_years ?? (asset.algorithm_name?.includes('RSA') || asset.algorithm_name?.includes('ECDSA') ? 10 : 7);
                   const lifetimeLbl = asset.lifetime_label || (lifetimeYr >= 10 ? 'LONG_TERM' : 'MEDIUM_TERM');
+                  const migrationYr = asset.migration_time_years ?? 3;
+                  const threatZ = asset.quantum_threat_horizon ?? 2033;
                   const critLbl = asset.business_criticality_label || (asset.quantum_safety === 'VULNERABLE' ? 'HIGH' : 'MEDIUM');
 
                   return (
@@ -219,7 +224,21 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, loading, onRefre
                       {/* Lifetime X */}
                       <td className="py-3 px-4">
                         <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-cyan-950/60 border border-cyan-800/60 text-cyan-200">
-                          {lifetimeLbl} ({lifetimeYr}y)
+                          {lifetimeYr}y ({lifetimeLbl})
+                        </span>
+                      </td>
+
+                      {/* Migration Y */}
+                      <td className="py-3 px-4">
+                        <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-amber-950/60 border border-amber-800/60 text-amber-200">
+                          {migrationYr}y
+                        </span>
+                      </td>
+
+                      {/* Horizon Z */}
+                      <td className="py-3 px-4">
+                        <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-purple-950/60 border border-purple-800/60 text-purple-200">
+                          {threatZ}
                         </span>
                       </td>
 

@@ -259,6 +259,35 @@ export const AssetDetailDrawer: React.FC<AssetDetailDrawerProps> = ({ asset, onC
                 </div>
               </div>
 
+              {/* MOSCA TRIAD (X, Y, Z) */}
+              <div className="rounded-2xl border border-cyan-500/30 bg-[#0F172A] p-5 sm:col-span-2 space-y-3 shadow-lg">
+                <div className="flex items-center justify-between">
+                  <div className="text-[10px] uppercase tracking-wider font-mono text-cyan-400 font-bold">
+                    MOSCA THEOREM PARAMETERS (X, Y, Z)
+                  </div>
+                  <span className="text-[11px] font-mono text-slate-400">
+                    Equation: X + Y &gt; Z - 2026
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div className="p-3 rounded-xl bg-cyan-950/40 border border-cyan-800/50">
+                    <div className="text-[10px] font-mono text-cyan-400 uppercase font-bold">X (Data Lifetime)</div>
+                    <div className="text-xl font-bold font-mono text-cyan-200 mt-1">{asset.data_lifetime_years ?? 10}y</div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">{asset.lifetime_label || 'LONG_TERM'}</div>
+                  </div>
+                  <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-800/50">
+                    <div className="text-[10px] font-mono text-amber-400 uppercase font-bold">Y (Migration Time)</div>
+                    <div className="text-xl font-bold font-mono text-amber-200 mt-1">{asset.migration_time_years ?? 3}y</div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">Execution Time</div>
+                  </div>
+                  <div className="p-3 rounded-xl bg-purple-950/40 border border-purple-800/50">
+                    <div className="text-[10px] font-mono text-purple-400 uppercase font-bold">Z (Threat Horizon)</div>
+                    <div className="text-xl font-bold font-mono text-purple-200 mt-1">{asset.quantum_threat_horizon ?? 2033}</div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">CRQC Estimate</div>
+                  </div>
+                </div>
+              </div>
+
               {/* WHY */}
               <div className="rounded-2xl border border-rose-500/30 bg-[#1E293B] p-5 sm:col-span-2 space-y-3 shadow-lg hover:-translate-y-1 hover:border-rose-500/50 transition-all">
                 <div className="flex items-center justify-between">

@@ -158,6 +158,8 @@ class CryptoAssetResponse(BaseModel):
     business_criticality_label: Optional[str] = None
     business_criticality_score: Optional[float] = None
     classification_summary: Optional[str] = None
+    migration_time_years: Optional[float] = 3.0
+    quantum_threat_horizon: Optional[int] = 2033
     evidence_items: List[EvidenceResponse] = []
 
     model_config = ConfigDict(from_attributes=True)

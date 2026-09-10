@@ -119,6 +119,21 @@ class CryptoAsset(Base):
     def classification_summary(self) -> str:
         return self.classification["classification_summary"]
 
+    @property
+    def migration_time_years(self) -> float:
+        alg_upper = (self.algorithm_name or "").upper()
+        if any(k in alg_upper for k in ["RSA", "ECDSA", "DSA"]):
+            return 3.0
+        elif any(k in alg_upper for k in ["AES", "CHACHA"]):
+            return 1.5
+        elif self.asset_type and str(getattr(self.asset_type, "value", self.asset_type)) in ["VENDOR_MANAGED", "BINARY"]:
+            return 5.0
+        return 2.0
+
+    @property
+    def quantum_threat_horizon(self) -> int:
+        return 2033
+
 class Evidence(Base):
     __tablename__ = "evidence"
 
