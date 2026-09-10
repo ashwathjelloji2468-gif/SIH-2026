@@ -45,6 +45,15 @@ export interface HealthResponse {
   timestamp: string;
 }
 
+// Project Business Context
+export interface BusinessContextInput {
+  data_sensitivity: number;
+  operational_criticality: number;
+  operational_cost: number;
+  regulatory_impact: number;
+  business_dependency: number;
+}
+
 // Project
 export interface Project {
   id: string;
@@ -54,6 +63,7 @@ export interface Project {
   user_x_years?: number | null;
   user_domain?: string | null;
   user_y_scenario?: string | null;
+  business_context?: BusinessContextInput | null;
   created_at: string;
   updated_at: string;
 }
@@ -65,6 +75,7 @@ export interface ProjectCreateInput {
   user_x_years?: number;
   user_domain?: string;
   user_y_scenario?: string;
+  business_context?: BusinessContextInput;
 }
 
 // Scan

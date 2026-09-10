@@ -22,6 +22,7 @@ class ProjectBase(BaseModel):
     user_x_years: Optional[int] = None
     user_domain: Optional[str] = None
     user_y_scenario: Optional[str] = None
+    business_context: Optional[Dict[str, Any]] = None
 
 class ProjectCreate(ProjectBase):
     pass
@@ -34,6 +35,7 @@ class ProjectUpdate(BaseModel):
     user_domain: Optional[str] = None
     user_y_scenario: Optional[str] = None
     folder_contexts: Optional[Dict[str, Any]] = None
+    business_context: Optional[Dict[str, Any]] = None
 
 class ProjectResponse(ProjectBase):
     id: str
@@ -41,6 +43,7 @@ class ProjectResponse(ProjectBase):
     user_domain: Optional[str] = None
     user_y_scenario: Optional[str] = None
     folder_contexts: Optional[Dict[str, Any]] = None
+    business_context: Optional[Dict[str, Any]] = None
     created_at: datetime
     updated_at: datetime
 

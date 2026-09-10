@@ -26,6 +26,7 @@ class Project(Base):
     user_domain = Column(String, nullable=True)
     user_y_scenario = Column(String, nullable=True)
     folder_contexts = Column(JSON, nullable=True)
+    business_context = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 

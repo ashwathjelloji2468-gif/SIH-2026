@@ -12,6 +12,14 @@ export const Project: React.FC = () => {
   const [repoUrl, setRepoUrl] = useState('');
   const [userXYears, setUserXYears] = useState<number | ''>('');
   const [userYScenario, setUserYScenario] = useState<string>('STANDARD');
+
+  // Business Context 1-5 Parameters (Default 3)
+  const [dataSensitivity, setDataSensitivity] = useState<number>(3);
+  const [operationalCriticality, setOperationalCriticality] = useState<number>(3);
+  const [operationalCost, setOperationalCost] = useState<number>(3);
+  const [regulatoryImpact, setRegulatoryImpact] = useState<number>(3);
+  const [businessDependency, setBusinessDependency] = useState<number>(3);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,6 +34,13 @@ export const Project: React.FC = () => {
         repository_url: repoUrl || undefined,
         user_x_years: userXYears !== '' ? Number(userXYears) : undefined,
         user_y_scenario: userYScenario || undefined,
+        business_context: {
+          data_sensitivity: Number(dataSensitivity),
+          operational_criticality: Number(operationalCriticality),
+          operational_cost: Number(operationalCost),
+          regulatory_impact: Number(regulatoryImpact),
+          business_dependency: Number(businessDependency),
+        },
       });
       await refreshProjects();
       setCurrentProject(created);
@@ -35,6 +50,11 @@ export const Project: React.FC = () => {
       setRepoUrl('');
       setUserXYears('');
       setUserYScenario('STANDARD');
+      setDataSensitivity(3);
+      setOperationalCriticality(3);
+      setOperationalCost(3);
+      setRegulatoryImpact(3);
+      setBusinessDependency(3);
     } catch (err: any) {
       setError(err.message || 'Failed to create project.');
     } finally {
@@ -145,7 +165,7 @@ export const Project: React.FC = () => {
       {/* Ingest Repository Modal */}
       {createModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-[#0B0F19] p-6 shadow-2xl">
+          <div className="w-full max-w-lg rounded-2xl border border-slate-800 bg-[#0B0F19] p-6 shadow-2xl max-h-[90vh] overflow-y-auto space-y-4">
             <h3 className="text-base font-bold font-mono text-slate-100 mb-1">Ingest New Project</h3>
             <p className="text-xs text-slate-400 mb-4">Register a git repository or local codebase target</p>
 
@@ -219,6 +239,85 @@ export const Project: React.FC = () => {
                     <option value="COMPLEX">COMPLEX (15y Refactor)</option>
                     <option value="LEGACY_HEAVY">LEGACY_HEAVY (20y)</option>
                   </select>
+                </div>
+              </div>
+
+              {/* BUSINESS IMPACT CONTEXT Section */}
+              <div className="pt-3 border-t border-slate-800 space-y-3">
+                <div>
+                  <h4 className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">
+                    BUSINESS IMPACT CONTEXT
+                  </h4>
+                  <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                    Rate the business impact of this application from 1 (lowest) to 5 (highest).
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  {[
+                    {
+                      label: 'Data Sensitivity',
+                      value: dataSensitivity,
+                      setValue: setDataSensitivity,
+                      minDesc: 'Public',
+                      maxDesc: 'Highly sensitive',
+                    },
+                    {
+                      label: 'Operational Criticality',
+                      value: operationalCriticality,
+                      setValue: setOperationalCriticality,
+                      minDesc: 'Non-critical',
+                      maxDesc: 'Mission-critical',
+                    },
+                    {
+                      label: 'Operational Cost of Failure',
+                      value: operationalCost,
+                      setValue: setOperationalCost,
+                      minDesc: 'Minimal',
+                      maxDesc: 'Severe',
+                    },
+                    {
+                      label: 'Regulatory Impact',
+                      value: regulatoryImpact,
+                      setValue: setRegulatoryImpact,
+                      minDesc: 'None',
+                      maxDesc: 'Major',
+                    },
+                    {
+                      label: 'Business Dependency',
+                      value: businessDependency,
+                      setValue: setBusinessDependency,
+                      minDesc: 'Few/no dependencies',
+                      maxDesc: 'Core business function',
+                    },
+                  ].map((param, idx) => (
+                    <div key={idx} className="space-y-1 bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/80">
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="font-mono text-slate-200 font-medium">{param.label}</span>
+                        <span className="font-mono text-cyan-400 font-bold text-[11px]">{param.value} / 5</span>
+                      </div>
+                      <div className="grid grid-cols-5 gap-1 pt-0.5">
+                        {[1, 2, 3, 4, 5].map((val) => (
+                          <button
+                            key={val}
+                            type="button"
+                            onClick={() => param.setValue(val)}
+                            className={`py-1 rounded text-xs font-mono font-semibold transition-all cursor-pointer ${
+                              param.value === val
+                                ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-950/50'
+                                : 'bg-slate-950 text-slate-400 border border-slate-800 hover:border-slate-700 hover:text-slate-200'
+                            }`}
+                          >
+                            {val}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex justify-between text-[10px] font-mono text-slate-500 pt-0.5">
+                        <span>1 = {param.minDesc}</span>
+                        <span>5 = {param.maxDesc}</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
