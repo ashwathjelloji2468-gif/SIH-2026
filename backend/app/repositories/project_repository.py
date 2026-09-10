@@ -9,9 +9,12 @@ class ProjectRepository:
 
     def create(self, obj_in: ProjectCreate) -> Project:
         db_obj = Project(
-            name=obj_in.name,
-            description=obj_in.description,
-            repository_url=obj_in.repository_url
+            name=getattr(obj_in, "name", ""),
+            description=getattr(obj_in, "description", None),
+            repository_url=getattr(obj_in, "repository_url", None),
+            user_x_years=getattr(obj_in, "user_x_years", None),
+            user_domain=getattr(obj_in, "user_domain", None),
+            user_y_scenario=getattr(obj_in, "user_y_scenario", None)
         )
         self.db.add(db_obj)
         self.db.commit()

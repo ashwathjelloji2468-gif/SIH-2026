@@ -10,6 +10,8 @@ export const Project: React.FC = () => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [repoUrl, setRepoUrl] = useState('');
+  const [userXYears, setUserXYears] = useState<number | ''>('');
+  const [userYScenario, setUserYScenario] = useState<string>('STANDARD');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,6 +24,8 @@ export const Project: React.FC = () => {
         name,
         description,
         repository_url: repoUrl || undefined,
+        user_x_years: userXYears !== '' ? Number(userXYears) : undefined,
+        user_y_scenario: userYScenario || undefined,
       });
       await refreshProjects();
       setCurrentProject(created);
@@ -29,6 +33,8 @@ export const Project: React.FC = () => {
       setName('');
       setDescription('');
       setRepoUrl('');
+      setUserXYears('');
+      setUserYScenario('STANDARD');
     } catch (err: any) {
       setError(err.message || 'Failed to create project.');
     } finally {
@@ -183,6 +189,37 @@ export const Project: React.FC = () => {
                   className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-200 text-xs font-mono focus:outline-none focus:border-cyan-500"
                   placeholder="https://github.com/org/repo.git"
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">Confidentiality Lifetime (X)</label>
+                  <select
+                    value={userXYears}
+                    onChange={(e) => setUserXYears(e.target.value ? Number(e.target.value) : '')}
+                    className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-200 text-xs font-mono focus:outline-none focus:border-cyan-500"
+                  >
+                    <option value="">Auto / Conservative (20y)</option>
+                    <option value="20">20 years (Long-term data)</option>
+                    <option value="15">15 years (Banking / Financial)</option>
+                    <option value="10">10 years (Standard Enterprise)</option>
+                    <option value="5">5 years (Short-lived data)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">Migration Effort (Y)</label>
+                  <select
+                    value={userYScenario}
+                    onChange={(e) => setUserYScenario(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-200 text-xs font-mono focus:outline-none focus:border-cyan-500"
+                  >
+                    <option value="STANDARD">STANDARD (10y)</option>
+                    <option value="FAST">FAST (5y Accelerated)</option>
+                    <option value="COMPLEX">COMPLEX (15y Refactor)</option>
+                    <option value="LEGACY_HEAVY">LEGACY_HEAVY (20y)</option>
+                  </select>
+                </div>
               </div>
 
               <div className="pt-3 flex justify-end gap-3 border-t border-slate-800">

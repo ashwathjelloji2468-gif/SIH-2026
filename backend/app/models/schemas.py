@@ -19,6 +19,9 @@ class ProjectBase(BaseModel):
     name: str = Field(..., json_schema_extra={"example": "Enterprise Payments Service"})
     description: Optional[str] = Field(None, json_schema_extra={"example": "Core transaction processing backend"})
     repository_url: Optional[str] = Field(None, json_schema_extra={"example": "https://github.com/org/repo.git"})
+    user_x_years: Optional[int] = None
+    user_domain: Optional[str] = None
+    user_y_scenario: Optional[str] = None
 
 class ProjectCreate(ProjectBase):
     pass

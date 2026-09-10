@@ -51,6 +51,9 @@ export interface Project {
   name: string;
   description?: string | null;
   repository_url?: string | null;
+  user_x_years?: number | null;
+  user_domain?: string | null;
+  user_y_scenario?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -59,6 +62,9 @@ export interface ProjectCreateInput {
   name: string;
   description?: string;
   repository_url?: string;
+  user_x_years?: number;
+  user_domain?: string;
+  user_y_scenario?: string;
 }
 
 // Scan
@@ -191,6 +197,34 @@ export interface RiskAssessment {
   confidence_score: number;
   risk_model_version?: string;
   created_at?: string;
+  x?: {
+    value: number;
+    unit?: string;
+    source?: string;
+    explanation?: string;
+  };
+  y?: {
+    value: number;
+    unit?: string;
+    scenario?: string;
+    explanation?: string;
+  };
+  z?: {
+    z_score?: number;
+    z_planning_horizon_years?: number;
+    z_target_year?: number;
+    z_value?: number;
+    quantum_class?: string;
+    status?: string;
+    base_score?: number;
+    env_multiplier?: number;
+    dep_factor?: number;
+    explanation?: string;
+  };
+  z_score?: number;
+  z_planning_horizon_years?: number;
+  mosca_score?: number;
+  technical_urgency?: string;
   factors?: {
     quantum_exposure?: number;
     data_sensitivity?: number;
@@ -203,6 +237,11 @@ export interface RiskAssessment {
     mosca_status?: string;
     quantum_threat_horizon?: number;
     rationale?: string;
+    mosca_score?: number;
+    x_years?: number;
+    y_years?: number;
+    z_horizon_years?: number;
+    z_score?: number;
     x?: number;
     y?: number;
     z?: number;

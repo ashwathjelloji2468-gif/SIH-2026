@@ -105,6 +105,47 @@ export const AssetRiskDetailModal: React.FC<AssetRiskDetailModalProps> = ({
           </div>
         </div>
 
+        {/* Mosca Theorem Equation Breakdown ($M_i = X + Y - Z_i$) */}
+        <div className="p-4 rounded-xl border border-cyan-900/60 bg-gradient-to-br from-[#06080F] via-[#0B0F19] to-[#06080F] space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-mono font-bold text-cyan-300 uppercase tracking-wider flex items-center gap-2">
+              <Clock className="w-4 h-4 text-cyan-400" />
+              Mosca Theorem Risk Analysis ($M_i = X + Y - Z_i$)
+            </span>
+            {assessment?.mosca_score !== undefined && assessment.mosca_score !== null && (
+              <span className={`px-2.5 py-0.5 rounded text-xs font-mono font-bold border ${assessment.mosca_score > 0 ? 'bg-rose-950 border-rose-700 text-rose-300' : 'bg-emerald-950 border-emerald-700 text-emerald-300'}`}>
+                $M_i$ = {assessment.mosca_score > 0 ? `+${assessment.mosca_score}` : assessment.mosca_score} years
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs font-mono">
+            <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 space-y-1">
+              <span className="text-slate-400 text-[10px] uppercase block">Lifetime ($X$)</span>
+              <span className="text-cyan-300 text-sm font-bold">{assessment?.x?.value ?? assessment?.mosca?.x_years ?? 20} years</span>
+              <span className="text-[10px] text-slate-500 block truncate">{assessment?.x?.source || 'Confidentiality'}</span>
+            </div>
+
+            <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 space-y-1">
+              <span className="text-slate-400 text-[10px] uppercase block">Migration ($Y$)</span>
+              <span className="text-cyan-300 text-sm font-bold">{assessment?.y?.value ?? assessment?.mosca?.y_years ?? 10} years</span>
+              <span className="text-[10px] text-slate-500 block truncate">{assessment?.y?.scenario || 'STANDARD'}</span>
+            </div>
+
+            <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 space-y-1">
+              <span className="text-slate-400 text-[10px] uppercase block">Threat Horizon ($Z_i$)</span>
+              <span className="text-amber-300 text-sm font-bold">{assessment?.z?.z_planning_horizon_years ?? assessment?.z_planning_horizon_years ?? assessment?.mosca?.z_horizon_years ?? 15} years</span>
+              <span className="text-[10px] text-slate-500 block truncate">Target: {assessment?.z?.z_target_year || assessment?.mosca?.quantum_threat_horizon || 2041}</span>
+            </div>
+
+            <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 space-y-1">
+              <span className="text-slate-400 text-[10px] uppercase block">Relative $Z$ Score</span>
+              <span className="text-rose-300 text-sm font-bold">{assessment?.z?.z_score ?? assessment?.z_score ?? assessment?.mosca?.z_score ?? 5.00}</span>
+              <span className="text-[10px] text-slate-500 block truncate">Base: {assessment?.z?.base_score ?? 5} | Env: {assessment?.z?.env_multiplier ?? 1}</span>
+            </div>
+          </div>
+        </div>
+
         {/* Real Contributing Risk Factors */}
         <div className="space-y-3">
           <h3 className="text-sm font-semibold text-slate-200 font-mono flex items-center gap-2">

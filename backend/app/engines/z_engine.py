@@ -19,6 +19,7 @@ Distinguishes:
 """
 
 from typing import Dict, Any, List, Optional, Tuple, Union
+from app.config.mosca_config import map_z_score_to_horizon, Z_SCORE_LOOKUP_TABLE
 
 DEFAULT_QUANTUM_HORIZON = 10  # T_Q = 10 years (relative horizon ~2036 for 2026)
 CURRENT_YEAR = 2026
@@ -46,6 +47,58 @@ class ZEngine:
     def __init__(self, default_horizon: int = DEFAULT_QUANTUM_HORIZON):
         self.default_horizon = default_horizon
 
+    def _calculate_base_score(
+        self,
+        primitive: str,
+        algorithm_name: str,
+        purpose: str = "",
+        asset_type: str = ""
+    ) -> float:
+        text = f"{primitive} {algorithm_name} {purpose} {asset_type}".upper().strip()
+
+        # Signature -> 4
+        sig_keywords = ["SIGNATURE", "SIG", "ECDSA", "ED25519", "SLH-DSA", "ML-DSA", "DILITHIUM", "FALCON", "SPHINCS", "DSA"]
+        if any(kw in text for kw in sig_keywords) or "SIGN" in text:
+            return 4.0
+
+        # Key Exchange / Asymmetric / Certificate / Public Key -> 5
+        key_keywords = [
+            "RSA", "ECC", "ECDH", "DH", "DIFFIE", "X25519", "KEY_EXCHANGE", "KEY_ESTABLISHMENT",
+            "ASYMMETRIC", "CERTIFICATE", "CERT", "X509", "PUBLIC_KEY", "ML-KEM", "KYBER", "PQC"
+        ]
+        if any(kw in text for kw in key_keywords):
+            return 5.0
+
+        # Hash / Symmetric -> 1
+        sym_keywords = [
+            "AES", "SHA", "DES", "3DES", "CHACHA", "SALSA", "BLOWFISH", "HMAC", "MD5",
+            "HASH", "SYMMETRIC", "CIPHER"
+        ]
+        if any(kw in text for kw in sym_keywords):
+            return 1.0
+
+        return 1.0
+
+    def _calculate_env_multiplier(
+        self,
+        execution_environment: str = "",
+        location: str = ""
+    ) -> float:
+        text = f"{execution_environment} {location}".upper().strip()
+        if any(kw in text for kw in ["EMBEDDED", "IOT", "FIRMWARE"]):
+            return 4.0
+        if any(kw in text for kw in ["HARDWARE", "HSM"]):
+            return 3.0
+        if any(kw in text for kw in ["ON_PREM", "ON-PREM", "ONPREM", "SERVER"]):
+            return 2.0
+        # Software / Cloud / Container / Web / App (default 1 with documented assumption)
+        return 1.0
+
+    def _calculate_dep_factor(self, crypto_refs: Optional[List[Any]] = None) -> float:
+        refs = crypto_refs or []
+        count = len(refs) if isinstance(refs, list) else 0
+        return 1.0 + 0.1 * count
+
     def evaluate_component(
         self,
         component: Dict[str, Any],
@@ -56,11 +109,14 @@ class ZEngine:
         Accepts dict with keys: id/component_id, primitive, algorithm_name/algorithm, key_size, output_size, purpose, location, repository_path.
         Returns ZResult dict.
         """
-        t_q = quantum_horizon if quantum_horizon is not None and quantum_horizon > 0 else self.default_horizon
-
         comp_id = str(component.get("id") or component.get("component_id") or component.get("name") or "unknown-component")
         algo_name = str(component.get("algorithm_name") or component.get("algorithm") or component.get("primitive") or "").strip()
         primitive = str(component.get("primitive") or algo_name).strip()
+        purpose = str(component.get("purpose") or "")
+        asset_type = str(component.get("asset_type") or "")
+        exec_env = str(component.get("execution_environment") or component.get("environment") or "")
+        refs = component.get("cryptoRefArray") or component.get("dependencies") or component.get("crypto_ref_array") or []
+
         key_size = component.get("key_size")
         if isinstance(key_size, str) and key_size.isdigit():
             key_size = int(key_size)
@@ -75,8 +131,20 @@ class ZEngine:
 
         location = str(component.get("location") or component.get("repository_path") or "")
 
-        # Perform component-wise classification
-        q_class, status, z_value, c_bits, q_bits, explanation, confidence = self._classify_component(
+        t_q = quantum_horizon if quantum_horizon is not None and quantum_horizon > 0 else self.default_horizon
+
+        base_score = self._calculate_base_score(primitive, algo_name, purpose, asset_type)
+        env_mult = self._calculate_env_multiplier(exec_env, location)
+        dep_factor = self._calculate_dep_factor(refs)
+
+        z_score = base_score * env_mult * dep_factor
+        mapped_horizon_years, mapped_target_year = map_z_score_to_horizon(z_score)
+
+        z_planning_horizon_years = mapped_horizon_years
+        z_target_year = CURRENT_YEAR + z_planning_horizon_years
+
+        # Perform component-wise classification using t_q
+        q_class, status, raw_z_value, c_bits, q_bits, explanation, confidence = self._classify_component(
             primitive=primitive,
             algorithm_name=algo_name,
             key_size=key_size,
@@ -84,26 +152,34 @@ class ZEngine:
             t_q=t_q
         )
 
+        z_value = raw_z_value
+
         return {
             "component_id": comp_id,
             "primitive": primitive or algo_name or "UNKNOWN",
             "algorithm": algo_name or primitive or "UNKNOWN",
             "key_size": key_size,
             "location": location,
-            "quantum_horizon": t_q,
-            "target_horizon_year": CURRENT_YEAR + t_q,
+            "quantum_horizon": z_planning_horizon_years,
+            "target_horizon_year": z_target_year,
             "quantum_class": q_class,
             "status": status,
             "z_value": z_value,
+            "z_score": round(z_score, 2),
+            "z_planning_horizon_years": z_planning_horizon_years,
+            "z_target_year": z_target_year,
+            "base_score": base_score,
+            "env_multiplier": env_mult,
+            "dep_factor": round(dep_factor, 2),
             "classical_security_bits": c_bits,
             "quantum_security_bits": q_bits,
             "explanation": explanation,
             "confidence": confidence,
             "metadata": {
-                "model": "CONSERVATIVE_CRQC_SCENARIO",
+                "model": "DYNAMIC_Z_SCORE_LOOKUP_MODEL",
                 "current_year": CURRENT_YEAR,
-                "threat_horizon_year": CURRENT_YEAR + t_q,
-                "disclaimer": "Scenario-based risk modelling assumption, not a guaranteed CRQC arrival prediction."
+                "threat_horizon_year": z_target_year,
+                "disclaimer": "Component-wise relative Z score mapped to threat horizon via lookup table."
             }
         }
 

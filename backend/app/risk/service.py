@@ -265,6 +265,24 @@ class RiskService:
         }
 
     def _assessment_to_dict(self, ra, asset, threats) -> Dict[str, Any]:
+        comp_dict = {
+            "id": asset.id if asset else ra.asset_id,
+            "primitive": asset.algorithm_name if asset else "UNKNOWN",
+            "algorithm_name": asset.algorithm_name if asset else "UNKNOWN",
+            "key_size": getattr(asset, "key_size", None),
+            "location": asset.location if asset else "",
+            "purpose": asset.purpose.value if asset and hasattr(asset.purpose, "value") else str(getattr(asset, "purpose", "")) if asset else ""
+        }
+        project = getattr(asset, "project", None) if asset else None
+        
+        from app.engines.mosca_engine import MoscaEngine
+        m_eval = MoscaEngine().evaluate_component_mosca(
+            component=comp_dict,
+            user_x_years=getattr(project, "user_x_years", None) if project else None,
+            user_domain=getattr(project, "user_domain", None) if project else None,
+            user_y_scenario=getattr(project, "user_y_scenario", None) if project else None
+        )
+
         return {
             "id": ra.id,
             "asset_id": ra.asset_id,
@@ -277,6 +295,13 @@ class RiskService:
             "risk_level": ra.risk_level.value if hasattr(ra.risk_level, "value") else str(ra.risk_level),
             "priority": ra.priority or "LOW",
             "confidence_score": ra.confidence_score,
+            "x": m_eval["x"],
+            "y": m_eval["y"],
+            "z": m_eval["z"],
+            "z_score": m_eval["z"].get("z_score"),
+            "z_planning_horizon_years": m_eval["z"].get("z_planning_horizon_years"),
+            "mosca_score": m_eval.get("mosca_score"),
+            "technical_urgency": m_eval.get("technical_urgency"),
             "factors": ra.factors or {
                 "quantum_exposure": ra.quantum_exposure,
                 "data_sensitivity": ra.data_sensitivity_score,
@@ -286,9 +311,14 @@ class RiskService:
                 "mosca_score": ra.mosca_factor_score
             },
             "mosca": {
-                "mosca_status": ra.mosca_status or "UNKNOWN",
-                "quantum_threat_horizon": ra.quantum_threat_horizon or 2033,
-                "rationale": ra.explanation
+                "mosca_status": ra.mosca_status or m_eval.get("urgency", "UNKNOWN"),
+                "quantum_threat_horizon": m_eval["z"].get("z_target_year") or ra.quantum_threat_horizon or 2036,
+                "mosca_score": m_eval.get("mosca_score"),
+                "x_years": m_eval["x"]["value"],
+                "y_years": m_eval["y"]["value"],
+                "z_horizon_years": m_eval["z"].get("z_planning_horizon_years"),
+                "z_score": m_eval["z"].get("z_score"),
+                "rationale": m_eval.get("explanation") or ra.explanation
             },
             "threat_scenarios": [
                 {
