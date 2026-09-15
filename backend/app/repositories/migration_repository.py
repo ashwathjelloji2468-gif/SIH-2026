@@ -14,14 +14,20 @@ class MigrationRepository:
         name: str,
         total_person_days: float = 0.0,
         total_calendar_months: float = 0.0,
-        assumptions: Optional[dict] = None
+        assumptions: Optional[dict] = None,
+        profile: Optional[str] = "BALANCED",
+        effort_level: Optional[str] = "MEDIUM",
+        effort_factors: Optional[list] = None
     ) -> MigrationPlan:
         db_obj = MigrationPlan(
             project_id=project_id,
             name=name,
             total_person_days=total_person_days,
             total_calendar_months=total_calendar_months,
-            assumptions=assumptions or {}
+            assumptions=assumptions or {},
+            profile=profile,
+            effort_level=effort_level,
+            effort_factors=effort_factors or []
         )
         self.db.add(db_obj)
         self.db.commit()

@@ -255,6 +255,7 @@ class ThreatScenarioResponse(ThreatScenarioBase):
 # Migration Plan Schemas
 class MigrationPlanCreate(BaseModel):
     name: str = Field(..., json_schema_extra={"example": "PQC Upgrade Phase 1"})
+    profile: Optional[str] = "BALANCED"
     vendor_dependency_count: Optional[int] = 1
     pki_cert_dependency_count: Optional[int] = 1
     crypto_agility_score: Optional[float] = 0.6
@@ -289,6 +290,9 @@ class MigrationPlanResponse(BaseModel):
     id: str
     project_id: str
     name: str
+    profile: str = "BALANCED"
+    effort_level: str = "MEDIUM"
+    effort_factors: List[str] = []
     total_person_days: float
     total_calendar_months: float
     assumptions: Optional[Dict[str, Any]] = None

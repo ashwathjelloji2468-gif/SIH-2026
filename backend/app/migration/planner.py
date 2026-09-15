@@ -290,14 +290,33 @@ class MigrationPlanner:
         pki_cert_dependency_count: int = 1,
         crypto_agility_score: float = 0.6,
         testing_requirement_level: TestingRequirement = TestingRequirement.HIGH,
-        engineering_capacity_developers: int = 3
+        engineering_capacity_developers: int = 3,
+        profile: Optional[str] = None
     ) -> MigrationPlan:
 
         repo = MigrationRepository(db)
         impact_analyzer = ImpactAnalyzer()
 
+        # Resolve Migration Profile
+        resolved_profile = "BALANCED"
+        if profile:
+            raw_prof = str(profile).upper()
+            if raw_prof in ["LOW_LATENCY", "BALANCED", "SECURITY_FIRST"]:
+                resolved_profile = raw_prof
+        else:
+            # Check project default profile
+            from app.models.db_models import Project
+            prj = db.query(Project).filter(Project.id == project_id).first()
+            if prj and prj.default_migration_profile:
+                resolved_profile = prj.default_migration_profile
+
         # 1. Prebuild graph ONCE for all project assets
         project_graph = build_project_graph(assets) if assets else None
+
+        # Calculate blast radius affected nodes count across assets
+        blast_affected_nodes = 0
+        if project_graph:
+            blast_affected_nodes = len(project_graph.nodes)
 
         # 2. Bulk fetch latest RiskAssessments and Recommendations
         ra_map = {}
@@ -337,25 +356,29 @@ class MigrationPlanner:
         except Exception:
             pass
 
+        # Calculate distinct file locations
+        distinct_files = len(set(a.location for a in assets if getattr(a, "location", None)))
+
         effort = estimate_migration_effort(
             affected_assets_count=len(assets),
-            affected_apps_count=1,
-            dependency_count=len(assets) // 2,
+            affected_files_count=distinct_files,
+            blast_radius_affected_nodes=blast_affected_nodes,
             vendor_dependency_count=vendor_dependency_count,
             pki_cert_dependency_count=pki_cert_dependency_count,
-            crypto_agility_score=crypto_agility_score,
             testing_requirement_level=testing_requirement_level,
             business_criticality_score=eff_crit_score,
             engineering_capacity_developers=engineering_capacity_developers
         )
-
 
         plan = repo.create_plan(
             project_id=project_id,
             name=plan_name,
             total_person_days=effort["person_days"],
             total_calendar_months=effort["calendar_months"],
-            assumptions=effort["assumptions"]
+            assumptions=effort["assumptions"],
+            profile=resolved_profile,
+            effort_level=effort["effort_level"],
+            effort_factors=effort.get("factors", [])
         )
 
         # 3. Bulk persist tasks in a single batch insert & commit

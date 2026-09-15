@@ -180,3 +180,14 @@ class ValidationCheckStatus(str, Enum):
     NOT_CONFIGURED = "NOT_CONFIGURED"
     NOT_SUPPORTED = "NOT_SUPPORTED"
     ERROR = "ERROR"
+
+class MigrationProfile(str, Enum):
+    LOW_LATENCY = "LOW_LATENCY"
+    BALANCED = "BALANCED"
+    SECURITY_FIRST = "SECURITY_FIRST"
+
+class MigrationEffortLevel(str, Enum):
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+

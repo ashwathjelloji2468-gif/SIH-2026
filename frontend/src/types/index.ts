@@ -52,12 +52,16 @@ export interface BusinessContextInput {
   business_dependency: number;
 }
 
+export type MigrationProfile = 'LOW_LATENCY' | 'BALANCED' | 'SECURITY_FIRST';
+export type MigrationEffortLevel = 'LOW' | 'MEDIUM' | 'HIGH';
+
 // Project
 export interface Project {
   id: string;
   name: string;
   description?: string | null;
   repository_url?: string | null;
+  default_migration_profile?: MigrationProfile | string | null;
   user_x_years?: number | null;
   user_domain?: string | null;
   user_y_scenario?: string | null;
@@ -70,6 +74,7 @@ export interface ProjectCreateInput {
   name: string;
   description?: string;
   repository_url?: string;
+  default_migration_profile?: MigrationProfile | string;
   user_x_years?: number;
   user_domain?: string;
   user_y_scenario?: string;
@@ -362,6 +367,9 @@ export interface MigrationPlan {
   id: string;
   project_id: string;
   name: string;
+  profile?: MigrationProfile | string;
+  effort_level?: MigrationEffortLevel | string;
+  effort_factors?: string[];
   total_person_days: number;
   total_calendar_months: number;
   assumptions?: Record<string, any> | null;
@@ -371,6 +379,7 @@ export interface MigrationPlan {
 
 export interface MigrationPlanCreateInput {
   name: string;
+  profile?: MigrationProfile | string;
   vendor_dependency_count?: number;
   pki_cert_dependency_count?: number;
   crypto_agility_score?: number;

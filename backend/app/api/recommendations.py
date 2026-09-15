@@ -11,10 +11,10 @@ from app.knowledge.standard_registry import STANDARD_REGISTRY
 router = APIRouter(tags=["Recommendations"])
 
 @router.get("/assets/{asset_id}/recommendations", response_model=List[Dict[str, Any]])
-def get_asset_recommendations(asset_id: str, db: Session = Depends(get_db)):
+def get_asset_recommendations(asset_id: str, profile: Optional[str] = Query(None), db: Session = Depends(get_db)):
     service = RecommendationService(db)
     try:
-        rec = service.recommend_asset(asset_id)
+        rec = service.recommend_asset(asset_id, profile=profile)
         return [rec]
     except Exception:
         asset_repo = AssetRepository(db)
@@ -22,13 +22,13 @@ def get_asset_recommendations(asset_id: str, db: Session = Depends(get_db)):
         if not asset:
             raise HTTPException(status_code=404, detail="Asset not found")
         engine = RecommendationEngine()
-        return engine.evaluate_recommendations(asset)
+        return engine.evaluate_recommendations(asset, profile=profile)
 
 @router.post("/assets/{asset_id}/recommendations/evaluate")
-def evaluate_asset_recommendation(asset_id: str, db: Session = Depends(get_db)):
+def evaluate_asset_recommendation(asset_id: str, profile: Optional[str] = Query(None), db: Session = Depends(get_db)):
     service = RecommendationService(db)
     try:
-        rec = service.recommend_asset(asset_id, force_regeneration=True)
+        rec = service.recommend_asset(asset_id, force_regeneration=True, profile=profile)
         return {"asset_id": asset_id, "recommendations": [rec]}
     except Exception:
         asset_repo = AssetRepository(db)
@@ -36,25 +36,25 @@ def evaluate_asset_recommendation(asset_id: str, db: Session = Depends(get_db)):
         if not asset:
             raise HTTPException(status_code=404, detail="Asset not found")
         engine = RecommendationEngine()
-        return {"asset_id": asset_id, "recommendations": engine.evaluate_recommendations(asset)}
+        return {"asset_id": asset_id, "recommendations": engine.evaluate_recommendations(asset, profile=profile)}
 
 @router.get("/projects/{project_id}/recommendations", response_model=List[Dict[str, Any]])
-def get_project_recommendations(project_id: str, db: Session = Depends(get_db)):
+def get_project_recommendations(project_id: str, profile: Optional[str] = Query(None), db: Session = Depends(get_db)):
     """Retrieve full real PQC recommendations for all cryptographic assets in a project."""
     service = RecommendationService(db)
-    return service.recommend_project(project_id)
+    return service.recommend_project(project_id, profile=profile)
 
 @router.get("/projects/{project_id}/recommendations/summary")
-def get_project_recommendations_summary(project_id: str, db: Session = Depends(get_db)):
+def get_project_recommendations_summary(project_id: str, profile: Optional[str] = Query(None), db: Session = Depends(get_db)):
     """Retrieve aggregate recommendation metrics and detailed recommendation list for a project."""
     service = RecommendationService(db)
-    return service.get_project_recommendation_summary(project_id)
+    return service.get_project_recommendation_summary(project_id, profile=profile)
 
 @router.post("/projects/{project_id}/recommendations/evaluate")
-def evaluate_project_recommendations(project_id: str, db: Session = Depends(get_db)):
+def evaluate_project_recommendations(project_id: str, profile: Optional[str] = Query(None), db: Session = Depends(get_db)):
     """Force re-evaluation of PQC recommendations for all cryptographic assets in a project."""
     service = RecommendationService(db)
-    return service.get_project_recommendation_summary(project_id, force_regeneration=True)
+    return service.get_project_recommendation_summary(project_id, force_regeneration=True, profile=profile)
 
 @router.get("/knowledge/pqc")
 def get_pqc_knowledge():

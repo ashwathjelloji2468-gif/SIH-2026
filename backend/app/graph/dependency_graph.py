@@ -10,6 +10,10 @@ class DependencyGraph:
     def __init__(self):
         self.graph = nx.DiGraph()
 
+    @property
+    def nodes(self):
+        return self.graph.nodes
+
     def add_node(self, node_id: str, node_type: str, label: str, metadata: Optional[Dict[str, Any]] = None):
         self.graph.add_node(
             node_id,

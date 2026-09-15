@@ -10,7 +10,7 @@ class RecommendationEngine:
     Purpose-first, risk-aware, threat-aware candidate selection enriched with
     practical latency and cost considerations.
     """
-    def evaluate_recommendations(self, asset: Any) -> List[Dict[str, Any]]:
+    def evaluate_recommendations(self, asset: Any, profile: Any = "BALANCED") -> List[Dict[str, Any]]:
         detector_names = [e.detector_name for e in (getattr(asset, "evidence_items", []) or [])]
         rec = self.generate_recommendation(
             algorithm_name=getattr(asset, "algorithm_name", ""),
@@ -18,7 +18,8 @@ class RecommendationEngine:
             quantum_safety=getattr(asset, "quantum_safety", QuantumSafety.UNKNOWN),
             risk_level="LOW",
             risk_score=0.0,
-            detector_names=detector_names
+            detector_names=detector_names,
+            profile=profile
         )
         rec["asset_id"] = getattr(asset, "id", None)
         rec["asset_name"] = getattr(asset, "name", None)
@@ -33,7 +34,8 @@ class RecommendationEngine:
         risk_score: float = 0.0,
         threat_scenarios: Optional[List[Dict[str, Any]]] = None,
         migration_complexity: str = "MEDIUM",
-        detector_names: Optional[List[str]] = None
+        detector_names: Optional[List[str]] = None,
+        profile: Any = "BALANCED"
     ) -> Dict[str, Any]:
 
         alg_upper = (algorithm_name or "").strip().upper()
@@ -43,6 +45,32 @@ class RecommendationEngine:
         category, primary_cand, alt_cand, std_status, tradeoffs, base_rationale = self._select_candidates(
             alg_upper, purpose, quantum_safety
         )
+
+        prof_str = str(profile.value if hasattr(profile, "value") else (profile or "BALANCED")).upper()
+        if prof_str not in ["LOW_LATENCY", "BALANCED", "SECURITY_FIRST"]:
+            prof_str = "BALANCED"
+
+        # Dynamic profile candidate re-ordering among VALID candidate options only
+        selected_primary = primary_cand
+        selected_alt = alt_cand
+        profile_annotation = ""
+
+        if prof_str == "LOW_LATENCY":
+            if "HYBRID" in alt_cand.upper():
+                selected_primary = alt_cand
+                selected_alt = primary_cand
+                profile_annotation = "Preferred candidate under Low Latency profile to leverage hybrid deployment compatibility and reduce operational disruption."
+            else:
+                profile_annotation = "Candidate selected under Low Latency profile to optimize runtime compatibility."
+        elif prof_str == "SECURITY_FIRST":
+            if "SLH-DSA" in alt_cand.upper():
+                selected_primary = alt_cand
+                selected_alt = primary_cand
+                profile_annotation = "Preferred candidate under Security First profile to leverage conservative hash-based signature security."
+            else:
+                profile_annotation = "Candidate selected under Security First profile prioritizing maximum long-term quantum security margin."
+        else:
+            profile_annotation = "Candidate selected under Balanced profile balancing security improvement, compatibility, and implementation complexity."
 
         # 2. Map Priority from Risk Level
         r_level_str = (risk_level or "LOW").upper()
@@ -78,7 +106,7 @@ class RecommendationEngine:
         # 5. Calculate Recommendation Confidence
         confidence = self._calculate_confidence(alg_upper, purpose, detector_names or [])
 
-        # 6. Enrich Rationale with Threat & Risk Context
+        # 6. Enrich Rationale with Threat, Risk & Profile Context
         rationale_lines = [base_rationale]
 
         if "HARVEST_NOW_DECRYPT_LATER" in threat_types:
@@ -101,13 +129,16 @@ class RecommendationEngine:
         elif priority == "LOW":
             rationale_lines.append("Assessed at LOW risk. Plan transition as part of ongoing crypto agility maintenance.")
 
+        if profile_annotation:
+            rationale_lines.append(profile_annotation)
+
         full_rationale = " ".join(rationale_lines)
 
         # Derive transformation pattern
         if category == RecommendationCategory.PQC_REPLACEMENT:
-            if "ML-DSA" in primary_cand or purpose in [CryptoPurpose.DIGITAL_SIGNATURE, CryptoPurpose.SIGNATURE, CryptoPurpose.AUTHENTICATION]:
+            if "ML-DSA" in selected_primary or purpose in [CryptoPurpose.DIGITAL_SIGNATURE, CryptoPurpose.SIGNATURE, CryptoPurpose.AUTHENTICATION]:
                 transformation_pattern = "RSA_TO_ML_DSA" if "RSA" in alg_upper else "ECDSA_TO_ML_DSA"
-            elif "ML-KEM" in primary_cand or purpose == CryptoPurpose.KEY_ESTABLISHMENT:
+            elif "ML-KEM" in selected_primary or purpose == CryptoPurpose.KEY_ESTABLISHMENT:
                 transformation_pattern = "ECDH_TO_ML_KEM_HYBRID"
             else:
                 transformation_pattern = "RSA_TO_ML_DSA"
@@ -117,12 +148,13 @@ class RecommendationEngine:
             transformation_pattern = "MANUAL_REVIEW"
 
         return {
-            "target_pqc_candidate": primary_cand,
-            "recommended_algorithm": primary_cand,
-            "alternative_algorithm": alt_cand,
+            "target_pqc_candidate": selected_primary,
+            "recommended_algorithm": selected_primary,
+            "alternative_algorithm": selected_alt,
             "transformation_pattern": transformation_pattern,
             "category": category,
             "priority": priority,
+            "profile": prof_str,
             "standard_status": std_status,
             "rationale": full_rationale,
             "compatibility_notes": tradeoffs.get("compatibility_notes"),

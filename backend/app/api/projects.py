@@ -28,9 +28,26 @@ def get_project(project_id: str, db: Session = Depends(get_db)):
 @router.patch("/{project_id}", response_model=ProjectResponse)
 def update_project(project_id: str, project_in: ProjectUpdate, db: Session = Depends(get_db)):
     repo = ProjectRepository(db)
+    old_proj = repo.get(project_id)
+    old_profile = getattr(old_proj, "default_migration_profile", None) if old_proj else None
+
     proj = repo.update(project_id, project_in)
     if not proj:
         raise HTTPException(status_code=404, detail="Project not found")
+
+    if project_in.default_migration_profile and project_in.default_migration_profile != old_profile:
+        from app.repositories.audit_repository import AuditRepository
+        AuditRepository(db).log(
+            action="MIGRATION_PROFILE_CHANGED",
+            actor="system",
+            project_id=project_id,
+            details={
+                "previous_profile": old_profile,
+                "new_profile": project_in.default_migration_profile,
+                "scope": "PROJECT_DEFAULT"
+            }
+        )
+
     return proj
 
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)

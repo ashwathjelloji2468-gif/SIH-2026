@@ -35,8 +35,9 @@ export const migrationService = {
     return api.get<MigrationPlan>(`/migration/plans/${planId}`);
   },
 
-  recalculatePlan: async (planId: string): Promise<MigrationPlan> => {
-    return api.post<MigrationPlan>(`/migration/plans/${planId}/recalculate`);
+  recalculatePlan: async (planId: string, profile?: string): Promise<MigrationPlan> => {
+    const url = profile ? `/migration/plans/${planId}/recalculate?profile=${encodeURIComponent(profile)}` : `/migration/plans/${planId}/recalculate`;
+    return api.post<MigrationPlan>(url);
   },
 
   simulateTransformation: async (planId: string, pattern = 'RSA_TO_ML_DSA'): Promise<SandboxSimulationResult> => {

@@ -31,16 +31,19 @@ export const recommendationService = {
     return api.post<{ asset_id: string; recommendations: Recommendation[] }>(`/assets/${assetId}/recommendations/evaluate`);
   },
 
-  getProjectRecommendations: async (projectId: string): Promise<Recommendation[]> => {
-    return api.get<Recommendation[]>(`/projects/${projectId}/recommendations`);
+  getProjectRecommendations: async (projectId: string, profile?: string): Promise<Recommendation[]> => {
+    const url = profile ? `/projects/${projectId}/recommendations?profile=${encodeURIComponent(profile)}` : `/projects/${projectId}/recommendations`;
+    return api.get<Recommendation[]>(url);
   },
 
-  getProjectRecommendationSummary: async (projectId: string): Promise<RecommendationSummaryResponse> => {
-    return api.get<RecommendationSummaryResponse>(`/projects/${projectId}/recommendations/summary`);
+  getProjectRecommendationSummary: async (projectId: string, profile?: string): Promise<RecommendationSummaryResponse> => {
+    const url = profile ? `/projects/${projectId}/recommendations/summary?profile=${encodeURIComponent(profile)}` : `/projects/${projectId}/recommendations/summary`;
+    return api.get<RecommendationSummaryResponse>(url);
   },
 
-  evaluateProjectRecommendations: async (projectId: string): Promise<RecommendationSummaryResponse> => {
-    return api.post<RecommendationSummaryResponse>(`/projects/${projectId}/recommendations/evaluate`);
+  evaluateProjectRecommendations: async (projectId: string, profile?: string): Promise<RecommendationSummaryResponse> => {
+    const url = profile ? `/projects/${projectId}/recommendations/evaluate?profile=${encodeURIComponent(profile)}` : `/projects/${projectId}/recommendations/evaluate`;
+    return api.post<RecommendationSummaryResponse>(url);
   },
 
   getPqcCatalog: async (): Promise<Record<string, any>> => {

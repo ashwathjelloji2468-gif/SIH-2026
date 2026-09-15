@@ -118,7 +118,7 @@ def create_or_generate_migration_plan(plan_in: MigrationPlanCreate, project_id: 
     assets = asset_repo.get_by_project(target_project_id)
 
     planner = MigrationPlanner()
-    return planner.create_plan_for_project(
+    plan = planner.create_plan_for_project(
         db=db,
         project_id=target_project_id,
         plan_name=plan_in.name,
@@ -127,15 +127,25 @@ def create_or_generate_migration_plan(plan_in: MigrationPlanCreate, project_id: 
         pki_cert_dependency_count=plan_in.pki_cert_dependency_count or 1,
         crypto_agility_score=plan_in.crypto_agility_score or 0.6,
         testing_requirement_level=plan_in.testing_requirement_level or "HIGH",
-        engineering_capacity_developers=plan_in.engineering_capacity_developers or 3
+        engineering_capacity_developers=plan_in.engineering_capacity_developers or 3,
+        profile=plan_in.profile
     )
+    if plan_in.profile:
+        from app.repositories.audit_repository import AuditRepository
+        AuditRepository(db).log(
+            action="MIGRATION_PROFILE_CHANGED",
+            actor="system",
+            project_id=target_project_id,
+            details={"plan_id": plan.id, "new_profile": plan.profile, "scope": "MIGRATION_PLAN"}
+        )
+    return plan
 
 @router.post("/projects/{project_id}/migration/plans", response_model=MigrationPlanResponse)
 def create_project_migration_plan(project_id: str, plan_in: MigrationPlanCreate, db: Session = Depends(get_db)):
     asset_repo = AssetRepository(db)
     assets = asset_repo.get_by_project(project_id)
     planner = MigrationPlanner()
-    return planner.create_plan_for_project(
+    plan = planner.create_plan_for_project(
         db=db,
         project_id=project_id,
         plan_name=plan_in.name,
@@ -144,8 +154,18 @@ def create_project_migration_plan(project_id: str, plan_in: MigrationPlanCreate,
         pki_cert_dependency_count=plan_in.pki_cert_dependency_count or 1,
         crypto_agility_score=plan_in.crypto_agility_score or 0.6,
         testing_requirement_level=plan_in.testing_requirement_level or "HIGH",
-        engineering_capacity_developers=plan_in.engineering_capacity_developers or 3
+        engineering_capacity_developers=plan_in.engineering_capacity_developers or 3,
+        profile=plan_in.profile
     )
+    if plan_in.profile:
+        from app.repositories.audit_repository import AuditRepository
+        AuditRepository(db).log(
+            action="MIGRATION_PROFILE_CHANGED",
+            actor="system",
+            project_id=project_id,
+            details={"plan_id": plan.id, "new_profile": plan.profile, "scope": "MIGRATION_PLAN"}
+        )
+    return plan
 
 @router.get("/projects/{project_id}/migration/plans", response_model=List[MigrationPlanResponse])
 def list_migration_plans(project_id: str, db: Session = Depends(get_db)):
@@ -161,11 +181,40 @@ def get_migration_plan(plan_id: str, db: Session = Depends(get_db)):
     return plan
 
 @router.post("/migration/plans/{plan_id}/recalculate", response_model=MigrationPlanResponse)
-def recalculate_migration_plan(plan_id: str, db: Session = Depends(get_db)):
+def recalculate_migration_plan(plan_id: str, profile: Optional[str] = Query(None), db: Session = Depends(get_db)):
     repo = MigrationRepository(db)
     plan = repo.get_plan(plan_id)
     if not plan:
         raise HTTPException(status_code=404, detail="Migration plan not found")
+    if profile:
+        raw_prof = str(profile).upper()
+        if raw_prof in ["LOW_LATENCY", "BALANCED", "SECURITY_FIRST"] and raw_prof != plan.profile:
+            old_prof = plan.profile
+            plan.profile = raw_prof
+            from app.repositories.audit_repository import AuditRepository
+            AuditRepository(db).log(
+                action="MIGRATION_PROFILE_CHANGED",
+                actor="system",
+                project_id=plan.project_id,
+                details={"plan_id": plan.id, "previous_profile": old_prof, "new_profile": raw_prof, "scope": "MIGRATION_PLAN"}
+            )
+            # Re-estimate effort with new profile
+            assets = AssetRepository(db).get_by_project(plan.project_id)
+            distinct_files = len(set(a.location for a in assets if getattr(a, "location", None)))
+            from app.migration.effort_estimator import estimate_migration_effort
+            effort = estimate_migration_effort(
+                affected_assets_count=len(assets),
+                affected_files_count=distinct_files,
+                blast_radius_affected_nodes=len(assets),
+                business_criticality_score=75.0
+            )
+            plan.effort_level = effort["effort_level"]
+            plan.effort_factors = effort.get("factors", [])
+            plan.total_person_days = effort["person_days"]
+            plan.total_calendar_months = effort["calendar_months"]
+            plan.assumptions = effort["assumptions"]
+            db.commit()
+            db.refresh(plan)
     return plan
 
 @router.post("/migration/plans/{plan_id}/simulate")

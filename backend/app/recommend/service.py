@@ -28,13 +28,19 @@ class RecommendationService:
         self.rec_repo = RecommendationRepository(db) if hasattr(RecommendationRepository, "__call__") else None
         self.engine = RecommendationEngine()
 
-    def recommend_asset(self, asset_id: str, force_regeneration: bool = True) -> Dict[str, Any]:
+    def recommend_asset(self, asset_id: str, force_regeneration: bool = True, profile: Optional[str] = None) -> Dict[str, Any]:
         if not self.asset_repo:
             raise RuntimeError("Database repository unavailable.")
 
         asset = self.asset_repo.get(asset_id)
         if not asset:
             raise ValueError(f"Asset '{asset_id}' not found.")
+
+        eff_profile = profile
+        if not eff_profile and asset.scan and asset.scan.project:
+            eff_profile = getattr(asset.scan.project, "default_migration_profile", "BALANCED")
+        if not eff_profile:
+            eff_profile = "BALANCED"
 
         # Load latest RiskAssessment and ThreatScenarios
         ra = self.risk_repo.get_latest_for_asset(asset_id) if self.risk_repo else None
@@ -52,7 +58,9 @@ class RecommendationService:
         if not force_regeneration and self.rec_repo:
             existing = self.rec_repo.get_latest_for_asset(asset_id)
             if existing:
-                return self._recommendation_to_dict(existing, asset, ra, threat_dict_list)
+                res_dict = self._recommendation_to_dict(existing, asset, ra, threat_dict_list)
+                res_dict["profile"] = eff_profile
+                return res_dict
 
         detector_names = [e.detector_name for e in (getattr(asset, "evidence_items", []) or [])]
 
@@ -71,7 +79,8 @@ class RecommendationService:
             risk_score=risk_score,
             threat_scenarios=threat_dict_list,
             migration_complexity=comp_str,
-            detector_names=detector_names
+            detector_names=detector_names,
+            profile=eff_profile
         )
 
         rec_record = self.rec_repo.store_recommendation(
@@ -81,18 +90,29 @@ class RecommendationService:
         ) if self.rec_repo else None
 
         if rec_record:
-            return self._recommendation_to_dict(rec_record, asset, ra, threat_dict_list)
+            res_dict = self._recommendation_to_dict(rec_record, asset, ra, threat_dict_list)
+            res_dict["profile"] = eff_profile
+            return res_dict
         else:
             rec_eval["asset_id"] = asset_id
             rec_eval["asset_name"] = asset.name
             return rec_eval
 
-    def recommend_project(self, project_id: str, force_regeneration: bool = True) -> List[Dict[str, Any]]:
+    def recommend_project(self, project_id: str, force_regeneration: bool = True, profile: Optional[str] = None) -> List[Dict[str, Any]]:
         if not self.asset_repo:
             raise RuntimeError("Database repository unavailable.")
         assets = self.asset_repo.get_by_project(project_id)
         if not assets:
             return []
+
+        eff_profile = profile
+        if not eff_profile and self.db:
+            from app.models.db_models import Project
+            proj = self.db.query(Project).filter(Project.id == project_id).first()
+            if proj:
+                eff_profile = getattr(proj, "default_migration_profile", "BALANCED")
+        if not eff_profile:
+            eff_profile = "BALANCED"
 
         asset_ids = [a.id for a in assets]
         existing_map = {}
@@ -150,7 +170,8 @@ class RecommendationService:
                 risk_score=risk_score,
                 threat_scenarios=threat_dict_list,
                 migration_complexity=comp_str,
-                detector_names=detector_names
+                detector_names=detector_names,
+                profile=eff_profile
             )
             to_store.append((asset.id, rec_eval, ra.id if ra else None, asset, ra, threat_dict_list))
 
@@ -169,13 +190,13 @@ class RecommendationService:
 
         return results
 
-    def get_project_recommendation_summary(self, project_id: str, force_regeneration: bool = False) -> Dict[str, Any]:
+    def get_project_recommendation_summary(self, project_id: str, force_regeneration: bool = False, profile: Optional[str] = None) -> Dict[str, Any]:
         if not self.asset_repo:
             raise RuntimeError("Database repository unavailable.")
         assets = self.asset_repo.get_by_project(project_id)
         total_assets = len(assets)
 
-        rec_list = self.recommend_project(project_id, force_regeneration=force_regeneration)
+        rec_list = self.recommend_project(project_id, force_regeneration=force_regeneration, profile=profile)
 
         category_counts = {
             "pqc_replacement_count": 0,

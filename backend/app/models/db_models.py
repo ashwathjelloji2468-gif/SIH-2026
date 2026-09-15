@@ -27,8 +27,8 @@ class Project(Base):
     user_y_scenario = Column(String, nullable=True)
     folder_contexts = Column(JSON, nullable=True)
     business_context = Column(JSON, nullable=True)
+    default_migration_profile = Column(String, default="BALANCED", nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-
 
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
@@ -263,6 +263,9 @@ class MigrationPlan(Base):
     id = Column(String, primary_key=True, default=generate_uuid)
     project_id = Column(String, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
     name = Column(String, nullable=False)
+    profile = Column(String, default="BALANCED", nullable=False)
+    effort_level = Column(String, default="MEDIUM", nullable=False)
+    effort_factors = Column(JSON, nullable=True)
     total_person_days = Column(Float, default=0.0)
     total_calendar_months = Column(Float, default=0.0)
     assumptions = Column(JSON, nullable=True)
@@ -308,6 +311,7 @@ class MigrationSimulation(Base):
     asset_id = Column(String, nullable=False)
     recommendation_id = Column(String, nullable=True)
     migration_plan_id = Column(String, nullable=True)
+    profile = Column(String, default="BALANCED", nullable=False)
     status = Column(SQLEnum(SimulationStatus), default=SimulationStatus.CREATED, nullable=False)
     sandbox_path = Column(String, nullable=True)
     transformation_type = Column(String, nullable=True)
