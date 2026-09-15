@@ -1,0 +1,202 @@
+[
+  {
+    "scenario_id": "SCN-01-EMPTY-REPO",
+    "scenario_name": "Empty Repository",
+    "setup": "Valid empty directory workspace with 0 source files.",
+    "trigger": "Run ScanOrchestrator on empty repository.",
+    "expected_status": "COMPLETED",
+    "expected_http_status": 200,
+    "expected_message_or_state": "Scan completes successfully, 0 crypto assets discovered, CBOM valid with zero crypto components.",
+    "must_not_happen": "Do not mark as SCAN_FAILED or crash. Do not fabricate crypto assets."
+  },
+  {
+    "scenario_id": "SCN-02-NO-CRYPTO",
+    "scenario_name": "Repository with No Cryptography",
+    "setup": "Repository with non-cryptographic source code (e.g. print statements, plain HTML).",
+    "trigger": "Run ScanOrchestrator on non-crypto codebase.",
+    "expected_status": "COMPLETED",
+    "expected_http_status": 200,
+    "expected_message_or_state": "0 crypto assets, risk score 0, clean assessment.",
+    "must_not_happen": "Do not fabricate vulnerability counts or fake algorithms."
+  },
+  {
+    "scenario_id": "SCN-03-UNKNOWN-ALGORITHM",
+    "scenario_name": "Unknown or Unsupported Cryptographic Algorithm",
+    "setup": "Source file containing custom/unclassified crypto call 'custom_cipher_encrypt'.",
+    "trigger": "Run AST scanner and classification pipeline.",
+    "expected_status": "COMPLETED",
+    "expected_http_status": 200,
+    "expected_message_or_state": "Asset cataloged with purpose=UNKNOWN, quantum_safety=UNKNOWN, is_unknown=True, reduced confidence.",
+    "must_not_happen": "Do not invent fake algorithm name or treat UNKNOWN as absent."
+  },
+  {
+    "scenario_id": "SCN-04-MALFORMED-ZIP-TRAVERSAL",
+    "scenario_name": "Malformed ZIP and Path Traversal",
+    "setup": "ZIP archive containing '../evil.txt' entry or corrupt ZIP header bytes.",
+    "trigger": "Upload archive for extraction and scanning.",
+    "expected_status": "REJECTED",
+    "expected_http_status": 400,
+    "expected_message_or_state": "SecurityExtractionError raised, extraction aborted, temporary directory cleaned.",
+    "must_not_happen": "Do not extract outside root, do not leak stack traces, do not create partial project."
+  },
+  {
+    "scenario_id": "SCN-05-MALFORMED-CERTIFICATE",
+    "scenario_name": "Malformed or Corrupt Certificate",
+    "setup": "Corrupted PEM file with invalid BASE64 header/footer.",
+    "trigger": "Run certificate scanner on corrupt file.",
+    "expected_status": "COMPLETED",
+    "expected_http_status": 200,
+    "expected_message_or_state": "Handled gracefully as UNKNOWN/NEEDS_REVIEW or scanner error item.",
+    "must_not_happen": "Do not fabricate issuer, expiry date, or algorithm."
+  },
+  {
+    "scenario_id": "SCN-06-UNSUPPORTED-BINARY",
+    "scenario_name": "Unsupported Binary Format",
+    "setup": "Arbitrary unsupported binary blob.",
+    "trigger": "Run binary scanner on unsupported binary.",
+    "expected_status": "COMPLETED",
+    "expected_http_status": 200,
+    "expected_message_or_state": "Scanner logs unsupported format gracefully, no crash, 0 fake assets created.",
+    "must_not_happen": "Do not crash scanner process or treat unsupported binary as clean crypto."
+  },
+  {
+    "scenario_id": "SCN-07-BUILD-FAILURE",
+    "scenario_name": "Build Failure in Validation Sandbox",
+    "setup": "Project with syntax error causing compiler/build failure.",
+    "trigger": "Execute build validation in SandboxCommandRunner.",
+    "expected_status": "FAILED",
+    "expected_http_status": 200,
+    "expected_message_or_state": "ValidationCheckStatus.FAILED, exit_code != 0, real failure stderr captured.",
+    "must_not_happen": "Do not report PASS or fake success. Do not omit logs."
+  },
+  {
+    "scenario_id": "SCN-08-TEST-FAILURE",
+    "scenario_name": "Unit Test Failure in Validation Sandbox",
+    "setup": "Project with failing test assertion.",
+    "trigger": "Execute unit test validation in SandboxCommandRunner.",
+    "expected_status": "FAILED",
+    "expected_http_status": 200,
+    "expected_message_or_state": "ValidationCheckStatus.FAILED, real failure output captured, BEFORE PASS -> AFTER FAIL = REGRESSION.",
+    "must_not_happen": "Do not report PASS or obscure test failure exit codes."
+  },
+  {
+    "scenario_id": "SCN-09-MIGRATION-FAILURE",
+    "scenario_name": "Migration Simulation Failure",
+    "setup": "Simulation run where target code transformation fails.",
+    "trigger": "Run MigrationSimulator on invalid target asset.",
+    "expected_status": "FAILED",
+    "expected_http_status": 409,
+    "expected_message_or_state": "Simulation status = FAILED, BEFORE CBOM & validation preserved, sandbox cleaned up.",
+    "must_not_happen": "Do not generate fake AFTER CBOM or report false success."
+  },
+  {
+    "scenario_id": "SCN-10-DATABASE-FAILURE",
+    "scenario_name": "Database Persistence Failure",
+    "setup": "Simulated DB transaction error / invalid entity.",
+    "trigger": "Attempt DB commit during scan persistence.",
+    "expected_status": "ERROR",
+    "expected_http_status": 500,
+    "expected_message_or_state": "Controlled exception handling, transaction rolled back, safe error response.",
+    "must_not_happen": "Do not report false success or leak raw SQL / connection string passwords."
+  },
+  {
+    "scenario_id": "SCN-11-MISSING-CBOM",
+    "scenario_name": "Missing CBOM on Completed Scan",
+    "setup": "Scan record with cbom_json = None.",
+    "trigger": "Request GET /scans/{scan_id}/cbom or CBOM PDF.",
+    "expected_status": "REJECTED",
+    "expected_http_status": 404,
+    "expected_message_or_state": "HTTP 404 detail containing CBOM_NOT_AVAILABLE.",
+    "must_not_happen": "Do not return empty synthetic CBOM or reconstruct fake CycloneDX JSON."
+  },
+  {
+    "scenario_id": "SCN-12-PROJECT-SCAN-MISMATCH",
+    "scenario_name": "Project and Scan Ownership Mismatch",
+    "setup": "Project A and Scan B (belonging to Project B).",
+    "trigger": "Request GET /projects/{project_a_id}/reports/executive?scan_id={scan_b_id}.",
+    "expected_status": "REJECTED",
+    "expected_http_status": 400,
+    "expected_message_or_state": "HTTP 400 detail 'Scan does not belong to project'.",
+    "must_not_happen": "Do not return Project B data under Project A context."
+  },
+  {
+    "scenario_id": "SCN-13-EXECUTION-TIMEOUT",
+    "scenario_name": "Validation Execution Timeout",
+    "setup": "Long-running infinite loop command.",
+    "trigger": "Execute command exceeding timeout parameter.",
+    "expected_status": "TIMEOUT",
+    "expected_http_status": 200,
+    "expected_message_or_state": "ValidationCheckStatus.TIMEOUT, process killed, partial output captured.",
+    "must_not_happen": "Do not hang indefinitely or leave zombie child processes."
+  },
+  {
+    "scenario_id": "SCN-14-COMMAND-REJECTION",
+    "scenario_name": "Command Allowlist and Shell Injection Rejection",
+    "setup": "Command containing injection characters (';', '&&') or forbidden binary 'curl'.",
+    "trigger": "Execute forbidden command via SandboxCommandRunner.",
+    "expected_status": "BLOCKED",
+    "expected_http_status": 200,
+    "expected_message_or_state": "ValidationCheckStatus.BLOCKED, exit_code -1, Security Alert in summary.",
+    "must_not_happen": "Do not execute command or invoke system shell."
+  },
+  {
+    "scenario_id": "SCN-15-OVERSIZED-UPLOAD",
+    "scenario_name": "Oversized Binary Upload",
+    "setup": "Upload file exceeding 50MB limit.",
+    "trigger": "POST /projects/{id}/scans/upload-binary with >50MB stream.",
+    "expected_status": "REJECTED",
+    "expected_http_status": 413,
+    "expected_message_or_state": "HTTP 413 Request Entity Too Large, partial upload file deleted.",
+    "must_not_happen": "Do not write oversized file to disk or cause memory explosion."
+  },
+  {
+    "scenario_id": "SCN-16-INVALID-BUSINESS-CRITICALITY",
+    "scenario_name": "Invalid Business Criticality Input",
+    "setup": "Override set to 'CRITICAL' with empty/whitespace-only reason.",
+    "trigger": "Update business criticality via service/endpoint.",
+    "expected_status": "REJECTED",
+    "expected_http_status": 422,
+    "expected_message_or_state": "ValueError / HTTP 422 'Adjustment reason is required'.",
+    "must_not_happen": "Do not accept override without explanation."
+  },
+  {
+    "scenario_id": "SCN-17-INVALID-MIGRATION-PROFILE",
+    "scenario_name": "Invalid Migration Profile Input",
+    "setup": "Profile input string 'ULTRA_FAST'.",
+    "trigger": "Generate plan or evaluate recommendations with invalid profile.",
+    "expected_status": "REJECTED",
+    "expected_http_status": 400,
+    "expected_message_or_state": "Profile falls back safely to BALANCED or raises validation error.",
+    "must_not_happen": "Do not bypass security checks or crash recommendation engine."
+  },
+  {
+    "scenario_id": "SCN-18-REPORTING-FAILURE-STATES",
+    "scenario_name": "Reporting Failure States",
+    "setup": "Request report for non-existent project_id or scan_id.",
+    "trigger": "GET /projects/{invalid_id}/reports/executive.",
+    "expected_status": "REJECTED",
+    "expected_http_status": 404,
+    "expected_message_or_state": "HTTP 404 detail 'Project not found'.",
+    "must_not_happen": "Do not return synthetic HTML report with fake data."
+  },
+  {
+    "scenario_id": "SCN-19-ERROR-MESSAGE-SAFETY",
+    "scenario_name": "Error Message Safety & Secret Exposure Protection",
+    "setup": "Trigger internal exception or API error.",
+    "trigger": "Send invalid parameters to API endpoints.",
+    "expected_status": "REJECTED",
+    "expected_http_status": 400,
+    "expected_message_or_state": "Sanitized error message without stack trace, passwords, or filesystem root paths.",
+    "must_not_happen": "Do not leak DB connection strings, stack trace, or private keys."
+  },
+  {
+    "scenario_id": "SCN-20-E2E-BUILD-REGRESSION-FLOW",
+    "scenario_name": "End-to-End Build Regression Flow",
+    "setup": "Source snapshot passes build BEFORE migration, fails AFTER migration.",
+    "trigger": "Run RegressionValidator.",
+    "expected_status": "REGRESSION",
+    "expected_http_status": 200,
+    "expected_message_or_state": "RegressionStatus.REGRESSION, build_passed_after=False.",
+    "must_not_happen": "Do not report NO_REGRESSION or PASS."
+  }
+]
