@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useProject } from '../context/ProjectContext';
 import { riskService } from '../services/riskService';
 import { inventoryService } from '../services/inventoryService';
@@ -33,6 +33,8 @@ import { ShieldAlert, RefreshCw, Box, Play, ShieldCheck, Network, Download } fro
 
 export const Risk: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const initialAssetId = searchParams.get('asset_id');
   const { currentProject, latestScan } = useProject();
   const [assets, setAssets] = useState<CryptoAsset[]>([]);
   const [riskSummary, setRiskSummary] = useState<RiskSummary | null>(null);
@@ -286,6 +288,7 @@ export const Risk: React.FC = () => {
         riskSummary={riskSummary}
         assessments={assessments}
         isLoading={loading}
+        initialAssetId={initialAssetId}
       />
 
       {/* Single Authoritative Cryptographic Interdependencies & Blast Radius Console */}

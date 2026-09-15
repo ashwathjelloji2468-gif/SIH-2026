@@ -6,13 +6,14 @@ import { AssetTable } from '../components/Inventory/AssetTable';
 import { CoveragePanel } from '../components/Inventory/CoveragePanel';
 import { UnknownReviewModal } from '../components/Inventory/UnknownReviewModal';
 import { NetworkNodes3D } from '../components/Three/NetworkNodes3D';
-import { Binary, AlertTriangle, RefreshCw, Layers, Box, Table, ShieldCheck } from 'lucide-react';
+import { Binary, AlertTriangle, RefreshCw, Box, Table, ShieldCheck, AlertCircle, Cpu, Key, FileCheck, Network, Lock, Package } from 'lucide-react';
 
 export const Inventory: React.FC = () => {
   const { currentProject } = useProject();
   const [assets, setAssets] = useState<CryptoAsset[]>([]);
   const [coverage, setCoverage] = useState<CoverageReport | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'coverage' | 'all' | 'unknowns'>('coverage');
   const [viewMode, setViewMode] = useState<'table' | '3d'>('table');
   const [reviewAsset, setReviewAsset] = useState<CryptoAsset | null>(null);
@@ -22,20 +23,32 @@ export const Inventory: React.FC = () => {
       setAssets([]);
       setCoverage(null);
       setLoading(false);
+      setError(null);
       return;
     }
 
     setLoading(true);
+    setError(null);
+
     try {
-      const [invData, covData] = await Promise.allSettled([
+      const [invRes, covRes] = await Promise.allSettled([
         inventoryService.getProjectInventory(currentProject.id),
         inventoryService.getProjectCoverage(currentProject.id),
       ]);
 
-      if (invData.status === 'fulfilled') setAssets(invData.value || []);
-      if (covData.status === 'fulfilled') setCoverage(covData.value || null);
-    } catch (err) {
+      if (invRes.status === 'fulfilled') {
+        setAssets(invRes.value || []);
+      } else {
+        console.error('Inventory fetch error:', invRes.reason);
+        setError('Unable to load cryptographic inventory from backend server.');
+      }
+
+      if (covRes.status === 'fulfilled') {
+        setCoverage(covRes.value || null);
+      }
+    } catch (err: any) {
       console.error('Failed to load inventory:', err);
+      setError(err?.message || 'Unable to load cryptographic inventory.');
     } finally {
       setLoading(false);
     }
@@ -48,6 +61,17 @@ export const Inventory: React.FC = () => {
   const unknownAssets = assets.filter((a) => a.is_unknown);
   const displayAssets = activeTab === 'unknowns' ? unknownAssets : assets;
 
+  // Real data breakdown summary counts
+  const summaryCounts = {
+    total: assets.length,
+    algorithms: assets.filter((a) => ['ALGORITHM', 'API_CALL'].includes((a.asset_type || '').toUpperCase())).length,
+    certificates: assets.filter((a) => ['CERTIFICATE', 'KEY_STORE'].includes((a.asset_type || '').toUpperCase())).length,
+    keys: assets.filter((a) => (a.asset_type || '').toUpperCase() === 'KEY').length,
+    protocols: assets.filter((a) => (a.asset_type || '').toUpperCase() === 'PROTOCOL').length,
+    infrastructure: assets.filter((a) => ['HSM', 'TPM', 'CLOUD_KMS'].includes((a.asset_type || '').toUpperCase())).length,
+    dependencies: assets.filter((a) => (a.asset_type || '').toUpperCase() === 'DEPENDENCY').length,
+  };
+
   return (
     <div className="space-y-6 pb-12">
       {/* Top Header */}
@@ -59,12 +83,11 @@ export const Inventory: React.FC = () => {
           </div>
           <h1 className="text-2xl font-bold font-mono text-slate-100">Discovered Cryptographic Primitives</h1>
           <p className="text-xs text-slate-400 mt-1">
-            Project: <span className="text-cyan-300 font-mono">{currentProject?.name}</span> • Total Discovered: <strong className="text-slate-200 font-mono">{assets.length}</strong> assets
+            Project: <span className="text-cyan-300 font-mono">{currentProject?.name}</span> • Discovered Assets: <strong className="text-slate-200 font-mono">{assets.length}</strong>
           </p>
         </div>
 
         <div className="flex items-center gap-3">
-          {/* View Mode Switcher (only relevant in asset views) */}
           {(activeTab === 'all' || activeTab === 'unknowns') && (
             <div className="flex items-center p-1 rounded-xl border border-slate-800 bg-[#0B0F19]">
               <button
@@ -90,13 +113,60 @@ export const Inventory: React.FC = () => {
 
           <button
             onClick={fetchInventory}
-            className="p-2 rounded-xl border border-slate-800 hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+            disabled={loading}
+            className="p-2 rounded-xl border border-slate-800 hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer disabled:opacity-50"
             title="Refresh inventory"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </div>
+
+      {/* Real Data Breakdown Summary Cards */}
+      {assets.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+          <div className="p-3 rounded-xl border border-slate-800 bg-[#0B0F19]">
+            <div className="text-[10px] text-slate-500 font-mono uppercase">Algorithms</div>
+            <div className="text-lg font-bold font-mono text-cyan-400 mt-0.5">{summaryCounts.algorithms}</div>
+          </div>
+          <div className="p-3 rounded-xl border border-slate-800 bg-[#0B0F19]">
+            <div className="text-[10px] text-slate-500 font-mono uppercase">Certificates</div>
+            <div className="text-lg font-bold font-mono text-emerald-400 mt-0.5">{summaryCounts.certificates}</div>
+          </div>
+          <div className="p-3 rounded-xl border border-slate-800 bg-[#0B0F19]">
+            <div className="text-[10px] text-slate-500 font-mono uppercase">Keys & Stores</div>
+            <div className="text-lg font-bold font-mono text-amber-400 mt-0.5">{summaryCounts.keys}</div>
+          </div>
+          <div className="p-3 rounded-xl border border-slate-800 bg-[#0B0F19]">
+            <div className="text-[10px] text-slate-500 font-mono uppercase">Protocols</div>
+            <div className="text-lg font-bold font-mono text-blue-400 mt-0.5">{summaryCounts.protocols}</div>
+          </div>
+          <div className="p-3 rounded-xl border border-slate-800 bg-[#0B0F19]">
+            <div className="text-[10px] text-slate-500 font-mono uppercase">Infrastructure</div>
+            <div className="text-lg font-bold font-mono text-purple-400 mt-0.5">{summaryCounts.infrastructure}</div>
+          </div>
+          <div className="p-3 rounded-xl border border-slate-800 bg-[#0B0F19]">
+            <div className="text-[10px] text-slate-500 font-mono uppercase">Dependencies</div>
+            <div className="text-lg font-bold font-mono text-slate-300 mt-0.5">{summaryCounts.dependencies}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Error State Banner */}
+      {error && (
+        <div className="p-4 rounded-xl border border-rose-800/80 bg-rose-950/40 text-rose-300 text-xs font-mono flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            <span>{error}</span>
+          </div>
+          <button
+            onClick={fetchInventory}
+            className="px-3 py-1.5 rounded-lg bg-rose-900 hover:bg-rose-800 text-white font-semibold transition-colors cursor-pointer shrink-0"
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       {/* Tab Navigation */}
       <div className="flex items-center gap-4 border-b border-slate-800">

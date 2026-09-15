@@ -8,7 +8,7 @@ import { TaskTimeline } from '../components/Migration/TaskTimeline';
 import { MigrationWizard } from '../components/Migration/MigrationWizard';
 import { ScrollNavControl } from '../components/Migration/ScrollNavControl';
 import { Lock3D } from '../components/Three/Lock3D';
-import { GitFork, Layers, RefreshCw, CheckCircle2, ShieldCheck, FileSpreadsheet } from 'lucide-react';
+import { GitFork, RefreshCw, ShieldCheck, FileSpreadsheet, AlertCircle, CheckCircle2, Play, ArrowRight, Layers, FileCode } from 'lucide-react';
 
 export const Migration: React.FC = () => {
   const navigate = useNavigate();
@@ -16,26 +16,37 @@ export const Migration: React.FC = () => {
   const [plans, setPlans] = useState<MigrationPlan[]>([]);
   const [selectedPlan, setSelectedPlan] = useState<MigrationPlan | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchPlans = async () => {
     if (!currentProject) {
       setPlans([]);
       setSelectedPlan(null);
       setLoading(false);
+      setError(null);
       return;
     }
 
     setLoading(true);
+    setError(null);
+
     try {
       const data = await migrationService.listPlans(currentProject.id);
       setPlans(data);
+
+      // Preserve previously selected plan if still valid in returned list
       if (data.length > 0) {
-        setSelectedPlan(data[0]);
+        setSelectedPlan((prev) => {
+          if (!prev) return data[0];
+          const match = data.find((p) => p.id === prev.id);
+          return match || data[0];
+        });
       } else {
         setSelectedPlan(null);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to load migration plans:', err);
+      setError(err?.message || 'Unable to load migration plans from backend server.');
     } finally {
       setLoading(false);
     }
@@ -76,6 +87,51 @@ export const Migration: React.FC = () => {
           <Lock3D status="safe" className="w-full h-full" />
         </div>
       </div>
+
+      {/* Migration Progress Phase Flow */}
+      <div className="rounded-xl border border-slate-800 bg-[#0B0F19] p-4 shadow-xl">
+        <div className="text-[10px] text-slate-500 font-mono uppercase tracking-wider mb-3">
+          Transition Workflow Phases
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 text-xs font-mono">
+          <div className="p-2.5 rounded-lg border border-cyan-800/60 bg-cyan-950/40 text-cyan-300 flex items-center gap-2">
+            <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-[10px] shrink-0">1</span>
+            <span className="font-semibold truncate">Scope & Plan</span>
+          </div>
+          <div className="p-2.5 rounded-lg border border-slate-800 bg-slate-900/60 text-slate-300 flex items-center gap-2">
+            <span className="w-5 h-5 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center font-bold text-[10px] shrink-0">2</span>
+            <span className="font-semibold truncate">Sandbox Simulate</span>
+          </div>
+          <div className="p-2.5 rounded-lg border border-slate-800 bg-slate-900/60 text-slate-300 flex items-center gap-2">
+            <span className="w-5 h-5 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center font-bold text-[10px] shrink-0">3</span>
+            <span className="font-semibold truncate">Automated Validate</span>
+          </div>
+          <div className="p-2.5 rounded-lg border border-slate-800 bg-slate-900/60 text-slate-300 flex items-center gap-2">
+            <span className="w-5 h-5 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center font-bold text-[10px] shrink-0">4</span>
+            <span className="font-semibold truncate">CBOM Comparison</span>
+          </div>
+          <div className="p-2.5 rounded-lg border border-slate-800 bg-slate-900/60 text-slate-300 flex items-center gap-2">
+            <span className="w-5 h-5 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center font-bold text-[10px] shrink-0">5</span>
+            <span className="font-semibold truncate">Executive Approval</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Visible Error State Banner */}
+      {error && (
+        <div className="p-4 rounded-xl border border-rose-800/80 bg-rose-950/40 text-rose-300 text-xs font-mono flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            <span>{error}</span>
+          </div>
+          <button
+            onClick={fetchPlans}
+            className="px-3 py-1.5 rounded-lg bg-rose-900 hover:bg-rose-800 text-white font-semibold transition-colors cursor-pointer shrink-0"
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       {/* Plan Builder */}
       <PlanBuilder

@@ -9,6 +9,7 @@ interface AssetRiskTableProps {
   riskSummary: RiskSummary | null;
   assessments: RiskAssessment[];
   isLoading?: boolean;
+  initialAssetId?: string | null;
 }
 
 export const AssetRiskTable: React.FC<AssetRiskTableProps> = ({
@@ -16,6 +17,7 @@ export const AssetRiskTable: React.FC<AssetRiskTableProps> = ({
   riskSummary,
   assessments,
   isLoading = false,
+  initialAssetId
 }) => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -67,6 +69,19 @@ export const AssetRiskTable: React.FC<AssetRiskTableProps> = ({
 
     return list;
   }, [assets, riskSummary, assessments]);
+
+  React.useEffect(() => {
+    if (initialAssetId && combinedList.length > 0) {
+      const match = combinedList.find(
+        (item) => item.asset?.id === initialAssetId || item.assessment?.asset_id === initialAssetId
+      );
+      if (match) {
+        setSelectedAsset(match.asset);
+        setSelectedAssessment(match.assessment);
+        setIsDetailOpen(true);
+      }
+    }
+  }, [initialAssetId, combinedList]);
 
   // Compute Summary Card counts directly from RiskEngine riskSummary if non-zero, else compute directly from combinedList
   const counts = useMemo(() => {

@@ -1,8 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Filter, ChevronLeft, ChevronRight, Eye, AlertCircle, FileCode, CheckCircle2, ShieldAlert, ShieldCheck, FileSpreadsheet } from 'lucide-react';
-import { CryptoAsset, QuantumSafety, CryptoPurpose } from '../../types';
-import { StatusBadge } from '../Common/StatusBadge';
+import { Search, ChevronLeft, ChevronRight, Eye, AlertCircle, FileCode, ShieldAlert, ShieldCheck, FileSpreadsheet, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { CryptoAsset } from '../../types';
 import { ConfidenceBadge } from '../Common/ConfidenceBadge';
 import { AssetDetailDrawer } from './AssetDetailDrawer';
 import { UnknownReviewModal } from './UnknownReviewModal';
@@ -13,36 +12,132 @@ interface AssetTableProps {
   onRefresh?: () => void;
 }
 
+type SortColumn = 'algorithm_name' | 'asset_type' | 'quantum_safety' | 'business_criticality' | 'confidence' | 'location';
+type SortDirection = 'asc' | 'desc';
+
 export const AssetTable: React.FC<AssetTableProps> = ({ assets, loading, onRefresh }) => {
   const navigate = useNavigate();
   const [search, setSearch] = useState<string>('');
+  const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [safetyFilter, setSafetyFilter] = useState<string>('ALL');
   const [purposeFilter, setPurposeFilter] = useState<string>('ALL');
   const [onlyUnknowns, setOnlyUnknowns] = useState<boolean>(false);
+  const [sortColumn, setSortColumn] = useState<SortColumn>('quantum_safety');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [selectedAsset, setSelectedAsset] = useState<CryptoAsset | null>(null);
   const [reviewAsset, setReviewAsset] = useState<CryptoAsset | null>(null);
 
   const pageSize = 15;
 
-  // Filtered list
+  // Real data category counts
+  const categoryCounts = useMemo(() => {
+    const counts = {
+      ALL: assets.length,
+      ALGORITHMS: 0,
+      CERTIFICATES: 0,
+      KEYS: 0,
+      PROTOCOLS: 0,
+      INFRASTRUCTURE: 0,
+      DEPENDENCIES: 0,
+      BINARIES: 0,
+      VENDOR: 0,
+      UNKNOWN: 0
+    };
+
+    assets.forEach((a) => {
+      if (a.is_unknown) counts.UNKNOWN++;
+      const t = (a.asset_type || '').toUpperCase();
+      if (t === 'ALGORITHM' || t === 'API_CALL') counts.ALGORITHMS++;
+      else if (t === 'CERTIFICATE' || t === 'KEY_STORE') counts.CERTIFICATES++;
+      else if (t === 'KEY') counts.KEYS++;
+      else if (t === 'PROTOCOL') counts.PROTOCOLS++;
+      else if (t === 'HSM' || t === 'TPM' || t === 'CLOUD_KMS') counts.INFRASTRUCTURE++;
+      else if (t === 'DEPENDENCY') counts.DEPENDENCIES++;
+      else if (t === 'BINARY') counts.BINARIES++;
+      else if (t === 'VENDOR_MANAGED') counts.VENDOR++;
+    });
+
+    return counts;
+  }, [assets]);
+
+  // Filtered and Sorted list
   const filteredAssets = useMemo(() => {
-    return assets.filter((asset) => {
+    let result = assets.filter((asset) => {
       if (onlyUnknowns && !asset.is_unknown) return false;
       if (safetyFilter !== 'ALL' && asset.quantum_safety !== safetyFilter) return false;
       if (purposeFilter !== 'ALL' && asset.purpose !== purposeFilter) return false;
 
+      // Category Type filter
+      if (typeFilter !== 'ALL') {
+        const t = (asset.asset_type || '').toUpperCase();
+        if (typeFilter === 'ALGORITHMS' && !(t === 'ALGORITHM' || t === 'API_CALL')) return false;
+        if (typeFilter === 'CERTIFICATES' && !(t === 'CERTIFICATE' || t === 'KEY_STORE')) return false;
+        if (typeFilter === 'KEYS' && t !== 'KEY') return false;
+        if (typeFilter === 'PROTOCOLS' && t !== 'PROTOCOL') return false;
+        if (typeFilter === 'INFRASTRUCTURE' && !(t === 'HSM' || t === 'TPM' || t === 'CLOUD_KMS')) return false;
+        if (typeFilter === 'DEPENDENCIES' && t !== 'DEPENDENCY') return false;
+        if (typeFilter === 'BINARIES' && t !== 'BINARY') return false;
+        if (typeFilter === 'VENDOR' && t !== 'VENDOR_MANAGED') return false;
+        if (typeFilter === 'UNKNOWN' && !asset.is_unknown) return false;
+      }
+
+      // Search matching across all real fields (including AWS, Azure, GCP, KMS, PKCS11, TPM, TLS, SSH)
       if (search.trim()) {
         const query = search.toLowerCase();
-        const matchesAlg = asset.algorithm_name.toLowerCase().includes(query);
-        const matchesLoc = asset.location.toLowerCase().includes(query);
-        const matchesPurpose = asset.purpose.toLowerCase().includes(query);
-        if (!matchesAlg && !matchesLoc && !matchesPurpose) return false;
+        const ev = asset.evidence_items?.[0];
+        const searchTarget = [
+          asset.algorithm_name,
+          asset.name,
+          asset.asset_type,
+          asset.location,
+          asset.purpose,
+          asset.quantum_safety,
+          asset.business_criticality_label,
+          ev?.detector_name,
+          ev?.evidence_type,
+          ev?.source_file,
+          JSON.stringify((asset as any).extra_metadata || {})
+        ].filter(Boolean).join(' ').toLowerCase();
+
+        if (!searchTarget.includes(query)) return false;
       }
 
       return true;
     });
-  }, [assets, search, safetyFilter, purposeFilter, onlyUnknowns]);
+
+    // Column sorting
+    result.sort((a, b) => {
+      let valA: any = a[sortColumn as keyof CryptoAsset] ?? '';
+      let valB: any = b[sortColumn as keyof CryptoAsset] ?? '';
+
+      if (sortColumn === 'quantum_safety') {
+        const safetyWeight: Record<string, number> = {
+          VULNERABLE: 4,
+          QUANTUM_VULNERABLE: 4,
+          TRANSITIONAL: 3,
+          UNKNOWN: 2,
+          SAFE: 1,
+          QUANTUM_SAFE: 1
+        };
+        valA = safetyWeight[a.quantum_safety || 'UNKNOWN'] || 0;
+        valB = safetyWeight[b.quantum_safety || 'UNKNOWN'] || 0;
+      } else if (sortColumn === 'business_criticality') {
+        const critWeight: Record<string, number> = { CRITICAL: 4, HIGH: 3, MODERATE: 2, MEDIUM: 2, LOW: 1 };
+        valA = critWeight[a.business_criticality_label || ''] || 0;
+        valB = critWeight[b.business_criticality_label || ''] || 0;
+      } else if (sortColumn === 'confidence') {
+        valA = a.evidence_items?.[0]?.confidence_score ?? -1;
+        valB = b.evidence_items?.[0]?.confidence_score ?? -1;
+      }
+
+      if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+      if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return result;
+  }, [assets, search, typeFilter, safetyFilter, purposeFilter, onlyUnknowns, sortColumn, sortDirection]);
 
   const totalPages = Math.ceil(filteredAssets.length / pageSize) || 1;
   const paginatedAssets = useMemo(() => {
@@ -50,14 +145,105 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, loading, onRefre
     return filteredAssets.slice(start, start + pageSize);
   }, [filteredAssets, currentPage]);
 
-  const handlePageChange = (newPage: number) => {
-    if (newPage >= 1 && newPage <= totalPages) {
-      setCurrentPage(newPage);
+  const handleSort = (col: SortColumn) => {
+    if (sortColumn === col) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(col);
+      setSortDirection('desc');
     }
+  };
+
+  const renderSortIcon = (col: SortColumn) => {
+    if (sortColumn !== col) return <ArrowUpDown className="w-3 h-3 text-slate-600 inline ml-1" />;
+    return sortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-cyan-400 inline ml-1" /> : <ArrowDown className="w-3 h-3 text-cyan-400 inline ml-1" />;
   };
 
   return (
     <div className="space-y-4">
+      {/* Category Filter Chips with Real Data Counts */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-slate-800 text-xs font-mono">
+        <span className="text-slate-500 uppercase tracking-wider text-[10px] shrink-0 mr-1">Filter Type:</span>
+        <button
+          onClick={() => { setTypeFilter('ALL'); setCurrentPage(1); }}
+          className={`px-2.5 py-1 rounded-lg border shrink-0 transition-colors cursor-pointer ${
+            typeFilter === 'ALL' ? 'bg-cyan-950/80 border-cyan-500 text-cyan-300 font-semibold' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          All ({categoryCounts.ALL})
+        </button>
+        {categoryCounts.ALGORITHMS > 0 && (
+          <button
+            onClick={() => { setTypeFilter('ALGORITHMS'); setCurrentPage(1); }}
+            className={`px-2.5 py-1 rounded-lg border shrink-0 transition-colors cursor-pointer ${
+              typeFilter === 'ALGORITHMS' ? 'bg-cyan-950/80 border-cyan-500 text-cyan-300 font-semibold' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            Algorithms ({categoryCounts.ALGORITHMS})
+          </button>
+        )}
+        {categoryCounts.CERTIFICATES > 0 && (
+          <button
+            onClick={() => { setTypeFilter('CERTIFICATES'); setCurrentPage(1); }}
+            className={`px-2.5 py-1 rounded-lg border shrink-0 transition-colors cursor-pointer ${
+              typeFilter === 'CERTIFICATES' ? 'bg-cyan-950/80 border-cyan-500 text-cyan-300 font-semibold' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            Certificates ({categoryCounts.CERTIFICATES})
+          </button>
+        )}
+        {categoryCounts.KEYS > 0 && (
+          <button
+            onClick={() => { setTypeFilter('KEYS'); setCurrentPage(1); }}
+            className={`px-2.5 py-1 rounded-lg border shrink-0 transition-colors cursor-pointer ${
+              typeFilter === 'KEYS' ? 'bg-cyan-950/80 border-cyan-500 text-cyan-300 font-semibold' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            Keys ({categoryCounts.KEYS})
+          </button>
+        )}
+        {categoryCounts.PROTOCOLS > 0 && (
+          <button
+            onClick={() => { setTypeFilter('PROTOCOLS'); setCurrentPage(1); }}
+            className={`px-2.5 py-1 rounded-lg border shrink-0 transition-colors cursor-pointer ${
+              typeFilter === 'PROTOCOLS' ? 'bg-cyan-950/80 border-cyan-500 text-cyan-300 font-semibold' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            Protocols ({categoryCounts.PROTOCOLS})
+          </button>
+        )}
+        {categoryCounts.INFRASTRUCTURE > 0 && (
+          <button
+            onClick={() => { setTypeFilter('INFRASTRUCTURE'); setCurrentPage(1); }}
+            className={`px-2.5 py-1 rounded-lg border shrink-0 transition-colors cursor-pointer ${
+              typeFilter === 'INFRASTRUCTURE' ? 'bg-purple-950/80 border-purple-500 text-purple-300 font-semibold' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            Infrastructure (HSM/TPM/KMS) ({categoryCounts.INFRASTRUCTURE})
+          </button>
+        )}
+        {categoryCounts.DEPENDENCIES > 0 && (
+          <button
+            onClick={() => { setTypeFilter('DEPENDENCIES'); setCurrentPage(1); }}
+            className={`px-2.5 py-1 rounded-lg border shrink-0 transition-colors cursor-pointer ${
+              typeFilter === 'DEPENDENCIES' ? 'bg-cyan-950/80 border-cyan-500 text-cyan-300 font-semibold' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            Dependencies ({categoryCounts.DEPENDENCIES})
+          </button>
+        )}
+        {categoryCounts.UNKNOWN > 0 && (
+          <button
+            onClick={() => { setTypeFilter('UNKNOWN'); setCurrentPage(1); }}
+            className={`px-2.5 py-1 rounded-lg border shrink-0 transition-colors cursor-pointer ${
+              typeFilter === 'UNKNOWN' ? 'bg-amber-950/80 border-amber-500 text-amber-300 font-semibold' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            Needs Review ({categoryCounts.UNKNOWN})
+          </button>
+        )}
+      </div>
+
       {/* Search & Filter Toolbar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-[#0B0F19] p-4 rounded-xl border border-slate-800">
         <div className="relative flex-1 max-w-md">
@@ -69,12 +255,12 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, loading, onRefre
               setSearch(e.target.value);
               setCurrentPage(1);
             }}
-            placeholder="Search algorithm, file path, purpose..."
-            className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-cyan-500"
+            placeholder="Search AWS, Azure, KMS, PKCS11, TPM, TLS, SSH, RSA, location..."
+            className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-cyan-500 font-mono"
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 text-xs">
+        <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
           {/* Quantum Safety Filter */}
           <select
             value={safetyFilter}
@@ -156,15 +342,25 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, loading, onRefre
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-900/80 text-slate-400 font-mono uppercase tracking-wider border-b border-slate-800 text-[11px]">
               <tr className="border-b border-slate-800 text-slate-400 uppercase tracking-wider text-[11px]">
-                <th className="py-3 px-4">Algorithm / Asset</th>
-                <th className="py-3 px-4">Type</th>
+                <th className="py-3 px-4 cursor-pointer hover:text-cyan-300 transition-colors" onClick={() => handleSort('algorithm_name')}>
+                  Algorithm / Asset {renderSortIcon('algorithm_name')}
+                </th>
+                <th className="py-3 px-4 cursor-pointer hover:text-cyan-300 transition-colors" onClick={() => handleSort('asset_type')}>
+                  Type {renderSortIcon('asset_type')}
+                </th>
                 <th className="py-3 px-4">Data Lifetime (X)</th>
                 <th className="py-3 px-4">Migration Time (Y)</th>
                 <th className="py-3 px-4">Threat Horizon (Z)</th>
-                <th className="py-3 px-4">Business Criticality</th>
+                <th className="py-3 px-4 cursor-pointer hover:text-cyan-300 transition-colors" onClick={() => handleSort('business_criticality')}>
+                  Business Criticality {renderSortIcon('business_criticality')}
+                </th>
                 <th className="py-3 px-4">Purpose</th>
-                <th className="py-3 px-4">Source Location</th>
-                <th className="py-3 px-4">Confidence</th>
+                <th className="py-3 px-4 cursor-pointer hover:text-cyan-300 transition-colors" onClick={() => handleSort('location')}>
+                  Source Location {renderSortIcon('location')}
+                </th>
+                <th className="py-3 px-4 cursor-pointer hover:text-cyan-300 transition-colors" onClick={() => handleSort('confidence')}>
+                  Confidence {renderSortIcon('confidence')}
+                </th>
                 <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
@@ -172,20 +368,20 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, loading, onRefre
               {paginatedAssets.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="py-12 text-center text-slate-500 font-sans">
-                    No cryptographic assets match the selected criteria.
+                    No cryptographic assets match the selected filter criteria.
                   </td>
                 </tr>
               ) : (
                 paginatedAssets.map((asset) => {
                   const ev = asset.evidence_items && asset.evidence_items[0];
-                  const confidence = ev ? ev.confidence_score : 0.95;
-                  const detector = ev?.detector_name || (String(asset.asset_type) === 'DEPENDENCY' ? 'DependencyScanner' : String(asset.asset_type) === 'CERTIFICATE' ? 'CertificateScanner' : 'PythonASTDetector');
 
-                  const lifetimeYr = asset.data_lifetime_years ?? (asset.algorithm_name?.includes('RSA') || asset.algorithm_name?.includes('ECDSA') ? 10 : 7);
-                  const lifetimeLbl = asset.lifetime_label || (lifetimeYr >= 10 ? 'LONG_TERM' : 'MEDIUM_TERM');
-                  const migrationYr = asset.migration_time_years ?? 3;
-                  const threatZ = asset.quantum_threat_horizon ?? 2033;
-                  const critLbl = asset.business_criticality_label || (asset.quantum_safety === 'VULNERABLE' ? 'HIGH' : 'MEDIUM');
+                  // UNFABRICATED values: display real data or honest "Not assessed" / "Not available"
+                  const confidence = ev?.confidence_score != null ? ev.confidence_score : null;
+                  const lifetimeYr = asset.data_lifetime_years != null ? `${asset.data_lifetime_years}y` : null;
+                  const lifetimeLbl = asset.lifetime_label || null;
+                  const migrationYr = asset.migration_time_years != null ? `${asset.migration_time_years}y` : null;
+                  const threatZ = asset.quantum_threat_horizon != null ? asset.quantum_threat_horizon : null;
+                  const critLbl = asset.business_criticality_label || null;
 
                   return (
                     <tr
@@ -223,43 +419,59 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, loading, onRefre
 
                       {/* Lifetime X */}
                       <td className="py-3 px-4">
-                        <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-cyan-950/60 border border-cyan-800/60 text-cyan-200">
-                          {lifetimeYr}y ({lifetimeLbl})
-                        </span>
+                        {lifetimeYr ? (
+                          <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-cyan-950/60 border border-cyan-800/60 text-cyan-200">
+                            {lifetimeYr} {lifetimeLbl ? `(${lifetimeLbl})` : ''}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-slate-600 font-sans">Not assessed</span>
+                        )}
                       </td>
 
                       {/* Migration Y */}
                       <td className="py-3 px-4">
-                        <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-amber-950/60 border border-amber-800/60 text-amber-200">
-                          {migrationYr}y
-                        </span>
+                        {migrationYr ? (
+                          <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-amber-950/60 border border-amber-800/60 text-amber-200">
+                            {migrationYr}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-slate-600 font-sans">Not assessed</span>
+                        )}
                       </td>
 
                       {/* Horizon Z */}
                       <td className="py-3 px-4">
-                        <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-purple-950/60 border border-purple-800/60 text-purple-200">
-                          {threatZ}
-                        </span>
+                        {threatZ ? (
+                          <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-purple-950/60 border border-purple-800/60 text-purple-200">
+                            {threatZ}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-slate-600 font-sans">Not assessed</span>
+                        )}
                       </td>
 
                       {/* Business Criticality */}
                       <td className="py-3 px-4">
-                        <span
-                          className={`px-2 py-0.5 text-[10px] font-mono rounded border ${
-                            critLbl === 'CRITICAL'
-                              ? 'bg-rose-950/80 border-rose-800 text-rose-300'
-                              : critLbl === 'HIGH'
-                              ? 'bg-orange-950/80 border-orange-800 text-orange-300'
-                              : 'bg-amber-950/80 border-amber-800 text-amber-300'
-                          }`}
-                        >
-                          {critLbl}
-                        </span>
+                        {critLbl ? (
+                          <span
+                            className={`px-2 py-0.5 text-[10px] font-mono rounded border ${
+                              critLbl === 'CRITICAL'
+                                ? 'bg-rose-950/80 border-rose-800 text-rose-300'
+                                : critLbl === 'HIGH'
+                                ? 'bg-orange-950/80 border-orange-800 text-orange-300'
+                                : 'bg-amber-950/80 border-amber-800 text-amber-300'
+                            }`}
+                          >
+                            {critLbl}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-slate-600 font-sans">Not assessed</span>
+                        )}
                       </td>
 
                       {/* Purpose */}
                       <td className="py-3 px-4">
-                        <span className="text-slate-300">{asset.purpose}</span>
+                        <span className="text-slate-300">{asset.purpose || 'UNKNOWN'}</span>
                       </td>
 
                       {/* Location */}
@@ -274,7 +486,11 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, loading, onRefre
                       </td>
 
                       <td className="py-3 px-4">
-                        <ConfidenceBadge score={confidence} showLabel={false} />
+                        {confidence != null ? (
+                          <ConfidenceBadge score={confidence} showLabel={false} />
+                        ) : (
+                          <span className="text-[10px] text-slate-600 font-sans">Not available</span>
+                        )}
                       </td>
 
                       <td className="py-3 px-4 text-right">
@@ -288,9 +504,9 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, loading, onRefre
                             </button>
                           )}
                           <button
-                            onClick={() => navigate('/risk')}
+                            onClick={() => navigate(`/risk?asset_id=${asset.id}`)}
                             className="px-2 py-1 rounded bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 border border-rose-800/60 text-[11px] font-mono font-semibold transition-colors cursor-pointer flex items-center gap-1"
-                            title="View Risk Engine Assessment"
+                            title="View Risk Engine Assessment for this asset"
                           >
                             <ShieldAlert className="w-3 h-3" />
                             Risk
@@ -322,7 +538,7 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, loading, onRefre
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => handlePageChange(currentPage - 1)}
+              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
               disabled={currentPage === 1}
               className="p-1.5 rounded-lg border border-slate-800 hover:bg-slate-800 disabled:opacity-40 disabled:hover:bg-transparent cursor-pointer transition-colors"
             >
@@ -332,7 +548,7 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, loading, onRefre
               Page {currentPage} of {totalPages}
             </span>
             <button
-              onClick={() => handlePageChange(currentPage + 1)}
+              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
               disabled={currentPage === totalPages}
               className="p-1.5 rounded-lg border border-slate-800 hover:bg-slate-800 disabled:opacity-40 disabled:hover:bg-transparent cursor-pointer transition-colors"
             >
