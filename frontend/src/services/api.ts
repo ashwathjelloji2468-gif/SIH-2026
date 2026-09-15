@@ -204,6 +204,16 @@ export const api = {
     });
   },
 
+  put: async <T>(endpoint: string, body?: any, options?: ApiRequestOptions): Promise<T> => {
+    clearApiCache();
+    return request<T>(endpoint, { 
+      ...options, 
+      method: 'PUT', 
+      body: body ? JSON.stringify(body) : undefined 
+    });
+  },
+
+
   delete: async <T>(endpoint: string, options?: ApiRequestOptions): Promise<T> => {
     clearApiCache();
     return request<T>(endpoint, { ...options, method: 'DELETE' });

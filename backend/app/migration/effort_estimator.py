@@ -9,7 +9,7 @@ def estimate_migration_effort(
     pki_cert_dependency_count: int = 1,
     crypto_agility_score: float = 0.5,
     testing_requirement_level: TestingRequirement = TestingRequirement.HIGH,
-    business_criticality_score: float = 80.0,
+    business_criticality_score: float = 75.0,
     engineering_capacity_developers: int = 3
 ) -> Dict[str, Any]:
     """

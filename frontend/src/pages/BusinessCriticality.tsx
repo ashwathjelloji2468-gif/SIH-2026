@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
-import { Sliders, Calculator, ShieldAlert, Info, RotateCcw, Cpu, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Sliders, Calculator, ShieldAlert, Info, RotateCcw, Save, AlertTriangle, CheckCircle2, History, ArrowRightLeft } from 'lucide-react';
+import { useProject } from '../context/ProjectContext';
+import { businessCriticalityService, ProjectBusinessCriticality } from '../services/businessCriticalityService';
+import { auditService } from '../services/auditService';
 
 interface FactorDefinition {
   id: string;
@@ -20,7 +23,15 @@ const FACTORS: FactorDefinition[] = [
 ];
 
 export const BusinessCriticality: React.FC = () => {
-  // Initial ratings set to match the exact Worked Example (4.60 WIS -> 4.22 Normalized)
+  const { currentProject } = useProject();
+
+  const [critData, setCritData] = useState<ProjectBusinessCriticality | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [saving, setSaving] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // Local factor ratings state (synced with backend)
   const [ratings, setRatings] = useState<Record<string, number>>({
     dataSensitivity: 5,
     dataShelfLife: 4,
@@ -30,15 +41,124 @@ export const BusinessCriticality: React.FC = () => {
     regulatoryExposure: 5,
     financialImpact: 5,
     reputationalImpact: 4,
+    exposureRating: 4,
   });
 
-  const [exposureRating, setExposureRating] = useState<number>(4);
+  // User Planning Override Form state
+  const [overrideValue, setOverrideValue] = useState<string>('HIGH');
+  const [adjustmentReason, setAdjustmentReason] = useState<string>('');
+
+  // Audit trail state
+  const [auditEvents, setAuditEvents] = useState<any[]>([]);
+
+  const loadCriticalityData = useCallback(async () => {
+    if (!currentProject) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await businessCriticalityService.getProjectBusinessCriticality(currentProject.id);
+      setCritData(data);
+      if (data.factor_ratings) {
+        setRatings(data.factor_ratings);
+      }
+      if (data.user_override) {
+        setOverrideValue(data.user_override);
+      } else {
+        setOverrideValue(data.system_criticality);
+      }
+      if (data.adjustment_reason) {
+        setAdjustmentReason(data.adjustment_reason);
+      } else {
+        setAdjustmentReason('');
+      }
+
+      // Fetch audit events
+      try {
+        const audits = await auditService.getProjectAuditTrail(currentProject.id);
+        const filtered = (audits || []).filter((a: any) =>
+          ['BUSINESS_CRITICALITY_OVERRIDE', 'BUSINESS_CRITICALITY_OVERRIDE_REVERTED', 'UPDATE_USER_CONTEXT'].includes(a.action)
+        );
+        setAuditEvents(filtered);
+      } catch (_) {
+        setAuditEvents([]);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to load business criticality for project.');
+    } finally {
+      setLoading(false);
+    }
+  }, [currentProject]);
+
+  useEffect(() => {
+    loadCriticalityData();
+  }, [loadCriticalityData]);
 
   const handleRatingChange = (id: string, value: number) => {
     setRatings((prev) => ({ ...prev, [id]: value }));
   };
 
-  const handleReset = () => {
+  const handleSaveFactorRatings = async () => {
+    if (!currentProject) return;
+    setSaving(true);
+    setError(null);
+    setSuccessMsg(null);
+    try {
+      const updated = await businessCriticalityService.updateProjectBusinessCriticality(currentProject.id, {
+        factor_ratings: ratings,
+      });
+      setCritData(updated);
+      setSuccessMsg('Factor ratings saved successfully and risk assessments updated.');
+    } catch (err: any) {
+      setError(err.message || 'Failed to save factor ratings.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveOverride = async () => {
+    if (!currentProject) return;
+    if (!adjustmentReason.trim()) {
+      setError('Adjustment reason is required when setting a planning criticality override.');
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    setSuccessMsg(null);
+    try {
+      const updated = await businessCriticalityService.overrideBusinessCriticality(
+        currentProject.id,
+        overrideValue,
+        adjustmentReason.trim()
+      );
+      setCritData(updated);
+      setSuccessMsg(`Planning criticality override saved to ${overrideValue}. Risk & Priority queues updated.`);
+      loadCriticalityData();
+    } catch (err: any) {
+      setError(err.message || 'Failed to save business criticality override.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRevertOverride = async () => {
+    if (!currentProject) return;
+    setSaving(true);
+    setError(null);
+    setSuccessMsg(null);
+    try {
+      const updated = await businessCriticalityService.revertBusinessCriticality(currentProject.id);
+      setCritData(updated);
+      setAdjustmentReason('');
+      setSuccessMsg('Override reverted. Effective planning criticality restored to system classification.');
+      loadCriticalityData();
+    } catch (err: any) {
+      setError(err.message || 'Failed to revert business criticality override.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleResetLocalDemoExample = () => {
     setRatings({
       dataSensitivity: 5,
       dataShelfLife: 4,
@@ -48,11 +168,12 @@ export const BusinessCriticality: React.FC = () => {
       regulatoryExposure: 5,
       financialImpact: 5,
       reputationalImpact: 4,
+      exposureRating: 4,
     });
-    setExposureRating(4);
+    setSuccessMsg('Loaded worked example factor values in local view (click Save to persist to project).');
   };
 
-  // Calculations matching Worked Example formulas
+  // Local calculations matching methodology
   const contributions = FACTORS.map((f) => ({
     ...f,
     rating: ratings[f.id] ?? 0,
@@ -60,20 +181,21 @@ export const BusinessCriticality: React.FC = () => {
   }));
 
   const wis = contributions.reduce((sum, item) => sum + item.contribution, 0);
-
-  // Exposure Multiplier calculation: EM = 1.0 + 0.09375 * exposureRating (Rating 4 -> EM = 1.375)
-  const exposureMultiplier = 1.0 + 0.09375 * exposureRating;
+  const expRating = ratings['exposureRating'] ?? 4;
+  const exposureMultiplier = 1.0 + 0.09375 * expRating;
   const rawScore = wis * exposureMultiplier;
   const normalizedValue = Math.min(5.0, Number((rawScore / 1.5).toFixed(2)));
 
-  const getCriticalityBadge = (val: number) => {
-    if (val >= 4.0) return { label: 'CRITICAL', class: 'bg-rose-950/80 border-rose-700/80 text-rose-300' };
-    if (val >= 3.0) return { label: 'HIGH', class: 'bg-orange-950/80 border-orange-700/80 text-orange-300' };
-    if (val >= 2.0) return { label: 'MEDIUM', class: 'bg-amber-950/80 border-amber-700/80 text-amber-300' };
+  const getCriticalityBadge = (val: string) => {
+    const s = (val || '').toUpperCase();
+    if (s === 'CRITICAL') return { label: 'CRITICAL', class: 'bg-rose-950/80 border-rose-700/80 text-rose-300' };
+    if (s === 'HIGH') return { label: 'HIGH', class: 'bg-orange-950/80 border-orange-700/80 text-orange-300' };
+    if (s === 'MEDIUM') return { label: 'MEDIUM', class: 'bg-amber-950/80 border-amber-700/80 text-amber-300' };
     return { label: 'LOW', class: 'bg-emerald-950/80 border-emerald-700/80 text-emerald-300' };
   };
 
-  const badge = getCriticalityBadge(normalizedValue);
+  const sysBadge = getCriticalityBadge(critData?.system_criticality || 'HIGH');
+  const effBadge = getCriticalityBadge(critData?.effective_criticality || 'HIGH');
 
   return (
     <div className="space-y-6 pb-12">
@@ -82,22 +204,40 @@ export const BusinessCriticality: React.FC = () => {
         <div>
           <div className="flex items-center gap-2 text-cyan-400 font-mono text-xs uppercase tracking-wider font-semibold mb-1">
             <Sliders className="w-4 h-4" />
-            <span>Governance &amp; Compliance Framework</span>
+            <span>Governance &amp; Planning Framework (Priority 3)</span>
           </div>
-          <h1 className="text-2xl font-bold font-mono text-slate-100">Business Criticality Factors</h1>
+          <h1 className="text-2xl font-bold font-mono text-slate-100">
+            Business Criticality — {currentProject?.name || 'Select Project'}
+          </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Interactive Weighted Impact Score (WIS) &amp; Exposure Multiplier (EM) demonstrator.
+            Authoritative Weighted Impact Score (WIS), system classification, and user planning override engine.
           </p>
         </div>
 
-        <button
-          onClick={handleReset}
-          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 text-xs font-mono transition-colors cursor-pointer self-start sm:self-auto"
-        >
-          <RotateCcw className="w-3.5 h-3.5" />
-          <span>Reset Worked Example</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleResetLocalDemoExample}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 text-xs font-mono transition-colors cursor-pointer"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Load Worked Example (Local Demo)</span>
+          </button>
+        </div>
       </div>
+
+      {error && (
+        <div className="p-3.5 rounded-xl bg-rose-950/50 border border-rose-800/60 text-xs text-rose-300 font-mono flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {successMsg && (
+        <div className="p-3.5 rounded-xl bg-emerald-950/50 border border-emerald-800/60 text-xs text-emerald-300 font-mono flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{successMsg}</span>
+        </div>
+      )}
 
       {/* Summary KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -108,39 +248,58 @@ export const BusinessCriticality: React.FC = () => {
         </div>
 
         <div className="rounded-xl border border-amber-800/60 bg-gradient-to-br from-amber-950/40 via-[#0B0F19] to-[#0B0F19] p-4">
-          <div className="text-[11px] font-mono text-amber-400 uppercase tracking-wider">Exposure Multiplier</div>
-          <div className="text-2xl font-bold font-mono text-amber-300 mt-1">{exposureMultiplier.toFixed(3)}x</div>
-          <p className="text-[10px] text-slate-400 mt-1 font-mono">Rating {exposureRating} (EM = 1 + 0.09375×Rating)</p>
+          <div className="text-[11px] font-mono text-amber-400 uppercase tracking-wider">System Classification</div>
+          <div className="flex items-center gap-2 mt-1">
+            <span className={`text-xs px-2.5 py-1 rounded font-mono font-bold border ${sysBadge.class}`}>
+              {sysBadge.label}
+            </span>
+          </div>
+          <p className="text-[10px] text-slate-400 mt-1 font-mono">Derived from AST discovery &amp; rules</p>
         </div>
 
         <div className="rounded-xl border border-purple-800/60 bg-gradient-to-br from-purple-950/40 via-[#0B0F19] to-[#0B0F19] p-4">
-          <div className="text-[11px] font-mono text-purple-400 uppercase tracking-wider">Raw Score (WIS × EM)</div>
-          <div className="text-2xl font-bold font-mono text-purple-300 mt-1">{rawScore.toFixed(3)}</div>
-          <p className="text-[10px] text-slate-400 mt-1 font-mono">{wis.toFixed(2)} × {exposureMultiplier.toFixed(3)}</p>
+          <div className="text-[11px] font-mono text-purple-400 uppercase tracking-wider">User Planning Override</div>
+          <div className="flex items-center gap-2 mt-1">
+            {critData?.user_override ? (
+              <span className={`text-xs px-2.5 py-1 rounded font-mono font-bold border ${getCriticalityBadge(critData.user_override).class}`}>
+                {critData.user_override} (OVERRIDDEN)
+              </span>
+            ) : (
+              <span className="text-xs font-mono text-slate-500 italic">None (Using System)</span>
+            )}
+          </div>
+          <p className="text-[10px] text-slate-400 mt-1 font-mono">Organization planning context</p>
         </div>
 
         <div className="rounded-xl border border-rose-800/60 bg-gradient-to-br from-rose-950/40 via-[#0B0F19] to-[#0B0F19] p-4">
           <div className="flex justify-between items-center">
-            <span className="text-[11px] font-mono text-rose-400 uppercase tracking-wider">Normalized Score</span>
-            <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold border ${badge.class}`}>
-              {badge.label}
+            <span className="text-[11px] font-mono text-rose-400 uppercase tracking-wider">Effective Criticality</span>
+            <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold border ${effBadge.class}`}>
+              {effBadge.label}
             </span>
           </div>
-          <div className="text-2xl font-bold font-mono text-slate-100 mt-1">{normalizedValue.toFixed(2)} <span className="text-xs text-slate-500">/ 5.00</span></div>
-          <p className="text-[10px] text-slate-400 mt-1 font-mono">min(5, {rawScore.toFixed(3)} / 1.5) = {normalizedValue.toFixed(2)}</p>
+          <div className="text-xl font-bold font-mono text-slate-100 mt-1">{effBadge.label}</div>
+          <p className="text-[10px] text-slate-400 mt-1 font-mono">Used for Risk, Priority &amp; Roadmap</p>
         </div>
       </div>
 
       {/* Main Two-Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column: Interactive Factor Sliders */}
+        {/* Left Column: Interactive Factor Sliders & Backend Sync */}
         <div className="lg:col-span-6 rounded-2xl border border-slate-800 bg-[#0B0F19] p-6 shadow-xl space-y-5">
           <div className="flex items-center justify-between pb-3 border-b border-slate-800">
             <h2 className="text-base font-bold font-mono text-slate-100 flex items-center gap-2">
               <Calculator className="w-4 h-4 text-cyan-400" />
               Factor Rating Sliders (0 – 5)
             </h2>
-            <span className="text-xs font-mono text-slate-400">Total Weight: 100%</span>
+            <button
+              onClick={handleSaveFactorRatings}
+              disabled={saving}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-mono font-bold transition-all cursor-pointer shadow-md shadow-cyan-950/50"
+            >
+              <Save className="w-3.5 h-3.5" />
+              <span>Save Factor Ratings</span>
+            </button>
           </div>
 
           <div className="space-y-4">
@@ -162,7 +321,6 @@ export const BusinessCriticality: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Segmented 0-5 Button Selector + Range Slider */}
                   <div className="space-y-2">
                     <div className="grid grid-cols-6 gap-1">
                       {[0, 1, 2, 3, 4, 5].map((num) => (
@@ -202,7 +360,7 @@ export const BusinessCriticality: React.FC = () => {
                 <span className="font-bold text-amber-300">Exposure Rating</span>
                 <div className="flex items-center gap-2">
                   <span className="px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800 font-bold">
-                    Rating: {exposureRating}
+                    Rating: {expRating}
                   </span>
                   <span className="text-amber-400 font-bold text-[11px]">
                     EM = {exposureMultiplier.toFixed(3)}
@@ -214,9 +372,9 @@ export const BusinessCriticality: React.FC = () => {
                   <button
                     key={num}
                     type="button"
-                    onClick={() => setExposureRating(num)}
+                    onClick={() => handleRatingChange('exposureRating', num)}
                     className={`py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
-                      exposureRating === num
+                      expRating === num
                         ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-950/50'
                         : 'bg-slate-900 text-slate-400 border border-slate-800 hover:border-slate-700 hover:text-slate-200'
                     }`}
@@ -230,8 +388,8 @@ export const BusinessCriticality: React.FC = () => {
                 min={0}
                 max={5}
                 step={1}
-                value={exposureRating}
-                onChange={(e) => setExposureRating(Number(e.target.value))}
+                value={expRating}
+                onChange={(e) => handleRatingChange('exposureRating', Number(e.target.value))}
                 className="w-full accent-amber-400 cursor-pointer h-1.5 bg-slate-800 rounded-lg"
               />
               <p className="text-[10px] text-slate-400">
@@ -241,111 +399,119 @@ export const BusinessCriticality: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Column: Worked Example Output Table */}
-        <div className="lg:col-span-6 rounded-2xl border border-slate-800 bg-[#0B0F19] p-6 shadow-xl space-y-5">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-            <div>
-              <span className="text-xs font-mono text-cyan-400 uppercase tracking-wider font-semibold">Worked Example</span>
-              <h2 className="text-base font-bold font-mono text-slate-100 mt-0.5">
-                Payment-Processing Microservice Evaluation
-              </h2>
+        {/* Right Column: User Planning Override & Audit Trail */}
+        <div className="lg:col-span-6 space-y-6">
+          {/* User Override Card */}
+          <div className="rounded-2xl border border-purple-900/60 bg-[#0B0F19] p-6 shadow-xl space-y-4">
+            <div className="pb-3 border-b border-purple-900/40 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-mono uppercase tracking-wider text-purple-400 font-bold">
+                  User Planning Override
+                </span>
+                <h2 className="text-base font-bold font-mono text-slate-100">
+                  Override Effective Planning Criticality
+                </h2>
+              </div>
+              {critData?.is_overridden && (
+                <button
+                  onClick={handleRevertOverride}
+                  disabled={saving}
+                  className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 hover:border-slate-600 text-slate-300 text-xs font-mono transition-all cursor-pointer"
+                >
+                  Revert to System Default
+                </button>
+              )}
             </div>
-            <span className="px-2.5 py-1 text-xs font-mono rounded-md bg-cyan-950 border border-cyan-800 text-cyan-300 font-bold">
-              WIS = {wis.toFixed(2)}
-            </span>
+
+            <div className="space-y-4 font-mono text-xs">
+              <div>
+                <label className="block text-slate-300 font-bold mb-1.5">
+                  Planning Criticality Tier
+                </label>
+                <div className="grid grid-cols-4 gap-2">
+                  {['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map((tier) => (
+                    <button
+                      key={tier}
+                      type="button"
+                      onClick={() => setOverrideValue(tier)}
+                      className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        overrideValue === tier
+                          ? 'bg-purple-600 text-white shadow-lg shadow-purple-950/60 border border-purple-400'
+                          : 'bg-slate-900 text-slate-400 border border-slate-800 hover:border-slate-700'
+                      }`}
+                    >
+                      {tier}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1.5">
+                  Adjustment Reason <span className="text-rose-400">* (Mandatory)</span>
+                </label>
+                <textarea
+                  value={adjustmentReason}
+                  onChange={(e) => setAdjustmentReason(e.target.value)}
+                  placeholder="e.g. Payment processing system has contractual SLA requirements and regulatory exposure."
+                  className="w-full h-24 p-3 rounded-xl bg-[#06080F] border border-slate-800 text-slate-200 text-xs font-mono placeholder-slate-600 focus:outline-none focus:border-purple-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <span className="text-[11px] text-slate-500">
+                  Updates RiskAssessments, Priority Queue, and Roadmap Effort.
+                </span>
+                <button
+                  onClick={handleSaveOverride}
+                  disabled={saving || !adjustmentReason.trim()}
+                  className="px-4 py-2 rounded-xl bg-purple-500 hover:bg-purple-400 disabled:opacity-50 text-slate-950 font-bold text-xs shadow-md shadow-purple-950/50 cursor-pointer transition-all"
+                >
+                  Save Override &amp; Audit
+                </button>
+              </div>
+            </div>
           </div>
 
-          {/* Formatted Worked Example Table */}
-          <div className="rounded-xl border border-slate-800 overflow-hidden bg-[#06080F]">
-            <table className="w-full text-left text-xs font-mono">
-              <thead className="bg-slate-900/90 text-slate-400 border-b border-slate-800 uppercase tracking-wider">
-                <tr>
-                  <th className="py-3 px-4">Factor</th>
-                  <th className="py-3 px-4 text-center">Rating</th>
-                  <th className="py-3 px-4 text-center">Weight</th>
-                  <th className="py-3 px-4 text-right">Contribution</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60">
-                {contributions.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-900/40 transition-colors">
-                    <td className="py-2.5 px-4 font-semibold text-slate-200">{item.name}</td>
-                    <td className="py-2.5 px-4 text-center">
-                      <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-cyan-300 font-bold">
-                        {item.rating}
-                      </span>
-                    </td>
-                    <td className="py-2.5 px-4 text-center text-slate-400">{item.weight.toFixed(2)}</td>
-                    <td className="py-2.5 px-4 text-right font-bold text-slate-100">
-                      {item.contribution.toFixed(2)}
-                    </td>
-                  </tr>
-                ))}
-
-                {/* Summary Rows */}
-                <tr className="bg-cyan-950/30 border-t-2 border-slate-700 font-bold">
-                  <td className="py-3 px-4 text-cyan-300 text-sm">WIS</td>
-                  <td className="py-3 px-4 text-center"></td>
-                  <td className="py-3 px-4 text-center"></td>
-                  <td className="py-3 px-4 text-right text-cyan-300 text-sm font-black">
-                    {wis.toFixed(2)}
-                  </td>
-                </tr>
-
-                <tr className="bg-slate-900/60">
-                  <td className="py-3 px-4 text-slate-300 font-medium">Exposure rating</td>
-                  <td className="py-3 px-4 text-center">
-                    <span className="px-2 py-0.5 rounded bg-amber-950 border border-amber-800 text-amber-300 font-bold">
-                      {exposureRating}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-center text-slate-500">—</td>
-                  <td className="py-3 px-4 text-right text-amber-300 font-bold">
-                    EM = {exposureMultiplier.toFixed(3)}
-                  </td>
-                </tr>
-
-                <tr className="bg-slate-900/80">
-                  <td className="py-3 px-4 text-slate-200 font-medium">Raw Score</td>
-                  <td className="py-3 px-4 text-center"></td>
-                  <td className="py-3 px-4 text-center"></td>
-                  <td className="py-3 px-4 text-right text-purple-300 font-bold">
-                    {rawScore.toFixed(3)}
-                  </td>
-                </tr>
-
-                <tr className="bg-rose-950/40 border-t border-rose-800/60 font-black">
-                  <td className="py-3 px-4 text-rose-300 text-sm">Normalized</td>
-                  <td className="py-3 px-4 text-center"></td>
-                  <td className="py-3 px-4 text-center"></td>
-                  <td className="py-3 px-4 text-right text-rose-300 text-sm">
-                    min(5, { (rawScore / 1.5).toFixed(2) }) = <span className="underline">{normalizedValue.toFixed(2)}</span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* Mathematical Formula Explanation Card */}
-          <div className="p-4 rounded-xl border border-slate-800 bg-[#06080F] space-y-2">
-            <h3 className="text-xs font-mono font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
-              <Info className="w-4 h-4 text-cyan-400" />
-              Mathematical Formula Reference
-            </h3>
-            <div className="space-y-1.5 text-xs font-mono text-slate-400 leading-relaxed">
-              <p>
-                <strong className="text-cyan-300">1. Weighted Impact Score (WIS):</strong> WIS = Σ (Rating_i × Weight_i)
-              </p>
-              <p>
-                <strong className="text-amber-300">2. Exposure Multiplier (EM):</strong> EM = 1.0 + (0.09375 × ExposureRating)
-              </p>
-              <p>
-                <strong className="text-purple-300">3. Raw Score:</strong> Raw Score = WIS × EM
-              </p>
-              <p>
-                <strong className="text-rose-300">4. Normalized Score:</strong> Normalized Score = min(5.00, Raw Score / 1.5)
-              </p>
+          {/* Audit Trail Card */}
+          <div className="rounded-2xl border border-slate-800 bg-[#0B0F19] p-6 shadow-xl space-y-4">
+            <div className="flex items-center gap-2 pb-3 border-b border-slate-800 text-xs font-mono text-cyan-400 font-bold uppercase tracking-wider">
+              <History className="w-4 h-4" />
+              <span>Audited Criticality Changes &amp; Overrides</span>
             </div>
+
+            {auditEvents && auditEvents.length > 0 ? (
+              <div className="space-y-3 font-mono text-xs max-h-60 overflow-y-auto pr-1">
+                {auditEvents.map((evt: any, idx: number) => {
+                  const d = evt.details || {};
+                  return (
+                    <div key={idx} className="p-3 rounded-xl bg-[#06080F] border border-slate-800/80 space-y-1">
+                      <div className="flex justify-between items-center text-slate-300 font-bold">
+                        <span className="text-cyan-300">{evt.action}</span>
+                        <span className="text-[10px] text-slate-500">{new Date(evt.created_at).toLocaleString()}</span>
+                      </div>
+                      <div className="text-[11px] text-slate-400">
+                        Actor: <span className="text-slate-200">{evt.actor}</span>
+                      </div>
+                      {d.reason && (
+                        <div className="text-[11px] text-purple-300 italic">
+                          "{d.reason}"
+                        </div>
+                      )}
+                      {d.changes && Array.isArray(d.changes) && (
+                        <div className="text-[10px] text-slate-500">
+                          {d.changes.join(', ')}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="py-6 text-center text-xs text-slate-500 font-mono">
+                No business criticality override events recorded yet.
+              </div>
+            )}
           </div>
         </div>
       </div>

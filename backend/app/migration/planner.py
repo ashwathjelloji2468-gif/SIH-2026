@@ -324,6 +324,19 @@ class MigrationPlanner:
             tasks = self.generate_tasks_for_asset(asset, ra, rec, impact_info)
             all_tasks_data.extend(tasks)
 
+        # Get dynamic effective business criticality score for project planning
+        eff_crit_score = 75.0
+        eff_label = "HIGH"
+        try:
+            from app.services.business_criticality_service import BusinessCriticalityService
+            crit_service = BusinessCriticalityService(db)
+            b_info = crit_service.get_project_business_criticality(project_id)
+            eff_label = b_info.get("effective_criticality", "HIGH")
+            crit_score_map = {"CRITICAL": 100.0, "HIGH": 75.0, "MEDIUM": 50.0, "LOW": 25.0}
+            eff_crit_score = crit_score_map.get(eff_label, 75.0)
+        except Exception:
+            pass
+
         effort = estimate_migration_effort(
             affected_assets_count=len(assets),
             affected_apps_count=1,
@@ -332,9 +345,10 @@ class MigrationPlanner:
             pki_cert_dependency_count=pki_cert_dependency_count,
             crypto_agility_score=crypto_agility_score,
             testing_requirement_level=testing_requirement_level,
-            business_criticality_score=80.0,
+            business_criticality_score=eff_crit_score,
             engineering_capacity_developers=engineering_capacity_developers
         )
+
 
         plan = repo.create_plan(
             project_id=project_id,
