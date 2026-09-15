@@ -22,5 +22,9 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
+if settings.ENVIRONMENT.lower() in ("production", "prod"):
+    if settings.SECRET_KEY == "dev-secret-key-change-in-production-do-not-use-hardcoded":
+        raise RuntimeError("CRITICAL SECURITY ERROR: SECRET_KEY must be changed from default in production environment!")
+
 os.makedirs(settings.STORAGE_PATH, exist_ok=True)
 os.makedirs(settings.SANDBOX_PATH, exist_ok=True)

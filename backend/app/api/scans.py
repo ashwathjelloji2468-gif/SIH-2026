@@ -67,15 +67,41 @@ async def upload_binary_and_start_scan(
     db: Session = Depends(get_db)
 ):
     import os, uuid
+    MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50MB limit
+
     upload_dir = os.path.join(os.getcwd(), "uploads")
     os.makedirs(upload_dir, exist_ok=True)
 
-    safe_filename = f"{uuid.uuid4().hex[:8]}_{file.filename}"
+    raw_filename = os.path.basename(file.filename or "uploaded_file")
+    # Sanitize filename (remove path traversal characters, keep safe characters)
+    safe_name = "".join(c for c in raw_filename if c.isalnum() or c in (".", "-", "_"))
+    if not safe_name:
+        safe_name = "uploaded_file"
+
+    safe_filename = f"{uuid.uuid4().hex[:8]}_{safe_name}"
     file_path = os.path.join(upload_dir, safe_filename)
 
-    contents = await file.read()
-    with open(file_path, "wb") as f:
-        f.write(contents)
+    total_bytes = 0
+    try:
+        with open(file_path, "wb") as f:
+            while True:
+                chunk = await file.read(1024 * 64)  # 64KB chunks
+                if not chunk:
+                    break
+                total_bytes += len(chunk)
+                if total_bytes > MAX_UPLOAD_BYTES:
+                    raise HTTPException(
+                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                        detail=f"Uploaded file size exceeds limit of {MAX_UPLOAD_BYTES} bytes."
+                    )
+                f.write(chunk)
+    except Exception:
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except OSError:
+                pass
+        raise
 
     repo = ScanRepository(db)
     scan = repo.create(project_id=project_id, target_path=file_path, scan_type="binary")

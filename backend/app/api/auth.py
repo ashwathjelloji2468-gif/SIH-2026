@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from app.core.security import create_access_token
+from app.core.config import settings
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -14,6 +15,12 @@ class TokenResponse(BaseModel):
 
 @router.post("/login", response_model=TokenResponse)
 def login(request: LoginRequest):
+    if settings.ENVIRONMENT.lower() in ("production", "prod"):
+        if request.password == "admin123":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Default credentials are disabled in production environment."
+            )
     if request.username == "admin" and request.password == "admin123":
         token = create_access_token(data={"sub": request.username})
         return TokenResponse(access_token=token)
