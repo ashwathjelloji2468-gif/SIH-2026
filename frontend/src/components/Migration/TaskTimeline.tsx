@@ -22,16 +22,16 @@ export const TaskTimeline: React.FC<TaskTimelineProps> = ({ plan }) => {
           <div className="flex items-center gap-2 rounded-xl bg-slate-900 border border-slate-800 px-3.5 py-2 font-mono">
             <Clock className="w-4 h-4 text-cyan-400" />
             <div>
-              <div className="text-[10px] text-slate-500 uppercase">Effort</div>
-              <div className="text-sm font-bold text-slate-200">{plan.total_person_days} Person-Days</div>
+              <div className="text-[10px] text-slate-500 uppercase">Effort Level</div>
+              <div className="text-sm font-bold text-slate-200">{plan.effort_level || 'MEDIUM'} Effort</div>
             </div>
           </div>
 
           <div className="flex items-center gap-2 rounded-xl bg-slate-900 border border-slate-800 px-3.5 py-2 font-mono">
             <Calendar className="w-4 h-4 text-purple-400" />
             <div>
-              <div className="text-[10px] text-slate-500 uppercase">Duration</div>
-              <div className="text-sm font-bold text-purple-300">{plan.total_calendar_months} Months</div>
+              <div className="text-[10px] text-slate-500 uppercase">Strategy Profile</div>
+              <div className="text-sm font-bold text-purple-300">{plan.profile || 'BALANCED'}</div>
             </div>
           </div>
         </div>
@@ -68,8 +68,8 @@ export const TaskTimeline: React.FC<TaskTimelineProps> = ({ plan }) => {
 
                 <div className="flex items-center gap-4 shrink-0 font-mono text-xs">
                   <div className="text-right">
-                    <span className="text-slate-300 font-semibold">{task.person_days}d</span>
-                    <span className="text-[10px] text-slate-500 block">estimated</span>
+                    <span className="text-slate-300 font-semibold">{task.priority || 'P1'}</span>
+                    <span className="text-[10px] text-slate-500 block">priority</span>
                   </div>
                   <span className="text-[10px] px-2 py-0.5 rounded border border-cyan-800/60 bg-cyan-950/60 text-cyan-400 font-semibold uppercase">
                     {task.status || 'PLANNED'}

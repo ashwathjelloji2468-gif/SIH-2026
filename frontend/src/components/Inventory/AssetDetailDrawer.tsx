@@ -395,9 +395,9 @@ export const AssetDetailDrawer: React.FC<AssetDetailDrawerProps> = ({ asset, onC
                     </div>
                   </div>
                   <div className="rounded-xl bg-[#0B0F19] border border-slate-800 p-3">
-                    <div className="text-[10px] text-slate-500 font-mono uppercase">Effort</div>
+                    <div className="text-[10px] text-slate-500 font-mono uppercase">Effort Level</div>
                     <div className="text-sm font-bold font-mono text-amber-300">
-                      {migrationInfo.estimated_person_days ? `${migrationInfo.estimated_person_days}d` : 'N/A'}
+                      {migrationInfo.effort_level || migrationInfo.complexity || 'MEDIUM'}
                     </div>
                   </div>
                   <div className="rounded-xl bg-[#0B0F19] border border-slate-800 p-3">

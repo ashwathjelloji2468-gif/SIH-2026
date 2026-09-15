@@ -4,6 +4,7 @@ import { MigrationPlan, MigrationPlanCreateInput, SandboxSimulationResult } from
 export interface MigrationSummary {
   total_tasks: number;
   completed_tasks: number;
+  effort_level?: string;
   total_person_days: number;
   total_calendar_months: number;
   priority_breakdown: Record<string, number>;

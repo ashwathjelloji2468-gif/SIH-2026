@@ -56,7 +56,7 @@ export const Migration: React.FC = () => {
           </div>
           <h1 className="text-2xl font-bold font-mono text-slate-100">Migration Planning & Sandbox Simulation</h1>
           <p className="text-xs text-slate-400 leading-relaxed">
-            Quantify transition person-days, execute side-by-side AST code transformation simulations from classical RSA/ECDSA to NIST FIPS 203/204 ML-KEM candidates, and run validation.
+            Evaluate evidence-backed transition effort, execute side-by-side AST code transformation simulations from classical RSA/ECDSA to NIST FIPS 203/204 ML-KEM candidates, and run validation.
           </p>
           <div className="flex flex-wrap items-center gap-3 pt-2 text-xs font-mono">
             <span className="bg-emerald-950/60 border border-emerald-800/60 text-emerald-300 px-2.5 py-1 rounded-full flex items-center gap-1.5">
@@ -104,7 +104,7 @@ export const Migration: React.FC = () => {
                       : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  {p.name} ({p.total_person_days}d)
+                  {p.name} ({p.effort_level || 'MEDIUM'})
                 </button>
               );
             })}

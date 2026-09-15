@@ -357,6 +357,7 @@ export interface MigrationTask {
   asset_id: string;
   title: string;
   description?: string | null;
+  priority?: string;
   person_days: number;
   sequence_order: number;
   status: string;

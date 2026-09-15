@@ -100,7 +100,7 @@ export const PipelineStatus: React.FC<PipelineStatusProps> = ({
       status: migrateStatus,
       metric:
         totalTasks > 0
-          ? `${totalTasks} tasks · ${migrationSummary?.total_person_days ?? 0}d`
+          ? `${totalTasks} tasks · ${migrationSummary?.effort_level || 'MEDIUM'}`
           : 'Not yet planned',
     },
     {
