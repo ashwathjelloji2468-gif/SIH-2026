@@ -324,16 +324,21 @@ class MigrationSimulationResponse(BaseModel):
 
 class ValidationRunResponse(BaseModel):
     id: str
+    project_id: Optional[str] = None
+    scan_id: Optional[str] = None
     simulation_id: Optional[str] = None
     plan_id: Optional[str] = None
     asset_id: Optional[str] = None
     check_type: str = "BUILD"
     status: str = "PENDING"
+    framework: Optional[str] = None
     command: Optional[str] = None
     exit_code: Optional[int] = None
     output_summary: Optional[str] = None
     evidence: Optional[Dict[str, Any]] = None
     duration: float = 0.0
+    duration_ms: int = 0
+    timeout: bool = False
     build_passed: bool = False
     unit_tests_passed: bool = False
     crypto_tests_passed: bool = False
@@ -343,6 +348,8 @@ class ValidationRunResponse(BaseModel):
     logs: Optional[str] = None
     residual_risk_score: float = 0.0
     confidence: float = 1.0
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

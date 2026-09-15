@@ -24,8 +24,6 @@ export type StandardStatus = 'FINAL_STANDARD' | 'DRAFT_STANDARD' | 'ROUND_4_CAND
 
 export type ThreatScenarioType = 'CONSERVATIVE' | 'MODERATE' | 'AGGRESSIVE' | 'CUSTOM';
 
-export type ValidationStatus = 'SUCCESS' | 'FAILED' | 'ERROR' | 'IN_PROGRESS';
-
 export type TestingRequirement = 'LOW' | 'MEDIUM' | 'HIGH' | 'REGULATED';
 
 // System Health
@@ -396,10 +394,32 @@ export interface SandboxSimulationResult {
 }
 
 // Validation
+export type ValidationStatus =
+  | 'PENDING'
+  | 'PASSED'
+  | 'FAILED'
+  | 'TIMEOUT'
+  | 'NOT_CONFIGURED'
+  | 'NOT_SUPPORTED'
+  | 'ERROR'
+  | 'INCONCLUSIVE'
+  | 'SUCCESS'
+  | 'IN_PROGRESS';
+
 export interface ValidationRun {
   id: string;
-  plan_id: string;
+  project_id?: string | null;
+  scan_id?: string | null;
+  simulation_id?: string | null;
+  plan_id?: string | null;
   status: ValidationStatus;
+  check_type?: string;
+  framework?: string | null;
+  command?: string | null;
+  exit_code?: number | null;
+  timeout?: boolean;
+  duration?: number;
+  duration_ms?: number;
   build_passed: boolean;
   unit_tests_passed: boolean;
   crypto_tests_passed: boolean;
@@ -407,8 +427,11 @@ export interface ValidationRun {
   regression_passed?: boolean;
   api_compatible?: boolean;
   logs?: string | null;
+  output_summary?: string | null;
   residual_risk_score: number;
   confidence: number;
+  started_at?: string | null;
+  completed_at?: string | null;
   created_at: string;
 }
 

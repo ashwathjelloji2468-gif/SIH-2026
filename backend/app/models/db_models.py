@@ -331,16 +331,21 @@ class ValidationRun(Base):
     __tablename__ = "validation_runs"
 
     id = Column(String, primary_key=True, default=generate_uuid)
+    project_id = Column(String, ForeignKey("projects.id", ondelete="CASCADE"), nullable=True)
+    scan_id = Column(String, ForeignKey("scans.id", ondelete="CASCADE"), nullable=True)
     simulation_id = Column(String, ForeignKey("migration_simulations.id", ondelete="CASCADE"), nullable=True)
     plan_id = Column(String, ForeignKey("migration_plans.id", ondelete="CASCADE"), nullable=True)
     asset_id = Column(String, nullable=True)
     check_type = Column(String, default="BUILD")
     status = Column(SQLEnum(ValidationStatus), default=ValidationStatus.PENDING, nullable=False)
+    framework = Column(String, nullable=True)
     command = Column(String, nullable=True)
     exit_code = Column(Integer, nullable=True)
     output_summary = Column(Text, nullable=True)
     evidence = Column(JSON, nullable=True)
     duration = Column(Float, default=0.0)
+    duration_ms = Column(Integer, default=0)
+    timeout = Column(Boolean, default=False)
     build_passed = Column(Boolean, default=False)
     unit_tests_passed = Column(Boolean, default=False)
     crypto_tests_passed = Column(Boolean, default=False)
@@ -350,6 +355,8 @@ class ValidationRun(Base):
     logs = Column(Text, nullable=True)
     residual_risk_score = Column(Float, default=0.0)
     confidence = Column(Float, default=1.0)
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships

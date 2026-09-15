@@ -61,6 +61,10 @@ class ValidationStatus(str, Enum):
     PASSED = "PASSED"
     FAILED = "FAILED"
     INCONCLUSIVE = "INCONCLUSIVE"
+    TIMEOUT = "TIMEOUT"
+    NOT_CONFIGURED = "NOT_CONFIGURED"
+    NOT_SUPPORTED = "NOT_SUPPORTED"
+    ERROR = "ERROR"
 
 class QuantumSafety(str, Enum):
     QUANTUM_VULNERABLE = "QUANTUM_VULNERABLE"
@@ -162,3 +166,7 @@ class ValidationCheckStatus(str, Enum):
     SKIPPED = "SKIPPED"
     BLOCKED = "BLOCKED"
     NOT_RUN = "NOT_RUN"
+    TIMEOUT = "TIMEOUT"
+    NOT_CONFIGURED = "NOT_CONFIGURED"
+    NOT_SUPPORTED = "NOT_SUPPORTED"
+    ERROR = "ERROR"

@@ -12,6 +12,12 @@ export interface ValidationSummary {
 }
 
 export const validationService = {
+  /** Execute real build validation for a project/repository */
+  runBuildValidation: async (projectId: string, scanId?: string): Promise<ValidationRun> => {
+    const url = scanId ? `/projects/${projectId}/validation/build?scan_id=${scanId}` : `/projects/${projectId}/validation/build`;
+    return api.post<ValidationRun>(url);
+  },
+
   runValidation: async (planId: string): Promise<ValidationRun> => {
     return api.post<ValidationRun>(`/migration/plans/${planId}/validate`);
   },

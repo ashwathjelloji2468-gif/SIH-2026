@@ -10,16 +10,21 @@ class ValidationRepository:
 
     def create_validation_run(
         self,
+        project_id: Optional[str] = None,
+        scan_id: Optional[str] = None,
         simulation_id: Optional[str] = None,
         plan_id: Optional[str] = None,
         asset_id: Optional[str] = None,
         check_type: str = "BUILD",
         status: ValidationStatus = ValidationStatus.PENDING,
+        framework: Optional[str] = None,
         command: Optional[str] = None,
         exit_code: Optional[int] = None,
         output_summary: Optional[str] = None,
         evidence: Optional[Dict[str, Any]] = None,
         duration: float = 0.0,
+        duration_ms: int = 0,
+        timeout: bool = False,
         build_passed: bool = False,
         unit_tests_passed: bool = False,
         crypto_tests_passed: bool = False,
@@ -28,7 +33,9 @@ class ValidationRepository:
         api_compatible: bool = False,
         logs: Optional[str] = None,
         residual_risk_score: float = 0.0,
-        confidence: float = 1.0
+        confidence: float = 1.0,
+        started_at: Optional[Any] = None,
+        completed_at: Optional[Any] = None
     ) -> ValidationRun:
         if not plan_id and simulation_id:
             from app.models.db_models import MigrationSimulation
@@ -36,19 +43,22 @@ class ValidationRepository:
             if sim and sim.migration_plan_id:
                 plan_id = sim.migration_plan_id
 
-
-
         run = ValidationRun(
+            project_id=project_id,
+            scan_id=scan_id,
             simulation_id=simulation_id,
             plan_id=plan_id,
             asset_id=asset_id,
             check_type=check_type,
             status=status,
+            framework=framework,
             command=command,
             exit_code=exit_code,
             output_summary=output_summary,
             evidence=evidence,
             duration=duration,
+            duration_ms=duration_ms,
+            timeout=timeout,
             build_passed=build_passed,
             unit_tests_passed=unit_tests_passed,
             crypto_tests_passed=crypto_tests_passed,
@@ -57,7 +67,9 @@ class ValidationRepository:
             api_compatible=api_compatible,
             logs=logs,
             residual_risk_score=residual_risk_score,
-            confidence=confidence
+            confidence=confidence,
+            started_at=started_at,
+            completed_at=completed_at
         )
         self.db.add(run)
         self.db.commit()
@@ -75,6 +87,7 @@ class ValidationRepository:
 
     def get_by_project(self, project_id: str) -> List[ValidationRun]:
         from app.models.db_models import CryptoAsset, Scan, MigrationPlan, MigrationSimulation
+        runs_by_direct = self.db.query(ValidationRun).filter(ValidationRun.project_id == project_id).all()
         runs_by_asset = (
             self.db.query(ValidationRun)
             .join(CryptoAsset, ValidationRun.asset_id == CryptoAsset.id)
@@ -96,7 +109,7 @@ class ValidationRepository:
         )
         seen = set()
         unique_runs = []
-        for r in runs_by_asset + runs_by_plan + runs_by_sim:
+        for r in runs_by_direct + runs_by_asset + runs_by_plan + runs_by_sim:
             if r.id not in seen:
                 seen.add(r.id)
                 unique_runs.append(r)
