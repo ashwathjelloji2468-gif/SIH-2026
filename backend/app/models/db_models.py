@@ -479,6 +479,55 @@ class CryptoEdge(Base):
     source_node = relationship("CryptoNode", foreign_keys=[source_node_id], back_populates="outgoing_edges")
     target_node = relationship("CryptoNode", foreign_keys=[target_node_id], back_populates="incoming_edges")
 
+    @property
+    def evidence_type(self) -> str:
+        if self.extra_metadata and isinstance(self.extra_metadata, dict):
+            return self.extra_metadata.get("evidence_type", "UNKNOWN")
+        return "UNKNOWN"
+
+    @property
+    def evidence_text(self) -> str:
+        if self.extra_metadata and isinstance(self.extra_metadata, dict):
+            text = self.extra_metadata.get("evidence_text")
+            if text:
+                return text
+        return "Legacy relationship; no stored evidence available."
+
+    @property
+    def file_path(self) -> Optional[str]:
+        if self.extra_metadata and isinstance(self.extra_metadata, dict):
+            return self.extra_metadata.get("file_path")
+        return None
+
+    @property
+    def line_number(self) -> Optional[int]:
+        if self.extra_metadata and isinstance(self.extra_metadata, dict):
+            val = self.extra_metadata.get("line_number")
+            if val is not None:
+                try:
+                    return int(val)
+                except (ValueError, TypeError):
+                    pass
+        return None
+
+    @property
+    def detector_name(self) -> Optional[str]:
+        if self.extra_metadata and isinstance(self.extra_metadata, dict):
+            return self.extra_metadata.get("detector_name")
+        return None
+
+    @property
+    def confidence(self) -> float:
+        if self.extra_metadata and isinstance(self.extra_metadata, dict):
+            val = self.extra_metadata.get("confidence")
+            if val is not None:
+                try:
+                    return float(val)
+                except (ValueError, TypeError):
+                    pass
+        return 0.50
+
+
 class BlastRadiusResult(Base):
     __tablename__ = "blast_radius_results"
 

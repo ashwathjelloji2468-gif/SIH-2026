@@ -468,6 +468,12 @@ class CryptoEdgeResponse(BaseModel):
     target_node_id: str
     relation_type: str
     strength: float
+    evidence_type: str = "UNKNOWN"
+    evidence_text: str = "Legacy relationship; no stored evidence available."
+    file_path: Optional[str] = None
+    line_number: Optional[int] = None
+    detector_name: Optional[str] = None
+    confidence: float = 0.50
     extra_metadata: Optional[Dict[str, Any]] = None
 
     model_config = ConfigDict(from_attributes=True)
@@ -498,11 +504,19 @@ class BlastRadiusResponse(BaseModel):
     root_node_type: str
     radius_score: float
     affected_nodes_count: int
+    direct_dependents: int = 0
+    indirect_dependents: int = 0
+    affected_crypto_assets: int = 0
+    affected_services: int = 0
+    critical_affected_nodes: int = 0
+    edges_traversed: int = 0
     systems_count: int
     data_classes: List[str]
     estimated_migration_effort: float
     affected_nodes: List[BlastRadiusAffectedNodeSchema]
     affected_systems: List[str] = []
+    calculation: Optional[Dict[str, Any]] = None
+    traversed_edges_evidence: List[Dict[str, Any]] = []
 
 class TopBlastRadiusSummaryResponse(BaseModel):
     project_id: str

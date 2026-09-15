@@ -480,6 +480,12 @@ export interface CryptoEdge {
   target_node_id: string;
   relation_type: string;
   strength: number;
+  evidence_type?: string;
+  evidence_text?: string;
+  file_path?: string | null;
+  line_number?: number | null;
+  detector_name?: string | null;
+  confidence?: number;
   extra_metadata?: Record<string, any> | null;
 }
 
@@ -509,6 +515,46 @@ export interface BlastRadiusAffectedNode {
   impact_score: number;
 }
 
+export interface TraversedEdgeEvidence {
+  edge_id: string;
+  source_node_id: string;
+  target_node_id: string;
+  source_name: string;
+  target_name: string;
+  relation_type: string;
+  evidence_type: string;
+  evidence_text: string;
+  file_path?: string | null;
+  line_number?: number | null;
+  confidence: number;
+  detector_name?: string | null;
+}
+
+export interface BlastRadiusCalculationBreakdown {
+  formula: string;
+  root_node_weights: {
+    quantum_risk: string;
+    risk_weight: number;
+    business_criticality: number;
+    mosca_x: number;
+  };
+  traversal_stats: {
+    max_hops: number;
+    total_visited_nodes: number;
+    affected_nodes_count: number;
+    direct_dependents: number;
+    indirect_dependents: number;
+    critical_affected_nodes: number;
+    edges_traversed: number;
+  };
+  score_breakdown: {
+    total_weighted_impact: number;
+    avg_weighted_impact: number;
+    volume_multiplier: number;
+    final_radius_score: number;
+  };
+}
+
 export interface BlastRadiusResult {
   id?: string;
   scan_id: string;
@@ -517,11 +563,19 @@ export interface BlastRadiusResult {
   root_node_type: string;
   radius_score: number;
   affected_nodes_count: number;
+  direct_dependents?: number;
+  indirect_dependents?: number;
+  affected_crypto_assets?: number;
+  affected_services?: number;
+  critical_affected_nodes?: number;
+  edges_traversed?: number;
   systems_count: number;
   data_classes: string[];
   estimated_migration_effort: number;
   affected_nodes: BlastRadiusAffectedNode[];
   affected_systems: string[];
+  calculation?: BlastRadiusCalculationBreakdown;
+  traversed_edges_evidence?: TraversedEdgeEvidence[];
 }
 
 export interface TopBlastRadiusSummary {

@@ -3,6 +3,7 @@ from typing import List, Dict, Any, Optional, Set
 from sqlalchemy.orm import Session
 from app.models.db_models import Scan, CryptoAsset, CryptoNode, CryptoEdge, BlastRadiusResult, RiskAssessment
 from app.core.logging import logger
+from app.validation.runner import mask_secrets
 
 class BlastRadiusEngine:
     """
@@ -96,20 +97,51 @@ class BlastRadiusEngine:
             created_nodes[node_key] = node
             return node
 
-        def add_edge(src_node_id: str, tgt_node_id: str, relation_type: str, strength: float = 1.0, metadata: Optional[Dict[str, Any]] = None):
+        def add_edge(
+            src_node_id: str,
+            tgt_node_id: str,
+            relation_type: str,
+            strength: float = 1.0,
+            evidence_type: str = "UNKNOWN",
+            evidence_text: str = "",
+            file_path: Optional[str] = None,
+            line_number: Optional[int] = None,
+            detector_name: Optional[str] = None,
+            confidence: float = 0.90,
+            metadata: Optional[Dict[str, Any]] = None
+        ):
             if src_node_id == tgt_node_id:
                 return
+
+            src_node = created_nodes.get(f"id:{src_node_id}") or db.query(CryptoNode).filter(CryptoNode.id == src_node_id).first()
+            tgt_node = created_nodes.get(f"id:{tgt_node_id}") or db.query(CryptoNode).filter(CryptoNode.id == tgt_node_id).first()
+            if src_node and tgt_node and src_node.scan_id != tgt_node.scan_id:
+                logger.warning(f"Rejected cross-scan edge between node {src_node_id} (scan {src_node.scan_id}) and {tgt_node_id} (scan {tgt_node.scan_id})")
+                return
+
             edge_tuple = (src_node_id, tgt_node_id, relation_type)
             if edge_tuple in created_edges_set:
                 return
             created_edges_set.add(edge_tuple)
+
+            meta = dict(metadata or {})
+            meta["evidence_type"] = evidence_type
+            meta["evidence_text"] = mask_secrets(evidence_text)
+            if file_path:
+                meta["file_path"] = file_path
+            if line_number is not None:
+                meta["line_number"] = line_number
+            if detector_name:
+                meta["detector_name"] = detector_name
+            meta["confidence"] = confidence
+
             edge = CryptoEdge(
                 scan_id=scan_id,
                 source_node_id=src_node_id,
                 target_node_id=tgt_node_id,
                 relation_type=relation_type,
                 strength=strength,
-                extra_metadata=metadata or {}
+                extra_metadata=meta
             )
             db.add(edge)
 
@@ -164,8 +196,23 @@ class BlastRadiusEngine:
             )
 
             # Component contains File, File uses Asset
-            add_edge(comp_node.id, file_node.id, "depends_on", strength=1.0)
-            add_edge(file_node.id, asset_node.id, "uses", strength=1.0)
+            add_edge(
+                comp_node.id, file_node.id, "depends_on", strength=1.0,
+                evidence_type="SOURCE_CONFIG_REFERENCE",
+                evidence_text=f"Component '{comp_name}' contains source file '{loc}'",
+                file_path=loc,
+                detector_name="SystemScanner",
+                confidence=1.0
+            )
+            add_edge(
+                file_node.id, asset_node.id, "uses", strength=1.0,
+                evidence_type="DIRECT_USAGE",
+                evidence_text=mask_secrets(f"File '{loc}' directly uses cryptographic asset '{asset_node.name}' ({asset.algorithm_name})"),
+                file_path=loc,
+                line_number=getattr(asset, "line_number", None),
+                detector_name=getattr(asset, "detector_name", "CryptoScanner"),
+                confidence=float(getattr(asset, "confidence", 0.95))
+            )
 
             # Track shared cert/key fingerprints
             extra_meta = asset.extra_metadata or {}
@@ -194,23 +241,59 @@ class BlastRadiusEngine:
                     mosca_x=10.0,
                     business_criticality=crit_score
                 )
-                add_edge(ref_file_node.id, asset_node.id, "uses", strength=0.9)
-                add_edge(file_node.id, ref_file_node.id, "depends_on", strength=0.9)
+                add_edge(
+                    ref_file_node.id, asset_node.id, "uses", strength=0.9,
+                    evidence_type="SOURCE_CONFIG_REFERENCE",
+                    evidence_text=mask_secrets(f"Cross-component reference file '{ref_file}' references asset '{asset_node.name}'"),
+                    file_path=ref_file,
+                    detector_name="ReferenceScanner",
+                    confidence=0.85
+                )
+                add_edge(
+                    file_node.id, ref_file_node.id, "depends_on", strength=0.9,
+                    evidence_type="SOURCE_CONFIG_REFERENCE",
+                    evidence_text=f"Source file '{loc}' depends on cross-component reference file '{ref_file}'",
+                    file_path=loc,
+                    detector_name="ReferenceScanner",
+                    confidence=0.85
+                )
 
         # 2. Infer 'shares_key' edges for matching fingerprints / shared key files
         for f_print, nodes_list in shared_fingerprint_map.items():
             if len(nodes_list) > 1:
                 for i in range(len(nodes_list)):
                     for j in range(i + 1, len(nodes_list)):
-                        add_edge(nodes_list[i].id, nodes_list[j].id, "shares_key", strength=1.0, metadata={"fingerprint": f_print})
-                        add_edge(nodes_list[j].id, nodes_list[i].id, "shares_key", strength=1.0, metadata={"fingerprint": f_print})
+                        ev_text = mask_secrets(f"Crypto asset '{nodes_list[i].name}' shares key fingerprint '{f_print}' with '{nodes_list[j].name}'")
+                        add_edge(
+                            nodes_list[i].id, nodes_list[j].id, "shares_key", strength=1.0,
+                            evidence_type="CBOM_RELATIONSHIP", evidence_text=ev_text,
+                            file_path=nodes_list[i].location, detector_name="KeyFingerprintMatcher", confidence=1.0,
+                            metadata={"fingerprint": f_print}
+                        )
+                        add_edge(
+                            nodes_list[j].id, nodes_list[i].id, "shares_key", strength=1.0,
+                            evidence_type="CBOM_RELATIONSHIP", evidence_text=ev_text,
+                            file_path=nodes_list[j].location, detector_name="KeyFingerprintMatcher", confidence=1.0,
+                            metadata={"fingerprint": f_print}
+                        )
 
         for fname, nodes_list in shared_filename_map.items():
             if len(nodes_list) > 1:
                 for i in range(len(nodes_list)):
                     for j in range(i + 1, len(nodes_list)):
-                        add_edge(nodes_list[i].id, nodes_list[j].id, "shares_key", strength=0.8, metadata={"shared_file": fname})
-                        add_edge(nodes_list[j].id, nodes_list[i].id, "shares_key", strength=0.8, metadata={"shared_file": fname})
+                        ev_text = mask_secrets(f"Asset at '{nodes_list[i].location}' shares certificate file '{fname}' with asset at '{nodes_list[j].location}'")
+                        add_edge(
+                            nodes_list[i].id, nodes_list[j].id, "shares_key", strength=0.8,
+                            evidence_type="HEURISTIC_DEPENDENCY", evidence_text=ev_text,
+                            file_path=nodes_list[i].location, detector_name="CertificateHeuristicMatcher", confidence=0.80,
+                            metadata={"shared_file": fname}
+                        )
+                        add_edge(
+                            nodes_list[j].id, nodes_list[i].id, "shares_key", strength=0.8,
+                            evidence_type="HEURISTIC_DEPENDENCY", evidence_text=ev_text,
+                            file_path=nodes_list[j].location, detector_name="CertificateHeuristicMatcher", confidence=0.80,
+                            metadata={"shared_file": fname}
+                        )
 
         db.commit()
         all_nodes = db.query(CryptoNode).filter(CryptoNode.scan_id == scan_id).all()
@@ -237,7 +320,6 @@ class BlastRadiusEngine:
         if node_map is None:
             all_nodes_list = db.query(CryptoNode).filter(CryptoNode.scan_id == scan_id).all()
             if not all_nodes_list and scan_id:
-                # If scan_id was a project_id or scan_id matched 0 nodes, try querying via Scan -> project_id
                 all_nodes_list = (
                     db.query(CryptoNode)
                     .join(Scan, CryptoNode.scan_id == Scan.id)
@@ -251,7 +333,6 @@ class BlastRadiusEngine:
             root_node = next((n for n in node_map.values() if n.asset_id == root_node_id), None)
 
         if not root_node:
-            # Fallback: Direct DB query for root_node by id or asset_id across all scans
             root_node = db.query(CryptoNode).filter(
                 (CryptoNode.id == root_node_id) | (CryptoNode.asset_id == root_node_id)
             ).first()
@@ -268,32 +349,49 @@ class BlastRadiusEngine:
                 "root_node_type": "Unknown",
                 "radius_score": 0.0,
                 "affected_nodes_count": 0,
+                "direct_dependents": 0,
+                "indirect_dependents": 0,
+                "affected_crypto_assets": 0,
+                "affected_services": 0,
+                "critical_affected_nodes": 0,
+                "edges_traversed": 0,
                 "systems_count": 0,
                 "data_classes": [],
                 "estimated_migration_effort": 0.0,
                 "affected_nodes": [],
-                "affected_systems": []
+                "affected_systems": [],
+                "calculation": None,
+                "traversed_edges_evidence": []
             }
 
-        adj = preloaded_adj
-        if adj is None:
-            all_edges = db.query(CryptoEdge).filter(CryptoEdge.scan_id == scan_id).all()
-            adj = collections.defaultdict(list)
-            for e in all_edges:
-                adj[e.source_node_id].append((e.target_node_id, e.relation_type))
-                adj[e.target_node_id].append((e.source_node_id, f"reverse_{e.relation_type}"))
+        # Query all scan edges and build adjacency with edge objects
+        all_edges = db.query(CryptoEdge).filter(CryptoEdge.scan_id == scan_id).all()
+        adj: Dict[str, List[tuple]] = collections.defaultdict(list)
+        for e in all_edges:
+            # Enforce cross-scan edge rejection safety check
+            src_n = node_map.get(e.source_node_id)
+            tgt_n = node_map.get(e.target_node_id)
+            if src_n and tgt_n and src_n.scan_id != tgt_n.scan_id:
+                continue
+            if e.source_node_id == e.target_node_id:
+                continue
+
+            adj[e.source_node_id].append((e.target_node_id, e.relation_type, e))
+            adj[e.target_node_id].append((e.source_node_id, f"reverse_{e.relation_type}", e))
 
         # BFS Traversal
         visited: Dict[str, int] = {root_node.id: 0}  # node_id -> min_distance
         paths: Dict[str, List[str]] = {root_node.id: [root_node.name]}
         queue = collections.deque([(root_node.id, 0, [root_node.name])])
+        traversed_edge_records: List[Dict[str, Any]] = []
+        traversed_edge_ids: Set[str] = set()
 
         while queue:
             curr_id, dist, path = queue.popleft()
             if dist >= max_hops:
                 continue
 
-            for neighbor_id, rel in adj.get(curr_id, []):
+            for neighbor_id, rel, e_obj in adj.get(curr_id, []):
                 if neighbor_id not in visited:
                     visited[neighbor_id] = dist + 1
                     neighbor_node = node_map.get(neighbor_id)
@@ -302,12 +400,35 @@ class BlastRadiusEngine:
                     paths[neighbor_id] = new_path
                     queue.append((neighbor_id, dist + 1, new_path))
 
+                    if e_obj and e_obj.id not in traversed_edge_ids:
+                        traversed_edge_ids.add(e_obj.id)
+                        curr_node = node_map.get(curr_id)
+                        traversed_edge_records.append({
+                            "edge_id": e_obj.id,
+                            "source_node_id": e_obj.source_node_id,
+                            "target_node_id": e_obj.target_node_id,
+                            "source_name": curr_node.name if curr_node else e_obj.source_node_id,
+                            "target_name": neighbor_node.name if neighbor_node else e_obj.target_node_id,
+                            "relation_type": e_obj.relation_type,
+                            "evidence_type": getattr(e_obj, "evidence_type", "UNKNOWN"),
+                            "evidence_text": mask_secrets(getattr(e_obj, "evidence_text", "Legacy relationship; no stored evidence available.")),
+                            "file_path": getattr(e_obj, "file_path", None),
+                            "line_number": getattr(e_obj, "line_number", None),
+                            "confidence": getattr(e_obj, "confidence", 0.50),
+                            "detector_name": getattr(e_obj, "detector_name", None)
+                        })
+
         # Compute Blast Radius metrics across affected nodes (excluding root itself)
         affected_nodes_list = []
         total_weighted_impact = 0.0
         affected_systems = set()
         affected_data_classes = set()
         estimated_effort = 0.0
+
+        direct_dependents = 0
+        indirect_dependents = 0
+        affected_crypto_assets = 0
+        critical_affected_nodes = 0
 
         # Include root node characteristics in data classes and effort
         root_data_classes = self._infer_data_classes(root_node.name, root_node.location or "", root_node.extra_metadata or {})
@@ -321,6 +442,18 @@ class BlastRadiusEngine:
             n = node_map.get(node_id)
             if not n:
                 continue
+
+            if dist == 1:
+                direct_dependents += 1
+            else:
+                indirect_dependents += 1
+
+            if n.asset_id or n.artefact_type in ["ALGORITHM", "KEY", "CERTIFICATE", "PROTOCOL", "HARDWARE_HSM", "CLOUD_KMS", "CRYPTO_ASSET"]:
+                affected_crypto_assets += 1
+
+            is_crit = any(k in str(n.quantum_risk).upper() for k in ["CRITICAL", "QUANTUM_VULNERABLE", "SHOR", "HIGH"]) or (n.business_criticality or 0.0) >= 75.0
+            if is_crit:
+                critical_affected_nodes += 1
 
             risk_weight = self._map_risk_weight(n.quantum_risk)
             crit_weight = (n.business_criticality or 50.0) / 100.0
@@ -367,10 +500,37 @@ class BlastRadiusEngine:
             crit_w = (root_node.business_criticality or 50.0) / 100.0
             mosca_w = max(0.5, min(2.0, (root_node.mosca_x or 10.0) / 5.0))
             radius_score = round(min(100.0, max(5.0, risk_w * crit_w * mosca_w * 80.0)), 1)
+            avg_impact = 0.0
+            volume_multiplier = 1.0
         else:
             avg_impact = total_weighted_impact / len(affected_nodes_list)
             volume_multiplier = min(2.5, 1.0 + (len(affected_nodes_list) * 0.15))
             radius_score = round(min(100.0, max(5.0, avg_impact * volume_multiplier)), 1)
+
+        calculation_breakdown = {
+            "formula": "radius_score = min(100.0, avg_weighted_impact * volume_multiplier)",
+            "root_node_weights": {
+                "quantum_risk": root_node.quantum_risk,
+                "risk_weight": self._map_risk_weight(root_node.quantum_risk),
+                "business_criticality": root_node.business_criticality,
+                "mosca_x": root_node.mosca_x
+            },
+            "traversal_stats": {
+                "max_hops": max_hops,
+                "total_visited_nodes": len(visited),
+                "affected_nodes_count": len(affected_nodes_list),
+                "direct_dependents": direct_dependents,
+                "indirect_dependents": indirect_dependents,
+                "critical_affected_nodes": critical_affected_nodes,
+                "edges_traversed": len(traversed_edge_records)
+            },
+            "score_breakdown": {
+                "total_weighted_impact": round(total_weighted_impact, 2),
+                "avg_weighted_impact": round(avg_impact, 2),
+                "volume_multiplier": round(volume_multiplier, 2),
+                "final_radius_score": radius_score
+            }
+        }
 
         result_payload = {
             "scan_id": scan_id,
@@ -379,11 +539,19 @@ class BlastRadiusEngine:
             "root_node_type": root_node.artefact_type,
             "radius_score": radius_score,
             "affected_nodes_count": len(affected_nodes_list),
+            "direct_dependents": direct_dependents,
+            "indirect_dependents": indirect_dependents,
+            "affected_crypto_assets": affected_crypto_assets,
+            "affected_services": max(1, len(affected_systems)),
+            "critical_affected_nodes": critical_affected_nodes,
+            "edges_traversed": len(traversed_edge_records),
             "systems_count": max(1, len(affected_systems)),
             "data_classes": sorted(list(affected_data_classes)),
             "estimated_migration_effort": round(estimated_effort, 1),
             "affected_nodes": affected_nodes_list,
-            "affected_systems": sorted(list(affected_systems))
+            "affected_systems": sorted(list(affected_systems)),
+            "calculation": calculation_breakdown,
+            "traversed_edges_evidence": traversed_edge_records
         }
 
         if save_to_db:

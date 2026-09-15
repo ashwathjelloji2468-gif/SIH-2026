@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BlastRadiusResult, CryptoNode } from '../../types';
-import { X, ShieldAlert, Zap, Clock, FileCode, Server, Database, ArrowRight } from 'lucide-react';
+import { X, ShieldAlert, Zap, Clock, FileCode, Server, Database, ArrowRight, ChevronDown, ChevronRight, Activity, GitCommit, Layers } from 'lucide-react';
 
 interface BlastRadiusSidePanelProps {
   node: CryptoNode | null;
@@ -17,13 +17,20 @@ export const BlastRadiusSidePanel: React.FC<BlastRadiusSidePanelProps> = ({
   onSimulateMigration,
   isLoading = false
 }) => {
+  const [showCalculation, setShowCalculation] = useState(false);
+  const [showEdgeEvidence, setShowEdgeEvidence] = useState(false);
+
   if (!node) return null;
 
   const score = blastRadius?.radius_score || 0;
   const isHighRisk = score >= 70 || ['CRITICAL', 'HIGH', 'QUANTUM_VULNERABLE', 'VULNERABLE'].includes((node.quantum_risk || '').toUpperCase());
 
+  const directCount = blastRadius?.direct_dependents ?? blastRadius?.affected_nodes.filter(n => n.distance === 1).length ?? 0;
+  const indirectCount = blastRadius?.indirect_dependents ?? blastRadius?.affected_nodes.filter(n => n.distance > 1).length ?? 0;
+  const criticalCount = blastRadius?.critical_affected_nodes ?? blastRadius?.affected_nodes.filter(n => ['CRITICAL', 'HIGH', 'QUANTUM_VULNERABLE', 'VULNERABLE'].includes((n.quantum_risk || '').toUpperCase())).length ?? 0;
+
   return (
-    <div className="w-full lg:w-96 shrink-0 bg-[#06080F]/95 backdrop-blur-xl border border-slate-800 rounded-2xl p-5 space-y-6 shadow-2xl flex flex-col justify-between">
+    <div className="w-full lg:w-96 shrink-0 bg-[#06080F]/95 backdrop-blur-xl border border-slate-800 rounded-2xl p-5 space-y-6 shadow-2xl flex flex-col justify-between max-h-[calc(100vh-120px)] overflow-y-auto">
       <div>
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -81,12 +88,28 @@ export const BlastRadiusSidePanel: React.FC<BlastRadiusSidePanelProps> = ({
           </div>
         </div>
 
+        {/* Breakdown Summary Badges */}
+        <div className="grid grid-cols-3 gap-2 mt-4 text-center">
+          <div className="bg-slate-950/70 p-2 rounded-lg border border-slate-800/60">
+            <div className="text-[9px] font-mono text-slate-400 uppercase">Direct</div>
+            <div className="text-sm font-bold font-mono text-cyan-400">{directCount}</div>
+          </div>
+          <div className="bg-slate-950/70 p-2 rounded-lg border border-slate-800/60">
+            <div className="text-[9px] font-mono text-slate-400 uppercase">Indirect</div>
+            <div className="text-sm font-bold font-mono text-purple-400">{indirectCount}</div>
+          </div>
+          <div className="bg-slate-950/70 p-2 rounded-lg border border-slate-800/60">
+            <div className="text-[9px] font-mono text-slate-400 uppercase">Critical</div>
+            <div className="text-sm font-bold font-mono text-rose-400">{criticalCount}</div>
+          </div>
+        </div>
+
         {/* Key Metrics Grid */}
         <div className="grid grid-cols-2 gap-3 mt-4">
           <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/60 space-y-1">
             <div className="text-[10px] text-slate-500 uppercase font-mono flex items-center gap-1">
               <Server className="w-3 h-3 text-cyan-400" />
-              <span>Systems</span>
+              <span>Services</span>
             </div>
             <div className="text-lg font-bold text-slate-200 font-mono">
               {blastRadius?.systems_count || 1}
@@ -120,6 +143,76 @@ export const BlastRadiusSidePanel: React.FC<BlastRadiusSidePanelProps> = ({
             ))}
           </div>
         </div>
+
+        {/* Transparent Calculation Breakdown Accordion */}
+        {blastRadius?.calculation && (
+          <div className="mt-4 border border-slate-800 rounded-xl overflow-hidden bg-slate-950/60">
+            <button
+              onClick={() => setShowCalculation(!showCalculation)}
+              className="w-full px-3 py-2 text-left font-mono text-xs font-bold text-cyan-400 hover:text-cyan-300 flex items-center justify-between bg-slate-900/60"
+            >
+              <div className="flex items-center gap-1.5">
+                <Activity className="w-3.5 h-3.5" />
+                <span>Calculation Breakdown</span>
+              </div>
+              {showCalculation ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+            </button>
+            {showCalculation && (
+              <div className="p-3 text-[11px] font-mono text-slate-300 space-y-2 border-t border-slate-800/80">
+                <div className="text-[10px] text-slate-400 bg-slate-900 p-1.5 rounded border border-slate-800">
+                  {blastRadius.calculation.formula}
+                </div>
+                <div className="grid grid-cols-2 gap-1.5 text-[10px]">
+                  <div>Root Risk Wt: <strong className="text-white">{blastRadius.calculation.root_node_weights.risk_weight}</strong></div>
+                  <div>Root Mosca X: <strong className="text-white">{blastRadius.calculation.root_node_weights.mosca_x}y</strong></div>
+                  <div>Avg Weighted Impact: <strong className="text-white">{blastRadius.calculation.score_breakdown.avg_weighted_impact}</strong></div>
+                  <div>Vol Multiplier: <strong className="text-white">{blastRadius.calculation.score_breakdown.volume_multiplier}x</strong></div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Traversed Edge Evidence Accordion */}
+        {blastRadius?.traversed_edges_evidence && blastRadius.traversed_edges_evidence.length > 0 && (
+          <div className="mt-3 border border-slate-800 rounded-xl overflow-hidden bg-slate-950/60">
+            <button
+              onClick={() => setShowEdgeEvidence(!showEdgeEvidence)}
+              className="w-full px-3 py-2 text-left font-mono text-xs font-bold text-purple-400 hover:text-purple-300 flex items-center justify-between bg-slate-900/60"
+            >
+              <div className="flex items-center gap-1.5">
+                <GitCommit className="w-3.5 h-3.5" />
+                <span>Edge Evidence ({blastRadius.traversed_edges_evidence.length})</span>
+              </div>
+              {showEdgeEvidence ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+            </button>
+            {showEdgeEvidence && (
+              <div className="p-2 space-y-2 border-t border-slate-800/80 max-h-48 overflow-y-auto">
+                {blastRadius.traversed_edges_evidence.map((ev) => (
+                  <div key={ev.edge_id} className="p-2 rounded bg-slate-900/80 border border-slate-800 text-[10px] font-mono space-y-1">
+                    <div className="flex justify-between text-slate-300 font-bold">
+                      <span className="truncate max-w-[140px]">{ev.source_name}</span>
+                      <span className="text-cyan-400">--[{ev.relation_type}]--&gt;</span>
+                      <span className="truncate max-w-[140px]">{ev.target_name}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[9px] text-slate-400">
+                      <span className="px-1 py-0.2 bg-purple-950 text-purple-300 rounded border border-purple-800">{ev.evidence_type}</span>
+                      <span>Conf: {(ev.confidence * 100).toFixed(0)}%</span>
+                    </div>
+                    <p className="text-slate-300 leading-tight break-all text-[9.5px] italic border-l-2 border-cyan-500 pl-1.5 py-0.5">
+                      {ev.evidence_text}
+                    </p>
+                    {ev.file_path && (
+                      <div className="text-slate-500 text-[9px] truncate">
+                        Loc: {ev.file_path}{ev.line_number ? `:${ev.line_number}` : ''}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Affected Downstream Nodes */}
         <div className="mt-4 space-y-2">
