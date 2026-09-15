@@ -13,7 +13,7 @@ from app.repositories.project_repository import ProjectRepository
 from app.repositories.scan_repository import ScanRepository
 from app.validation.validator import MigrationValidator
 from app.validation.test_runner import ValidationEngine
-from app.validation.detector import BuildDetector
+from app.validation.detector import BuildDetector, TestDetector, parse_test_counts
 from app.validation.runner import SandboxCommandRunner
 from app.migration.sandbox import SandboxEnvironment
 from app.models.schemas import ValidationRunResponse
@@ -213,6 +213,130 @@ def execute_project_build_validation(
         duration_ms=total_duration_ms,
         timeout=is_timeout,
         build_passed=all_passed,
+        logs="\n".join(logs),
+        residual_risk_score=15.0 if all_passed else 65.0,
+        confidence=0.92 if all_passed else 0.40,
+        started_at=dt_started,
+        completed_at=dt_completed
+    )
+
+    return val_run
+
+@router.post("/projects/{project_id}/validation/tests", response_model=ValidationRunResponse)
+def execute_project_test_validation(
+    project_id: str,
+    scan_id: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    dt_started = datetime.now(timezone.utc)
+    proj_repo = ProjectRepository(db)
+    scan_repo = ScanRepository(db)
+    val_repo = ValidationRepository(db)
+
+    proj = proj_repo.get(project_id)
+    if not proj:
+        raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found.")
+
+    target_scan = None
+    if scan_id:
+        target_scan = scan_repo.get(scan_id)
+        if not target_scan or target_scan.project_id != project_id:
+            raise HTTPException(status_code=400, detail=f"Scan '{scan_id}' does not belong to project '{project_id}'.")
+    else:
+        scans = scan_repo.get_by_project(project_id)
+        if scans:
+            target_scan = scans[0]
+
+    if not target_scan or not target_scan.target_path:
+        raise HTTPException(status_code=409, detail=f"No scan target path found for project '{project_id}'.")
+
+    target_path = target_scan.target_path
+    if not os.path.exists(target_path):
+        raise HTTPException(status_code=409, detail=f"Repository source path '{target_path}' does not exist on disk.")
+
+    detector = TestDetector()
+    runner = SandboxCommandRunner()
+
+    test_config = detector.detect_test_config(target_path)
+    framework = test_config.get("framework", "Unknown")
+    t_status = test_config.get("status", "NOT_SUPPORTED")
+    commands = test_config.get("commands", [])
+
+    logs = [f"[TestSystem] Discovered Framework: {framework} (Status: {t_status})"]
+    total_duration = 0.0
+    total_duration_ms = 0
+    is_timeout = False
+    last_exit_code = -1
+    all_passed = True
+    executed_command = None
+    status_val = ValidationStatus.PENDING
+    counts: Dict[str, Optional[int]] = {"total": None, "passed": None, "failed": None, "skipped": None}
+
+    if t_status == "NOT_CONFIGURED":
+        status_val = ValidationStatus.NOT_CONFIGURED
+        logs.append(f"[TestCheck] Status: NOT_CONFIGURED — {test_config.get('details')}")
+        all_passed = False
+    elif t_status == "NOT_SUPPORTED":
+        status_val = ValidationStatus.NOT_SUPPORTED
+        logs.append(f"[TestCheck] Status: NOT_SUPPORTED — {test_config.get('details')}")
+        all_passed = False
+    elif t_status == "ERROR":
+        status_val = ValidationStatus.ERROR
+        logs.append(f"[TestCheck] Status: ERROR — {test_config.get('details')}")
+        all_passed = False
+    elif t_status == "CONFIGURED" and commands:
+        executed_command = " && ".join([" ".join(c) for c in commands])
+        for stage_idx, cmd in enumerate(commands, 1):
+            logs.append(f"[TestCheck] Stage {stage_idx}/{len(commands)}: Executing test command `{' '.join(cmd)}`")
+            chk = runner.run_check(target_path, ValidationCheckType.UNIT_TEST, cmd, timeout_seconds=60)
+
+            c_stat = chk.get("status")
+            total_duration += chk.get("duration", 0.0)
+            total_duration_ms += chk.get("duration_ms", 0)
+            last_exit_code = chk.get("exit_code", -1)
+
+            if chk.get("timeout"):
+                is_timeout = True
+
+            combined_output = (chk.get("logs") or "")
+            if combined_output:
+                logs.append(f"--- Stage {stage_idx} Test Output ---\n{combined_output}")
+                counts = parse_test_counts(combined_output)
+
+            if c_stat != ValidationCheckStatus.PASS.value:
+                all_passed = False
+                if is_timeout:
+                    status_val = ValidationStatus.TIMEOUT
+                else:
+                    status_val = ValidationStatus.FAILED
+                logs.append(f"[TestCheck] Stage {stage_idx} Failed with status: {c_stat} (exit code {last_exit_code})")
+                break
+
+        if all_passed:
+            status_val = ValidationStatus.PASSED
+            last_exit_code = 0
+            logs.append("[TestCheck] Status: PASS — All unit test commands executed successfully.")
+
+    dt_completed = datetime.now(timezone.utc)
+
+    val_run = val_repo.create_validation_run(
+        project_id=project_id,
+        scan_id=target_scan.id,
+        check_type="UNIT_TEST",
+        status=status_val,
+        framework=framework,
+        command=executed_command,
+        exit_code=last_exit_code if last_exit_code != -1 else (0 if all_passed else 1),
+        output_summary=logs[-1] if logs else "",
+        evidence={"framework": framework, "test_config": test_config, "test_counts": counts},
+        duration=round(total_duration, 2),
+        duration_ms=total_duration_ms,
+        timeout=is_timeout,
+        unit_tests_passed=all_passed,
+        tests_total=counts.get("total"),
+        tests_passed=counts.get("passed"),
+        tests_failed=counts.get("failed"),
+        tests_skipped=counts.get("skipped"),
         logs="\n".join(logs),
         residual_risk_score=15.0 if all_passed else 65.0,
         confidence=0.92 if all_passed else 0.40,

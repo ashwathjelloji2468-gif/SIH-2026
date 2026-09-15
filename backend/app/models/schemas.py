@@ -341,6 +341,10 @@ class ValidationRunResponse(BaseModel):
     timeout: bool = False
     build_passed: bool = False
     unit_tests_passed: bool = False
+    tests_total: Optional[int] = None
+    tests_passed: Optional[int] = None
+    tests_failed: Optional[int] = None
+    tests_skipped: Optional[int] = None
     crypto_tests_passed: bool = False
     integration_tests_passed: bool = False
     regression_passed: bool = False

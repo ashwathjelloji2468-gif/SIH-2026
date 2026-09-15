@@ -18,6 +18,12 @@ export const validationService = {
     return api.post<ValidationRun>(url);
   },
 
+  /** Execute real unit-test validation for a project/repository */
+  runTestValidation: async (projectId: string, scanId?: string): Promise<ValidationRun> => {
+    const url = scanId ? `/projects/${projectId}/validation/tests?scan_id=${scanId}` : `/projects/${projectId}/validation/tests`;
+    return api.post<ValidationRun>(url);
+  },
+
   runValidation: async (planId: string): Promise<ValidationRun> => {
     return api.post<ValidationRun>(`/migration/plans/${planId}/validate`);
   },

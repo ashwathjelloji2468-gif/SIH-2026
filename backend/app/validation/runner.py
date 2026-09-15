@@ -24,6 +24,7 @@ ALLOWLISTED_EXECUTABLES = {
     "make",
     "go",
     "cargo",
+    "ctest",
     "./mvnw",
     "./gradlew"
 }

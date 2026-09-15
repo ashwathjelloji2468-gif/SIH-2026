@@ -11,11 +11,12 @@ interface ValidationRunnerProps {
 
 export const ValidationRunner: React.FC<ValidationRunnerProps> = ({ planId, projectId, scanId }) => {
   const [validationRun, setValidationRun] = useState<ValidationRun | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
+  const [loadingBuild, setLoadingBuild] = useState<boolean>(false);
+  const [loadingTest, setLoadingTest] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleRunValidation = async () => {
-    setLoading(true);
+  const handleRunBuildValidation = async () => {
+    setLoadingBuild(true);
     setError(null);
     try {
       let res: ValidationRun;
@@ -29,9 +30,26 @@ export const ValidationRunner: React.FC<ValidationRunnerProps> = ({ planId, proj
       }
       setValidationRun(res);
     } catch (err: any) {
-      setError(err.message || 'Validation suite execution failed.');
+      setError(err.message || 'Build validation pipeline execution failed.');
     } finally {
-      setLoading(false);
+      setLoadingBuild(false);
+    }
+  };
+
+  const handleRunTestValidation = async () => {
+    if (!projectId) {
+      setError('Project context required for test validation.');
+      return;
+    }
+    setLoadingTest(true);
+    setError(null);
+    try {
+      const res = await validationService.runTestValidation(projectId, scanId);
+      setValidationRun(res);
+    } catch (err: any) {
+      setError(err.message || 'Unit-test validation execution failed.');
+    } finally {
+      setLoadingTest(false);
     }
   };
 
@@ -91,31 +109,53 @@ export const ValidationRunner: React.FC<ValidationRunnerProps> = ({ planId, proj
         <div>
           <div className="flex items-center gap-2 text-emerald-400 font-mono text-xs uppercase tracking-wider font-semibold mb-1">
             <ShieldCheck className="w-4 h-4" />
-            <span>Actual Build Execution Pipeline</span>
+            <span>Deterministic Sandbox Execution Engine</span>
           </div>
-          <h3 className="text-base font-bold text-slate-100">Deterministic Build Validation Engine</h3>
+          <h3 className="text-base font-bold text-slate-100">Build & Unit-Test Validation Pipeline</h3>
           <p className="text-xs text-slate-400">
-            Discovers repository build system, executes allowlisted commands, and collects real process telemetry.
+            Discovers repository build/test systems, executes allowlisted process commands, and captures truthful telemetry.
           </p>
         </div>
 
-        <button
-          onClick={handleRunValidation}
-          disabled={loading}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-bold text-xs shadow-md shadow-emerald-950/50 cursor-pointer transition-all shrink-0 font-mono"
-        >
-          {loading ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Executing Build Pipeline...</span>
-            </>
-          ) : (
-            <>
-              <Play className="w-4 h-4 fill-current" />
-              <span>Run Build Validation</span>
-            </>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleRunBuildValidation}
+            disabled={loadingBuild || loadingTest}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-bold text-xs shadow-md shadow-emerald-950/50 cursor-pointer transition-all shrink-0 font-mono"
+          >
+            {loadingBuild ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Executing Build...</span>
+              </>
+            ) : (
+              <>
+                <Play className="w-4 h-4 fill-current" />
+                <span>Run Build Validation</span>
+              </>
+            )}
+          </button>
+
+          {projectId && (
+            <button
+              onClick={handleRunTestValidation}
+              disabled={loadingBuild || loadingTest}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-slate-950 font-bold text-xs shadow-md shadow-cyan-950/50 cursor-pointer transition-all shrink-0 font-mono"
+            >
+              {loadingTest ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Executing Tests...</span>
+                </>
+              ) : (
+                <>
+                  <Play className="w-4 h-4 fill-current" />
+                  <span>Run Test Validation</span>
+                </>
+              )}
+            </button>
           )}
-        </button>
+        </div>
       </div>
 
       {error && (
@@ -130,7 +170,7 @@ export const ValidationRunner: React.FC<ValidationRunnerProps> = ({ planId, proj
           {/* Header Telemetry Row */}
           <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-xl bg-slate-900/60 border border-slate-800 font-mono text-xs">
             <div className="flex items-center gap-3">
-              <span className="text-slate-400">Build Status:</span>
+              <span className="text-slate-400">{validationRun.check_type || 'Execution'} Status:</span>
               {renderStatusBadge(validationRun.status)}
             </div>
 
@@ -156,6 +196,28 @@ export const ValidationRunner: React.FC<ValidationRunnerProps> = ({ planId, proj
             </div>
           </div>
 
+          {/* Test Metrics Breakdown (if available) */}
+          {(validationRun.tests_total !== undefined && validationRun.tests_total !== null) && (
+            <div className="grid grid-cols-4 gap-3 p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 font-mono text-center">
+              <div>
+                <div className="text-[10px] text-slate-400 uppercase">Total Tests</div>
+                <div className="text-base font-bold text-slate-100">{validationRun.tests_total}</div>
+              </div>
+              <div>
+                <div className="text-[10px] text-slate-400 uppercase">Passed</div>
+                <div className="text-base font-bold text-emerald-400">{validationRun.tests_passed ?? 0}</div>
+              </div>
+              <div>
+                <div className="text-[10px] text-slate-400 uppercase">Failed</div>
+                <div className="text-base font-bold text-rose-400">{validationRun.tests_failed ?? 0}</div>
+              </div>
+              <div>
+                <div className="text-[10px] text-slate-400 uppercase">Skipped</div>
+                <div className="text-base font-bold text-amber-400">{validationRun.tests_skipped ?? 0}</div>
+              </div>
+            </div>
+          )}
+
           {/* Test Status Indicators */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center gap-2.5">
@@ -179,9 +241,9 @@ export const ValidationRunner: React.FC<ValidationRunnerProps> = ({ planId, proj
                 <XCircle className="w-4 h-4 text-rose-400 shrink-0" />
               )}
               <div className="text-xs font-mono">
-                <div className="text-slate-400 text-[10px]">Syntax & Readiness</div>
+                <div className="text-slate-400 text-[10px]">Unit Test Execution</div>
                 <div className={validationRun.unit_tests_passed ? 'text-emerald-300 font-bold' : 'text-rose-300 font-bold'}>
-                  {validationRun.unit_tests_passed ? 'VERIFIED' : 'PENDING'}
+                  {validationRun.unit_tests_passed ? 'PASSED' : validationRun.status}
                 </div>
               </div>
             </div>
@@ -215,7 +277,7 @@ export const ValidationRunner: React.FC<ValidationRunnerProps> = ({ planId, proj
             <div className="rounded-xl border border-slate-800 bg-[#0B0F19] overflow-hidden">
               <div className="flex items-center gap-2 px-3.5 py-2 bg-slate-900/80 border-b border-slate-800 text-xs text-slate-400 font-mono">
                 <Terminal className="w-3.5 h-3.5 text-cyan-400" />
-                <span>Build Telemetry & Logs Stream</span>
+                <span>Process Telemetry & Real Logs Stream</span>
               </div>
               <pre className="p-4 text-[11px] font-mono text-slate-300 whitespace-pre-wrap max-h-60 overflow-y-auto leading-relaxed selection:bg-cyan-900/50">
                 {validationRun.logs}
@@ -225,7 +287,7 @@ export const ValidationRunner: React.FC<ValidationRunnerProps> = ({ planId, proj
         </div>
       ) : (
         <div className="py-8 text-center text-xs text-slate-500 rounded-xl border border-dashed border-slate-800 bg-slate-950/40 font-mono">
-          Click "Run Build Validation" to execute deterministic build system detection and process execution.
+          Click "Run Build Validation" or "Run Test Validation" to execute deterministic process execution.
         </div>
       )}
     </div>

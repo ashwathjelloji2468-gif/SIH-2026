@@ -422,6 +422,10 @@ export interface ValidationRun {
   duration_ms?: number;
   build_passed: boolean;
   unit_tests_passed: boolean;
+  tests_total?: number | null;
+  tests_passed?: number | null;
+  tests_failed?: number | null;
+  tests_skipped?: number | null;
   crypto_tests_passed: boolean;
   integration_tests_passed?: boolean;
   regression_passed?: boolean;
