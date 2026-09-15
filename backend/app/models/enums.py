@@ -16,6 +16,10 @@ class AssetType(str, Enum):
     PROTOCOL = "PROTOCOL"
     BINARY = "BINARY"
     VENDOR_MANAGED = "VENDOR_MANAGED"
+    HSM = "HSM"
+    TPM = "TPM"
+    CLOUD_KMS = "CLOUD_KMS"
+    KEY_STORE = "KEY_STORE"
 
 class CryptoPurpose(str, Enum):
     SIGNATURE = "SIGNATURE"

@@ -7,7 +7,8 @@ class CoverageEngine:
         scanned_categories = {
             "Source Code": [a for a in assets if a.asset_type in [AssetType.ALGORITHM, AssetType.API_CALL]],
             "Dependencies": [a for a in assets if a.asset_type == AssetType.DEPENDENCY],
-            "Certificates": [a for a in assets if a.asset_type == AssetType.CERTIFICATE],
+            "Certificates & Key Stores": [a for a in assets if a.asset_type in [AssetType.CERTIFICATE, AssetType.KEY_STORE]],
+            "Hardware & Cloud KMS": [a for a in assets if a.asset_type in [AssetType.HSM, AssetType.TPM, AssetType.CLOUD_KMS]],
             "Containers": [a for a in assets if a.asset_type == AssetType.CONTAINER],
             "Binary-only Applications": [a for a in assets if a.asset_type == AssetType.BINARY],
             "Vendor-Managed Systems": [a for a in assets if a.asset_type == AssetType.VENDOR_MANAGED]
