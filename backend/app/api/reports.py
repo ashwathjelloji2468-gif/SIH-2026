@@ -17,33 +17,25 @@ router = APIRouter(tags=["Reports & CBOM"])
 @router.get("/scans/{scan_id}/cbom")
 def get_scan_cbom(scan_id: str, db: Session = Depends(get_db)):
     scan_repo = ScanRepository(db)
-    asset_repo = AssetRepository(db)
     scan = scan_repo.get(scan_id)
     if not scan:
-        raise HTTPException(status_code=404, detail="Scan not found")
+        raise HTTPException(status_code=404, detail=f"Scan '{scan_id}' not found")
     
-    if scan.cbom_json:
-        return scan.cbom_json
+    if not scan.cbom_json:
+        raise HTTPException(status_code=404, detail=f"CBOM not available for scan '{scan_id}'. Run or complete a scan first.")
 
-    # Generate on-demand if missing
-    assets = asset_repo.get_by_scan(scan_id)
-    cbom = generate_cbom_json(scan, assets)
-    scan.cbom_json = cbom
-    db.commit()
-    return cbom
+    return scan.cbom_json
 
 @router.post("/scans/{scan_id}/cbom/validate")
 def validate_scan_cbom(scan_id: str, db: Session = Depends(get_db)):
     scan_repo = ScanRepository(db)
-    asset_repo = AssetRepository(db)
     scan = scan_repo.get(scan_id)
     if not scan:
-        raise HTTPException(status_code=404, detail="Scan not found")
+        raise HTTPException(status_code=404, detail=f"Scan '{scan_id}' not found")
 
     cbom = scan.cbom_json
     if not cbom:
-        assets = asset_repo.get_by_scan(scan_id)
-        cbom = generate_cbom_json(scan, assets)
+        raise HTTPException(status_code=409, detail=f"CBOM not available for scan '{scan_id}'. Run or complete a scan first.")
 
     validator = CBOMValidator()
     is_valid = validator.validate(cbom)
@@ -52,15 +44,13 @@ def validate_scan_cbom(scan_id: str, db: Session = Depends(get_db)):
 @router.get("/scans/{scan_id}/cbom/download")
 def download_scan_cbom(scan_id: str, db: Session = Depends(get_db)):
     scan_repo = ScanRepository(db)
-    asset_repo = AssetRepository(db)
     scan = scan_repo.get(scan_id)
     if not scan:
-        raise HTTPException(status_code=404, detail="Scan not found")
+        raise HTTPException(status_code=404, detail=f"Scan '{scan_id}' not found")
 
     cbom = scan.cbom_json
     if not cbom:
-        assets = asset_repo.get_by_scan(scan_id)
-        cbom = generate_cbom_json(scan, assets)
+        raise HTTPException(status_code=409, detail=f"CBOM not available for scan '{scan_id}'. Run or complete a scan first.")
 
     return JSONResponse(
         content=cbom,
@@ -71,17 +61,17 @@ def download_scan_cbom(scan_id: str, db: Session = Depends(get_db)):
 def download_project_cbom(project_id: str, db: Session = Depends(get_db)):
     proj_repo = ProjectRepository(db)
     scan_repo = ScanRepository(db)
-    asset_repo = AssetRepository(db)
 
     proj = proj_repo.get(project_id)
     if not proj:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found")
 
-    assets = asset_repo.get_by_project(project_id)
     scans = scan_repo.get_by_project(project_id)
+    latest_scan = scans[0] if scans else None
+    cbom = latest_scan.cbom_json if latest_scan else None
     
-    dummy_scan = scans[0] if scans else type("DummyScan", (), {"id": project_id})()
-    cbom = generate_cbom_json(dummy_scan, assets)
+    if not cbom:
+        raise HTTPException(status_code=409, detail=f"CBOM not available for project '{project_id}'. Please complete a scan first.")
 
     return JSONResponse(
         content=cbom,

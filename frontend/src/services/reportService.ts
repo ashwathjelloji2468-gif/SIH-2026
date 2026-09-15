@@ -55,34 +55,14 @@ export const reportService = {
       let cbomData = existingCbom;
       if (!cbomData) {
         try {
-          cbomData = await api.get<CBOMCycloneDX>(`/projects/${projectId}/cbom`);
-        } catch {
-          const report = await api.get<Record<string, any>>(`/projects/${projectId}/reports/executive`).catch(() => null);
-          cbomData = report?.cbom || null;
+          cbomData = await api.get<CBOMCycloneDX>(`/projects/${projectId}/cbom/download`);
+        } catch (_) {
+          cbomData = null;
         }
       }
       if (!cbomData) {
-        const assets = await api.get<any[]>(`/projects/${projectId}/assets`).catch(() => []);
-        cbomData = {
-          bomFormat: 'CycloneDX',
-          specVersion: '1.6',
-          serialNumber: `urn:uuid:${projectId}`,
-          version: 1,
-          metadata: {
-            timestamp: new Date().toISOString(),
-            tools: [{ vendor: 'SENTRIQ', name: 'Quantum Core Scanner', version: '2.0' }]
-          },
-          components: (assets || []).map((a: any) => ({
-            'bom-ref': `cbom-${a.id}`,
-            type: 'cryptographic-asset',
-            name: a.name || a.primitive || 'Crypto Primitive',
-            version: a.algorithm || 'RSA-2048',
-            properties: [
-              { name: 'quantum_safe', value: String(a.is_quantum_safe ?? false) },
-              { name: 'location', value: a.file_path || 'unknown' }
-            ]
-          }))
-        } as any;
+        console.warn(`CBOM not available for project '${projectId}'. Please run a scan first.`);
+        return;
       }
       const jsonString = JSON.stringify(cbomData, null, 2);
       triggerFileDownload(jsonString, `cbom-${projectId}.json`, 'application/json');
