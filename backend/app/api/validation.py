@@ -346,6 +346,35 @@ def execute_project_test_validation(
 
     return val_run
 
+@router.post("/projects/{project_id}/validation/regression")
+def execute_project_regression_validation(
+    project_id: str,
+    scan_id: Optional[str] = Query(None),
+    simulation_id: Optional[str] = Query(None),
+    migration_plan_id: Optional[str] = Query(None),
+    asset_id: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    from app.validation.regression import RegressionValidationService
+    service = RegressionValidationService(db)
+    try:
+        res = service.run_full_regression_pipeline(
+            project_id=project_id,
+            scan_id=scan_id,
+            simulation_id=simulation_id,
+            migration_plan_id=migration_plan_id,
+            asset_id=asset_id
+        )
+        return res
+    except ValueError as e:
+        err_msg = str(e)
+        if "not found" in err_msg.lower():
+            raise HTTPException(status_code=404, detail=err_msg)
+        elif "does not belong" in err_msg.lower():
+            raise HTTPException(status_code=400, detail=err_msg)
+        else:
+            raise HTTPException(status_code=409, detail=err_msg)
+
 @router.post("/migration/plans/{plan_id}/validate", response_model=ValidationRunResponse)
 def validate_migration_plan(plan_id: str, db: Session = Depends(get_db)):
     from sqlalchemy import desc

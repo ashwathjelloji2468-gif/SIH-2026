@@ -24,6 +24,20 @@ export const validationService = {
     return api.post<ValidationRun>(url);
   },
 
+  /** Execute Before/After Regression Validation for a project/repository */
+  runRegressionValidation: async (
+    projectId: string,
+    params?: { scanId?: string; simulationId?: string; planId?: string }
+  ): Promise<any> => {
+    const searchParams = new URLSearchParams();
+    if (params?.scanId) searchParams.append('scan_id', params.scanId);
+    if (params?.simulationId) searchParams.append('simulation_id', params.simulationId);
+    if (params?.planId) searchParams.append('migration_plan_id', params.planId);
+
+    const queryStr = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    return api.post<any>(`/projects/${projectId}/validation/regression${queryStr}`);
+  },
+
   runValidation: async (planId: string): Promise<ValidationRun> => {
     return api.post<ValidationRun>(`/migration/plans/${planId}/validate`);
   },
