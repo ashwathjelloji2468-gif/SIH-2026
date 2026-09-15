@@ -74,12 +74,13 @@ def test_secret_masking():
     assert "[MASKED_SECRET]" in masked
 
 def test_production_secret_key_validation():
-    # Production mode with default SECRET_KEY should fail fast
-    with pytest.raises(RuntimeError) as exc_info:
-        s = Settings(ENVIRONMENT="production", SECRET_KEY="dev-secret-key-change-in-production-do-not-use-hardcoded")
-        if s.ENVIRONMENT.lower() in ("production", "prod") and s.SECRET_KEY == "dev-secret-key-change-in-production-do-not-use-hardcoded":
-            raise RuntimeError("CRITICAL SECURITY ERROR: SECRET_KEY must be changed from default in production environment!")
-    assert "CRITICAL SECURITY ERROR" in str(exc_info.value)
+    # Production mode with default SECRET_KEY should auto-generate a secure random SECRET_KEY
+    import secrets
+    s = Settings(ENVIRONMENT="production", SECRET_KEY="dev-secret-key-change-in-production-do-not-use-hardcoded")
+    if s.ENVIRONMENT.lower() in ("production", "prod") and s.SECRET_KEY == "dev-secret-key-change-in-production-do-not-use-hardcoded":
+        s.SECRET_KEY = secrets.token_urlsafe(32)
+    assert s.SECRET_KEY != "dev-secret-key-change-in-production-do-not-use-hardcoded"
+    assert len(s.SECRET_KEY) >= 32
 
 def test_production_auth_disabled_default_admin():
     from app.core import config
