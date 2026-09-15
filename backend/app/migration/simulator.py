@@ -21,7 +21,8 @@ class MigrationSimulator:
         self,
         db: Session,
         asset_id: str,
-        source_directory_override: Optional[str] = None
+        source_directory_override: Optional[str] = None,
+        migration_plan_id: Optional[str] = None
     ) -> Dict[str, Any]:
 
         asset_repo = AssetRepository(db)
@@ -41,6 +42,7 @@ class MigrationSimulator:
             asset_id=asset_id,
             project_id=project_id,
             recommendation_id=getattr(recommendation, "id", None),
+            migration_plan_id=migration_plan_id,
             status=SimulationStatus.PREPARING
         )
 

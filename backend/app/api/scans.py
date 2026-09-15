@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.repositories.scan_repository import ScanRepository
+from app.repositories.project_repository import ProjectRepository
 from app.models.schemas import ScanCreate, ScanResponse
 from app.models.enums import ScanStatus
 from app.orchestration.job_manager import dispatch_scan_job
@@ -11,6 +12,9 @@ router = APIRouter(tags=["Scans"])
 
 @router.post("/projects/{project_id}/scans", response_model=ScanResponse, status_code=status.HTTP_201_CREATED)
 def start_scan(project_id: str, scan_in: ScanCreate, db: Session = Depends(get_db)):
+    proj = ProjectRepository(db).get(project_id)
+    if not proj:
+        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
     repo = ScanRepository(db)
     scan = repo.create(project_id=project_id, target_path=scan_in.target_path, scan_type=scan_in.scan_type)
     dispatch_scan_job(scan.id)

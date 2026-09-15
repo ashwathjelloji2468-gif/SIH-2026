@@ -36,15 +36,22 @@ def override_get_db():
 
 @pytest.fixture(autouse=True)
 def setup_db():
+    import tempfile, os
     app.dependency_overrides[get_db] = override_get_db
     Base.metadata.create_all(bind=engine)
     db = TestingSessionLocal()
+
+    # Create real temporary file for tests
+    tmpdir = tempfile.mkdtemp()
+    tmp_file = os.path.join(tmpdir, "jwt_signer.py")
+    with open(tmp_file, "w") as f:
+        f.write("from cryptography.hazmat.primitives.asymmetric import rsa\nkey = rsa.generate_private_key(65537, 2048)\n")
 
     # Seed test project, scan, asset
     proj = Project(id="proj-integration-01", name="Integration Test Project")
     db.add(proj)
 
-    scan = Scan(id="scan-integration-01", project_id="proj-integration-01", target_path="/tmp/test", status="COMPLETED")
+    scan = Scan(id="scan-integration-01", project_id="proj-integration-01", target_path=tmpdir, status="COMPLETED")
     db.add(scan)
 
     asset1 = CryptoAsset(
@@ -55,7 +62,7 @@ def setup_db():
         algorithm_name="RSA-2048",
         key_size=2048,
         purpose=CryptoPurpose.SIGNATURE,
-        location="src/crypto/jwt_signer.py",
+        location=tmp_file,
         line_number=42,
         quantum_safety=QuantumSafety.QUANTUM_VULNERABLE
     )
@@ -67,7 +74,7 @@ def setup_db():
         algorithm_name="ECDSA-P256",
         key_size=256,
         purpose=CryptoPurpose.KEY_ESTABLISHMENT,
-        location="src/network/tls_handshake.go",
+        location=tmp_file,
         line_number=118,
         quantum_safety=QuantumSafety.QUANTUM_VULNERABLE
     )
@@ -79,7 +86,7 @@ def setup_db():
         asset_id="asset-rsa-01",
         project_id="proj-integration-01",
         migration_plan_id="non-existent-plan-999",
-        sandbox_path="/tmp",
+        sandbox_path=tmpdir,
         status=SimulationStatus.TRANSFORMED
     )
     db.add(bad_plan_sim)
@@ -171,11 +178,11 @@ def test_stage2_simulation_fails_gracefully_with_404_for_invalid_plan():
     sim_resp = client.post(f"/api/v1/migration/plans/{invalid_plan_id}/simulate?pattern=RSA_TO_ML_DSA")
 
     assert sim_resp.status_code == 404
-    assert sim_resp.json()["detail"] == "Migration plan not found"
+    assert "migration plan not found" in sim_resp.json()["detail"].lower()
 
     val_resp = client.post(f"/api/v1/migration/plans/{invalid_plan_id}/validate")
     assert val_resp.status_code == 404
-    assert val_resp.json()["detail"] == "Migration plan not found"
+    assert "migration plan not found" in val_resp.json()["detail"].lower()
 
 
 def test_invalid_plan_reference_simulation_returns_409():

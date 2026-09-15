@@ -52,19 +52,24 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         const savedId = localStorage.getItem(SAVED_PROJECT_KEY);
         const matched = savedId ? sortedProjects.find((p) => p.id === savedId) : null;
         
-        const preferred = matched || sortedProjects[0];
+        const preferred = matched || (sortedProjects.length > 0 ? sortedProjects[0] : null);
 
         setCurrentProjectState(preferred);
         if (preferred) {
           localStorage.setItem(SAVED_PROJECT_KEY, preferred.id);
+        } else {
+          localStorage.removeItem(SAVED_PROJECT_KEY);
         }
       } else {
         setProjects([]);
         setCurrentProjectState(null);
+        localStorage.removeItem(SAVED_PROJECT_KEY);
       }
     } catch (err: any) {
-      console.warn('Backend connection notice:', err);
-      setError(err?.message || 'Failed to connect to backend projects API');
+      setProjects([]);
+      setCurrentProjectState(null);
+      localStorage.removeItem(SAVED_PROJECT_KEY);
+      setError(err?.message || 'Unable to load projects: server returned error.');
     } finally {
       setLoading(false);
     }

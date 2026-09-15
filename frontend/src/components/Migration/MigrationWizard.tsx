@@ -42,45 +42,12 @@ interface TargetAssetCandidate {
   transformationPattern: string;
 }
 
-const FALLBACK_CANDIDATE_ASSETS: TargetAssetCandidate[] = [
-  {
-    id: 'asset-1',
-    name: 'Authentication JWT Key Signer',
-    file: 'src/crypto/jwt_signer.py',
-    currentAlgorithm: 'RSA-2048 (PKCS#1 v1.5)',
-    recommendedTarget: 'ML-DSA-65 (NIST FIPS 204)',
-    standard: 'FIPS 204',
-    urgency: 'CRITICAL',
-    complexity: 'Moderate (2 Person-Days)',
-    transformationPattern: 'RSA_TO_ML_DSA',
-  },
-  {
-    id: 'asset-2',
-    name: 'TLS Session Key Exchange',
-    file: 'src/network/tls_handshake.go',
-    currentAlgorithm: 'ECDH-P256 (SECP256r1)',
-    recommendedTarget: 'ML-KEM-768 Hybrid (NIST FIPS 203)',
-    standard: 'FIPS 203',
-    urgency: 'HIGH',
-    complexity: 'High (4 Person-Days)',
-    transformationPattern: 'ECDH_TO_ML_KEM_HYBRID',
-  },
-  {
-    id: 'asset-3',
-    name: 'Database KMS Key Vault Provider',
-    file: 'services/vault/kms_provider.java',
-    currentAlgorithm: 'AES-128-CBC',
-    recommendedTarget: 'AES-256-GCM (Symmetric Retained)',
-    standard: 'AES-256',
-    urgency: 'MEDIUM',
-    complexity: 'Low (1 Person-Day)',
-    transformationPattern: 'AES_256_GCM_RETENTION',
-  },
-];
+
 
 
 /** Honest before/after snippets keyed by transformation pattern — never show RSA→ML-KEM for AES retention. */
-function getDemoSnippets(asset: TargetAssetCandidate): { original: string; transformed: string } {
+function getDemoSnippets(asset: TargetAssetCandidate | null): { original: string; transformed: string } {
+  if (!asset) return { original: '# No asset selected', transformed: '# No asset selected' };
   const file = asset.file;
   switch (asset.transformationPattern) {
     case 'RSA_TO_ML_DSA':
@@ -166,8 +133,8 @@ function getDemoSnippets(asset: TargetAssetCandidate): { original: string; trans
 export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
   const { currentProject } = useProject();
   const [currentStep, setCurrentStep] = useState<number>(1);
-  const [candidates, setCandidates] = useState<TargetAssetCandidate[]>(FALLBACK_CANDIDATE_ASSETS);
-  const [selectedAsset, setSelectedAsset] = useState<TargetAssetCandidate>(FALLBACK_CANDIDATE_ASSETS[0]);
+  const [candidates, setCandidates] = useState<TargetAssetCandidate[]>([]);
+  const [selectedAsset, setSelectedAsset] = useState<TargetAssetCandidate | null>(null);
   const [pattern, setPattern] = useState<string>('RSA_TO_ML_DSA');
   const [loadingDbAssets, setLoadingDbAssets] = useState<boolean>(false);
 
@@ -188,7 +155,11 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
   // Fetch dynamic database assets & PQC recommendations on project/plan change
   useEffect(() => {
     async function fetchDbCandidates() {
-      if (!currentProject) return;
+      if (!currentProject) {
+        setCandidates([]);
+        setSelectedAsset(null);
+        return;
+      }
       setLoadingDbAssets(true);
       try {
         const [assetsRes, recsRes] = await Promise.allSettled([
@@ -255,9 +226,13 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
           setCandidates(dynamicCandidates);
           setSelectedAsset(dynamicCandidates[0]);
           setPattern(dynamicCandidates[0].transformationPattern);
+        } else {
+          setCandidates([]);
+          setSelectedAsset(null);
         }
       } catch (err) {
-        console.warn('Could not fetch DB assets for migration wizard:', err);
+        setCandidates([]);
+        setSelectedAsset(null);
       } finally {
         setLoadingDbAssets(false);
       }
@@ -285,7 +260,7 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
     setValError(null);
     setPatchError(null);
     setDeployNotice(null);
-  }, [selectedAsset.id, pattern]);
+  }, [selectedAsset?.id, pattern]);
 
   const handleRunSimulation = async () => {
     if (simulating) return;
@@ -347,6 +322,10 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
   const handleDownloadPatch = () => {
     setPatchError(null);
     setDeployNotice(null);
+    if (!selectedAsset) {
+      setPatchError('No candidate asset selected. Please select a candidate asset first.');
+      return;
+    }
     if (!simulationResult) {
       setPatchError('No simulation diff available. Please run Stage 2 Sandbox Simulation first.');
       return;
@@ -541,7 +520,7 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
             {/* Candidate Asset Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {candidates.map((asset) => {
-                const isSelected = selectedAsset.id === asset.id;
+                const isSelected = selectedAsset?.id === asset.id;
                 return (
                   <div
                     key={asset.id}
@@ -604,8 +583,8 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
               <div className="space-y-1">
                 <div className="text-xs text-[#94A3B8] font-mono uppercase tracking-wider">Active Target Asset</div>
                 <div className="text-sm font-bold font-mono text-[#F8FAFC] flex items-center gap-2">
-                  <span>{selectedAsset.name}</span>
-                  <span className="text-xs text-[#22D3EE]">({selectedAsset.file})</span>
+                  <span>{selectedAsset?.name || 'No Asset Selected'}</span>
+                  <span className="text-xs text-[#22D3EE]">({selectedAsset?.file || 'N/A'})</span>
                 </div>
                 <div className="text-xs text-[#94A3B8]">
                   Transformation Pattern: <span className="text-[#22D3EE] font-mono">{pattern}</span>
@@ -635,7 +614,7 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
                   Stage 2: Isolated Sandbox AST Refactoring Simulation
                 </h3>
                 <p className="text-xs text-[#94A3B8]">
-                  Execute side-by-side AST code transformation on <code className="text-[#22D3EE]">{selectedAsset.file}</code>.
+                  Execute side-by-side AST code transformation on <code className="text-[#22D3EE]">{selectedAsset?.file || 'target source'}</code>.
                 </p>
               </div>
 
@@ -709,7 +688,7 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
                     <div className="flex items-center justify-between text-rose-400 font-bold text-[11px]">
                       <span>- Classical Implementation (Vulnerable)</span>
                       <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-rose-950 border border-rose-900">
-                        {selectedAsset.currentAlgorithm}
+                        {selectedAsset?.currentAlgorithm || 'CLASSICAL'}
                       </span>
                     </div>
                     <pre className="p-3 rounded-lg bg-slate-950/90 text-rose-200 text-[11px] overflow-x-auto whitespace-pre leading-relaxed border border-rose-950 font-mono">
@@ -723,7 +702,7 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
                     <div className="flex items-center justify-between text-emerald-400 font-bold text-[11px]">
                       <span>+ Post-Quantum Cryptography (NIST Standard)</span>
                       <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-emerald-950 border border-emerald-900">
-                        {selectedAsset.recommendedTarget}
+                        {selectedAsset?.recommendedTarget || 'PQC'}
                       </span>
                     </div>
                     <pre className="p-3 rounded-lg bg-slate-950/90 text-emerald-200 text-[11px] overflow-x-auto whitespace-pre leading-relaxed border border-emerald-950 font-mono">
@@ -738,7 +717,7 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
                     <FileDiff className="w-4 h-4 text-[#22D3EE]" />
                     <span>
                       Refactored Files ({simulationResult.transformation.files_modified?.length || 1}):{' '}
-                      <code className="text-slate-200">{simulationResult.transformation.files_modified?.join(', ') || selectedAsset.file}</code>
+                      <code className="text-slate-200">{simulationResult.transformation.files_modified?.join(', ') || selectedAsset?.file || 'N/A'}</code>
                     </span>
                   </div>
 
@@ -757,7 +736,7 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
             ) : (
               <div className="py-16 text-center text-xs text-[#94A3B8] rounded-2xl border border-dashed border-slate-800 bg-[#0B0F19]/40 font-mono space-y-3">
                 <Cpu className="w-8 h-8 text-[#22D3EE] mx-auto opacity-80" />
-                <p>Click "Re-Run Sandbox Simulation" to generate side-by-side AST code diffs for {selectedAsset.name}.</p>
+                <p>Click "Re-Run Sandbox Simulation" to generate side-by-side AST code diffs for {selectedAsset?.name || 'the selected asset'}.</p>
               </div>
             )}
           </div>
@@ -1015,8 +994,8 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
                     </div>
                     <h4 className="text-xl font-bold font-mono text-[#F8FAFC]">NIST FIPS 203/204 Migration Validated</h4>
                     <p className="text-xs text-[#94A3B8] max-w-md leading-relaxed">
-                      Transformation from classical <code className="text-rose-300">{selectedAsset.currentAlgorithm}</code> to{' '}
-                      <code className="text-emerald-300">{selectedAsset.recommendedTarget}</code> passed all 4 build, KAT, and regression check gates.
+                      Transformation from classical <code className="text-rose-300">{selectedAsset?.currentAlgorithm || 'Classical Cryptography'}</code> to{' '}
+                      <code className="text-emerald-300">{selectedAsset?.recommendedTarget || 'NIST PQC Standard'}</code> passed all 4 build, KAT, and regression check gates.
                     </p>
                   </div>
                 </div>

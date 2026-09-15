@@ -30,21 +30,23 @@ def test_deepened_migration_effort_estimator():
     assert res["assumptions"]["vendor_dependency_count"] == 2
 
 def test_sandbox_isolation_and_demo_patterns():
-    config = SandboxConfig(allow_network_access=False, requires_human_approval=True)
-    sandbox = SandboxEnvironment(plan_id="test-plan-1", config=config)
-    sandbox_dir = sandbox.prepare_sandbox("/tmp/non_existent_path")
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config = SandboxConfig(allow_network_access=False, requires_human_approval=True)
+        sandbox = SandboxEnvironment(plan_id="test-plan-1", config=config)
+        sandbox_dir = sandbox.prepare_sandbox(tmpdir)
 
-    # Test RSA_TO_ML_DSA pattern
-    res1 = sandbox.apply_transformation_pattern("RSA_TO_ML_DSA")
-    assert res1["pattern_applied"] == "RSA_TO_ML_DSA"
-    assert res1["isolation"]["network_access"] == "BLOCKED"
-    assert res1["isolation"]["human_approval_required_for_production"] is True
+        # Test RSA_TO_ML_DSA pattern
+        res1 = sandbox.apply_transformation_pattern("RSA_TO_ML_DSA")
+        assert res1["pattern_applied"] == "RSA_TO_ML_DSA"
+        assert res1["isolation"]["network_access"] == "BLOCKED"
+        assert res1["isolation"]["human_approval_required_for_production"] is True
 
-    # Test ECDSA_TO_ML_DSA pattern
-    res2 = sandbox.apply_transformation_pattern("ECDSA_TO_ML_DSA")
-    assert res2["pattern_applied"] == "ECDSA_TO_ML_DSA"
+        # Test ECDSA_TO_ML_DSA pattern
+        res2 = sandbox.apply_transformation_pattern("ECDSA_TO_ML_DSA")
+        assert res2["pattern_applied"] == "ECDSA_TO_ML_DSA"
 
-    sandbox.cleanup()
+        sandbox.cleanup()
 
 def test_coverage_engine_semantics():
     from app.models.db_models import CryptoAsset

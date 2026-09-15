@@ -75,17 +75,7 @@ export const ScanModal: React.FC = () => {
         navigate('/inventory');
       }, 800);
     } catch (err: any) {
-      if (err.message?.includes('Failed to fetch') || err.message?.includes('Network') || err.status === 0) {
-        setSuccess(true);
-        try { await refreshLatestScan(); } catch (_) {}
-        setTimeout(() => {
-          setIsScanModalOpen(false);
-          setSuccess(false);
-          navigate('/inventory');
-        }, 800);
-        return;
-      }
-      setError(err.message || 'Failed to dispatch scan job.');
+      setError(err.message || 'Unable to start scan: backend is unavailable.');
     } finally {
       setLoading(false);
     }

@@ -97,9 +97,9 @@ class SandboxEnvironment:
 
             if os.path.isfile(real_source):
                 # Copy single file safely
-                self.validate_path_within_sandbox(self.sandbox_dir, "Target sandbox root")
                 rel_name = os.path.basename(real_source)
                 dest_file = os.path.join(self.sandbox_dir, rel_name)
+                self.validate_path_within_sandbox(dest_file, self.sandbox_dir)
                 shutil.copy2(real_source, dest_file)
                 self.detected_language = self.detect_language(rel_name)
             else:
@@ -111,15 +111,16 @@ class SandboxEnvironment:
                     ignore=shutil.ignore_patterns(".git", "__pycache__", "node_modules", ".venv", "*.db", "ecdat.db")
                 )
                 self.detected_language = self.detect_project_language(self.sandbox_dir)
+        elif source_path and os.path.isabs(source_path) and not os.path.exists(source_path):
+            raise ValueError(f"Migration source path '{source_path}' does not exist or is unavailable.")
         else:
-            # Create isolated sample Python file if no source path is provided
-            sample_file = os.path.join(self.sandbox_dir, "crypto_service.py")
-            with open(sample_file, "w") as f:
-                f.write(
-                    "from cryptography.hazmat.primitives.asymmetric import rsa\n"
-                    "key = rsa.generate_private_key(public_exponent=65537, key_size=2048)\n"
-                )
-            self.detected_language = "Python"
+            if source_path:
+                logger.warning(f"Migration source path '{source_path}' not found on disk. Preparing empty sandbox workspace.")
+                rel_name = os.path.basename(source_path)
+                ext_lang = self.detect_language(rel_name)
+                self.detected_language = ext_lang if ext_lang != "unknown" else "unknown"
+            else:
+                self.detected_language = "unknown"
 
         logger.info(f"Isolated sandbox prepared at: {self.sandbox_dir} (Language: {self.detected_language})")
         return self.sandbox_dir
