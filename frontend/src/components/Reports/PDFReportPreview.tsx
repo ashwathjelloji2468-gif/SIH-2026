@@ -33,11 +33,7 @@ export const PDFReportPreview: React.FC<PDFReportPreviewProps> = ({ assets, risk
 
   const handleDownloadHTML = () => {
     if (currentProject) {
-      reportService.downloadExecutiveReport(currentProject.id, {
-        name: currentProject.name,
-        assets,
-        riskSummary,
-      });
+      reportService.downloadExecutiveReport(currentProject.id);
     }
   };
 

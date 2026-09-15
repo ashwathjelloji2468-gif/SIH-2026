@@ -89,7 +89,7 @@ class BusinessCriticalityService:
             system_criticality = scores["calculated_label"]
 
         user_override = bctx.get("user_override")
-        adjustment_reason = bctx.get("adjustment_reason")
+        adjustment_reason = bctx.get("adjustment_reason") or bctx.get("override_reason")
 
         effective_criticality = user_override if (user_override and user_override in ["LOW", "MEDIUM", "HIGH", "CRITICAL"]) else system_criticality
 
@@ -116,6 +116,7 @@ class BusinessCriticalityService:
             "user_override": user_override,
             "effective_criticality": effective_criticality,
             "adjustment_reason": adjustment_reason,
+            "override_reason": adjustment_reason,
             "is_overridden": bool(user_override),
             "factor_ratings": ratings,
             "scores": scores,

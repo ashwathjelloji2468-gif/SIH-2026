@@ -80,17 +80,13 @@ export const Reports: React.FC = () => {
 
   const handleDownloadProjectCBOM = () => {
     if (currentProject) {
-      reportService.downloadProjectCBOM(currentProject.id, cbom);
+      reportService.downloadProjectCBOM(currentProject.id, selectedScanId || undefined);
     }
   };
 
   const handleDownloadExecutiveReport = () => {
     if (currentProject) {
-      reportService.downloadExecutiveReport(currentProject.id, {
-        name: currentProject.name,
-        assets,
-        riskSummary,
-      });
+      reportService.downloadExecutiveReport(currentProject.id, selectedScanId || undefined);
     }
   };
 
