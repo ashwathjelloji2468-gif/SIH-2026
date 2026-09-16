@@ -1,101 +1,58 @@
 import os
+import re
 from typing import Dict, Any, List, Optional
-from app.models.enums import CryptoPurpose, RecommendationCategory, QuantumSafety
+from app.models.enums import CryptoPurpose, QuantumSafety
 
 TRANSFORMATION_PATTERNS = {
     "RSA_TO_ML_DSA": {
         "name": "RSA Signature to NIST FIPS 204 ML-DSA Digital Signature",
         "target": "ML-DSA-65 (NIST FIPS 204)",
-        "strategy": "Lattice Signature Adapter",
-        "search_terms": ["rsa.generate_private_key", "PKCS1v15", "jwt.encode", "RS256", "RSA_PKCS1_SIGN"],
-        "template": (
-            "# NIST PQC Migration: ML-DSA-65 (FIPS 204) Lattice Signature Replacement for JWT/RSA\n"
-            "try:\n"
-            "    from pqcrypto.sign import ml_dsa_65\n"
-            "    public_key, secret_key = ml_dsa_65.generate_keypair()\n"
-            "except ImportError:\n"
-            "    # Fallback PQC Adapter Representation\n"
-            "    def generate_pqc_jwt_signer_keypair():\n"
-            "        return ('ML_DSA_65_PUBLIC_KEY', 'ML_DSA_65_SECRET_KEY')\n"
-        )
+        "strategy": "Lattice Signature Replacement",
+        "supported_purposes": [CryptoPurpose.DIGITAL_SIGNATURE, CryptoPurpose.SIGNATURE, CryptoPurpose.AUTHENTICATION, CryptoPurpose.UNKNOWN],
+        "supported_algorithms": ["RSA", "RSA-2048", "RSA-3072", "RSA-4096", "UNKNOWN"]
     },
     "ECDSA_TO_ML_DSA": {
         "name": "ECDSA to NIST FIPS 204 ML-DSA Digital Signature",
         "target": "ML-DSA-65 (NIST FIPS 204)",
-        "strategy": "Lattice Signature Adapter",
-        "search_terms": ["ec.generate_private_key", "ECDSA", "DSAPrivateKey"],
-        "template": (
-            "# NIST PQC Migration: ML-DSA-65 (FIPS 204) Lattice Signature Replacement for ECDSA\n"
-            "try:\n"
-            "    from pqcrypto.sign import ml_dsa_65\n"
-            "    public_key, secret_key = ml_dsa_65.generate_keypair()\n"
-            "except ImportError:\n"
-            "    # Fallback PQC Adapter Representation\n"
-            "    def generate_pqc_signature_keypair():\n"
-            "        return ('ML_DSA_65_PUBLIC_KEY', 'ML_DSA_65_SECRET_KEY')\n"
-        )
+        "strategy": "Lattice Signature Replacement",
+        "supported_purposes": [CryptoPurpose.DIGITAL_SIGNATURE, CryptoPurpose.SIGNATURE, CryptoPurpose.AUTHENTICATION, CryptoPurpose.UNKNOWN],
+        "supported_algorithms": ["ECDSA", "ECDSA-P256", "ECDSA-P384", "DSA", "ED25519", "UNKNOWN"]
     },
     "RSA_ECDSA_TO_ML_DSA": {
         "name": "RSA/ECDSA to NIST FIPS 204 ML-DSA Digital Signature",
         "target": "ML-DSA-65 (NIST FIPS 204)",
-        "strategy": "Lattice Signature Adapter",
-        "search_terms": ["rsa.generate_private_key", "ec.generate_private_key", "ECDSA", "DSAPrivateKey"],
-        "template": (
-            "# NIST PQC Migration: ML-DSA (FIPS 204) Lattice Signature Replacement\n"
-            "try:\n"
-            "    from pqcrypto.sign import ml_dsa_65\n"
-            "    public_key, secret_key = ml_dsa_65.generate_keypair()\n"
-            "except ImportError:\n"
-            "    # Fallback PQC Adapter Representation\n"
-            "    def generate_pqc_signature_keypair():\n"
-            "        return ('ML_DSA_65_PUBLIC_KEY', 'ML_DSA_65_SECRET_KEY')\n"
-        )
+        "strategy": "Lattice Signature Replacement",
+        "supported_purposes": [CryptoPurpose.DIGITAL_SIGNATURE, CryptoPurpose.SIGNATURE, CryptoPurpose.AUTHENTICATION, CryptoPurpose.UNKNOWN],
+        "supported_algorithms": ["RSA", "ECDSA", "RSA-2048", "ECDSA-P256", "UNKNOWN"]
     },
     "ECDH_TO_ML_KEM": {
         "name": "ECDH to NIST FIPS 203 ML-KEM Key Establishment",
-        "target": "ML-KEM-768 Hybrid (NIST FIPS 203)",
-        "strategy": "KEM Encapsulation Adapter",
-        "search_terms": ["ECDH", "generate_private_key", "X25519", "X448", "DiffieHellman"],
-        "template": (
-            "# NIST PQC Migration: ML-KEM (FIPS 203) Key Encapsulation Replacement\n"
-            "try:\n"
-            "    from pqcrypto.kem import ml_kem_768\n"
-            "    public_key, secret_key = ml_kem_768.generate_keypair()\n"
-            "except ImportError:\n"
-            "    # Fallback PQC Adapter Representation\n"
-            "    def generate_pqc_kem_keypair():\n"
-            "        return ('ML_KEM_768_PUBLIC_KEY', 'ML_KEM_768_SECRET_KEY')\n"
-        )
+        "target": "ML-KEM-768 (NIST FIPS 203)",
+        "strategy": "KEM Key Encapsulation Replacement",
+        "supported_purposes": [CryptoPurpose.KEY_ESTABLISHMENT, CryptoPurpose.UNKNOWN],
+        "supported_algorithms": ["ECDH", "ECDH-P256", "ECDH-P384", "DH", "X25519", "X448", "UNKNOWN"]
     },
     "ECDH_TO_ML_KEM_HYBRID": {
         "name": "ECDH to NIST FIPS 203 ML-KEM Key Establishment",
         "target": "ML-KEM-768 Hybrid (NIST FIPS 203)",
-        "strategy": "KEM Encapsulation Adapter",
-        "search_terms": ["ECDH", "generate_private_key", "X25519", "X448", "DiffieHellman"],
-        "template": (
-            "# NIST PQC Migration: ML-KEM (FIPS 203) Key Encapsulation Replacement\n"
-            "try:\n"
-            "    from pqcrypto.kem import ml_kem_768\n"
-            "    public_key, secret_key = ml_kem_768.generate_keypair()\n"
-            "except ImportError:\n"
-            "    # Fallback PQC Adapter Representation\n"
-            "    def generate_pqc_kem_keypair():\n"
-            "        return ('ML_KEM_768_PUBLIC_KEY', 'ML_KEM_768_SECRET_KEY')\n"
-        )
+        "strategy": "KEM Key Encapsulation Replacement",
+        "supported_purposes": [CryptoPurpose.KEY_ESTABLISHMENT, CryptoPurpose.UNKNOWN],
+        "supported_algorithms": ["ECDH", "ECDH-P256", "ECDH-P384", "DH", "X25519", "X448", "UNKNOWN"]
     }
 }
 
 class MigrationTransformer:
     """
-    Deterministic Migration Transformer for SENTRIQ (Prompt 6).
-    Applies conservative code transformations ONLY inside isolated sandbox directories.
-    Returns status: TRANSFORMED, NO_PQC_TRANSFORMATION_REQUIRED, or MANUAL_REVIEW_REQUIRED.
+    Deterministic Migration Transformer for SENTRIQ.
+    Performs real in-place code replacements inside working sandbox directory.
+    Returns status: TRANSFORMED, NO_PQC_TRANSFORMATION_REQUIRED, MANUAL_REVIEW_REQUIRED, or BLOCKED.
     """
     def transform_sandbox_code(
         self,
         sandbox_dir: str,
         asset: Any,
-        recommendation: Optional[Any] = None
+        recommendation: Optional[Any] = None,
+        requested_pattern: Optional[str] = None
     ) -> Dict[str, Any]:
 
         alg_upper = (getattr(asset, "algorithm_name", "") or "").strip().upper()
@@ -106,10 +63,10 @@ class MigrationTransformer:
         rec_category = str(getattr(recommendation, "category", "") or "").upper()
         target_pqc = str(getattr(recommendation, "target_pqc_candidate", "") or "").upper()
 
-        # Check CASE 4: Unknown / custom / HSM / vendor / binary-only
+        # Check CASE 4: Unknown / custom / HSM / vendor / binary-only -> MANUAL_REVIEW_REQUIRED
         is_unknown_or_complex = (
             purpose == CryptoPurpose.UNKNOWN or
-            alg_upper in ["UNKNOWN", "CUSTOM_CIPHER"] or
+            alg_upper in ["UNKNOWN", "CUSTOM_CIPHER", "PROPRIETARY_HSM_CIPHER"] or
             asset_type_str in ["BINARY", "CONTAINER", "VENDOR_MANAGED"] or
             "HSM" in alg_upper or "HARDWARE" in alg_upper or
             "MANUAL" in rec_category
@@ -151,20 +108,21 @@ class MigrationTransformer:
                 }
             }
 
-        # Check CASE 1 & 2: Key Establishment (ECDH) or Digital Signatures (RSA/ECDSA)
-        pattern_key = None
-        if isinstance(recommendation, dict) and recommendation.get("transformation_pattern"):
-            pattern_key = recommendation.get("transformation_pattern")
-        elif hasattr(recommendation, "transformation_pattern") and getattr(recommendation, "transformation_pattern"):
-            pattern_key = getattr(recommendation, "transformation_pattern")
+        # Determine pattern key
+        pattern_key = requested_pattern
+        if not pattern_key:
+            if isinstance(recommendation, dict) and recommendation.get("transformation_pattern"):
+                pattern_key = recommendation.get("transformation_pattern")
+            elif hasattr(recommendation, "transformation_pattern") and getattr(recommendation, "transformation_pattern"):
+                pattern_key = getattr(recommendation, "transformation_pattern")
 
-        if not pattern_key or pattern_key not in TRANSFORMATION_PATTERNS:
+        if not pattern_key:
             if purpose == CryptoPurpose.KEY_ESTABLISHMENT or any(k in alg_upper for k in ["ECDH", "DH", "X25519", "X448"]):
                 pattern_key = "ECDH_TO_ML_KEM_HYBRID"
             elif purpose in [CryptoPurpose.DIGITAL_SIGNATURE, CryptoPurpose.SIGNATURE, CryptoPurpose.AUTHENTICATION] or any(k in alg_upper for k in ["RSA", "ECDSA", "DSA", "ED25519"]):
                 pattern_key = "RSA_TO_ML_DSA" if "RSA" in alg_upper else "ECDSA_TO_ML_DSA"
 
-        if not pattern_key:
+        if not pattern_key or pattern_key not in TRANSFORMATION_PATTERNS:
             return {
                 "status": "MANUAL_REVIEW_REQUIRED",
                 "transformation_type": "UNRECOGNIZED_PATTERN",
@@ -177,23 +135,56 @@ class MigrationTransformer:
 
         pattern = TRANSFORMATION_PATTERNS[pattern_key]
 
-        # Locate files in sandbox to transform
-        files_changed = []
+        # Check pattern compatibility with asset (Requirement 4 & 12)
+        is_key_ex_pattern = "ECDH" in pattern_key or "KEM" in pattern_key
+        is_key_ex_asset = purpose == CryptoPurpose.KEY_ESTABLISHMENT or any(k in alg_upper for k in ["ECDH", "DH", "X25519", "X448"])
+        is_sig_pattern = "DSA" in pattern_key or "RSA" in pattern_key
+        is_sig_asset = purpose in [CryptoPurpose.DIGITAL_SIGNATURE, CryptoPurpose.SIGNATURE, CryptoPurpose.AUTHENTICATION] or any(k in alg_upper for k in ["RSA", "ECDSA", "DSA"])
+
+        if is_key_ex_pattern and is_sig_asset and not is_key_ex_asset:
+            return {
+                "status": "BLOCKED",
+                "transformation_type": pattern_key,
+                "strategy": pattern["strategy"],
+                "files_considered": [location] if location else [],
+                "files_changed": [],
+                "unsupported_assumptions": [f"Incompatible migration pattern '{pattern_key}' requested for signature asset '{alg_upper}'."],
+                "changes_summary": {"reason": "Migration pattern is incompatible with asset cryptographic purpose."}
+            }
+
+        if is_sig_pattern and is_key_ex_asset and not is_sig_asset:
+            return {
+                "status": "BLOCKED",
+                "transformation_type": pattern_key,
+                "strategy": pattern["strategy"],
+                "files_considered": [location] if location else [],
+                "files_changed": [],
+                "unsupported_assumptions": [f"Incompatible migration pattern '{pattern_key}' requested for key-establishment asset '{alg_upper}'."],
+                "changes_summary": {"reason": "Migration pattern is incompatible with asset cryptographic purpose."}
+            }
+
+        # Locate target file inside working sandbox directory
+        target_file_in_sandbox = None
         files_considered = []
 
-        # Find target source file inside sandbox
-        target_file_in_sandbox = None
         if location:
-            # Check relative location inside sandbox
-            possible_path = os.path.join(sandbox_dir, location)
+            clean_loc = os.path.basename(location) if os.path.isabs(location) else location.lstrip("/")
+            possible_path = os.path.join(sandbox_dir, clean_loc)
             if os.path.exists(possible_path) and os.path.isfile(possible_path):
                 target_file_in_sandbox = possible_path
+            else:
+                for root, _, files in os.walk(sandbox_dir):
+                    for f in files:
+                        if f == clean_loc or f == os.path.basename(location):
+                            target_file_in_sandbox = os.path.join(root, f)
+                            break
+                    if target_file_in_sandbox:
+                        break
 
         if not target_file_in_sandbox:
-            # Search for any .py file in sandbox
             for root, _, files in os.walk(sandbox_dir):
-                for f in files:
-                    if f.endswith(".py"):
+                for f in sorted(files):
+                    if f.endswith((".py", ".js", ".ts", ".java", ".go", ".rs")):
                         fp = os.path.join(root, f)
                         files_considered.append(os.path.relpath(fp, sandbox_dir))
                         if not target_file_in_sandbox:
@@ -214,16 +205,143 @@ class MigrationTransformer:
         files_considered.append(rel_changed_path)
 
         try:
-            with open(target_file_in_sandbox, "r") as f:
+            with open(target_file_in_sandbox, "r", errors="ignore") as f:
                 content = f.read()
 
-            # Append PQC adapter snippet conservatively
-            new_content = content + "\n\n" + pattern["template"]
+            transformed_content = content
+            replaced = False
+
+            if "ECDH" in pattern_key or "KEM" in pattern_key:
+                # Deterministic ECDH -> ML-KEM replacement
+                # Replace imports
+                if "from cryptography.hazmat.primitives.asymmetric import ec" in transformed_content:
+                    transformed_content = transformed_content.replace(
+                        "from cryptography.hazmat.primitives.asymmetric import ec",
+                        "from pqcrypto.kem import ml_kem_768  # ML-KEM-768 (FIPS 203)"
+                    )
+                    replaced = True
+                elif "import ec" in transformed_content:
+                    transformed_content = transformed_content.replace(
+                        "import ec",
+                        "from pqcrypto.kem import ml_kem_768  # ML-KEM-768 (FIPS 203)"
+                    )
+                    replaced = True
+
+                # Replace key generation
+                if "ec.generate_private_key(ec.SECP256R1())" in transformed_content:
+                    transformed_content = transformed_content.replace(
+                        "ec.generate_private_key(ec.SECP256R1())",
+                        "ml_kem_768.generate_keypair()"
+                    )
+                    replaced = True
+                elif "ec.generate_private_key" in transformed_content:
+                    transformed_content = re.sub(
+                        r"ec\.generate_private_key\([^)]*\)",
+                        "ml_kem_768.generate_keypair()",
+                        transformed_content
+                    )
+                    replaced = True
+
+                # Replace exchange call with KEM encapsulation call
+                if "private_key.exchange(ec.ECDH(), peer_public_key)" in transformed_content:
+                    transformed_content = transformed_content.replace(
+                        "private_key.exchange(ec.ECDH(), peer_public_key)",
+                        "ml_kem_768.encapsulate(peer_public_key)"
+                    )
+                    replaced = True
+                elif ".exchange(" in transformed_content:
+                    transformed_content = re.sub(
+                        r"\b\w+\.exchange\([^)]*\)",
+                        "ml_kem_768.encapsulate(public_key)",
+                        transformed_content
+                    )
+                    replaced = True
+
+            elif "RSA" in pattern_key or "ECDSA" in pattern_key or "DSA" in pattern_key:
+                # Deterministic RSA/ECDSA -> ML-DSA replacement
+                # Replace imports
+                if "from cryptography.hazmat.primitives.asymmetric import rsa, padding" in transformed_content:
+                    transformed_content = transformed_content.replace(
+                        "from cryptography.hazmat.primitives.asymmetric import rsa, padding",
+                        "from pqcrypto.sign import ml_dsa_65  # ML-DSA-65 (FIPS 204)"
+                    )
+                    replaced = True
+                elif "from cryptography.hazmat.primitives.asymmetric import rsa" in transformed_content:
+                    transformed_content = transformed_content.replace(
+                        "from cryptography.hazmat.primitives.asymmetric import rsa",
+                        "from pqcrypto.sign import ml_dsa_65"
+                    )
+                    replaced = True
+                elif "from cryptography.hazmat.primitives.asymmetric import ec" in transformed_content:
+                    transformed_content = transformed_content.replace(
+                        "from cryptography.hazmat.primitives.asymmetric import ec",
+                        "from pqcrypto.sign import ml_dsa_65"
+                    )
+                    replaced = True
+                elif "import rsa" in transformed_content:
+                    transformed_content = transformed_content.replace(
+                        "import rsa",
+                        "from pqcrypto.sign import ml_dsa_65"
+                    )
+                    replaced = True
+
+                # Replace key generation
+                if "rsa.generate_private_key(public_exponent=65537, key_size=2048)" in transformed_content:
+                    transformed_content = transformed_content.replace(
+                        "rsa.generate_private_key(public_exponent=65537, key_size=2048)",
+                        "ml_dsa_65.generate_keypair()"
+                    )
+                    replaced = True
+                elif "rsa.generate_key()" in transformed_content:
+                    transformed_content = transformed_content.replace(
+                        "rsa.generate_key()",
+                        "ml_dsa_65.generate_keypair()"
+                    )
+                    replaced = True
+                elif "rsa.generate_private_key" in transformed_content:
+                    transformed_content = re.sub(
+                        r"rsa\.generate_private_key\([^)]*\)",
+                        "ml_dsa_65.generate_keypair()",
+                        transformed_content
+                    )
+                    replaced = True
+                elif "ec.generate_private_key" in transformed_content:
+                    transformed_content = re.sub(
+                        r"ec\.generate_private_key\([^)]*\)",
+                        "ml_dsa_65.generate_keypair()",
+                        transformed_content
+                    )
+                    replaced = True
+
+                # Replace signature call
+                if "private_key.sign(" in transformed_content:
+                    transformed_content = re.sub(
+                        r"private_key\.sign\([^)]*\)",
+                        "ml_dsa_65.sign(secret_key, data)",
+                        transformed_content
+                    )
+                    replaced = True
+                elif "RS256" in transformed_content:
+                    transformed_content = transformed_content.replace("RS256", "ML-DSA-65")
+                    replaced = True
+
+            if not replaced or transformed_content == content:
+                # If no vulnerable pattern matches or file remains identical -> MANUAL_REVIEW_REQUIRED
+                return {
+                    "status": "MANUAL_REVIEW_REQUIRED",
+                    "transformation_type": pattern_key,
+                    "target_pqc_candidate": pattern["target"],
+                    "strategy": pattern["strategy"],
+                    "files_considered": list(set(files_considered)),
+                    "files_changed": [],
+                    "unsupported_assumptions": ["Safe deterministic transformation could not be established in target file."],
+                    "changes_summary": {"reason": "Source code contains no matching vulnerable operation for automated replacement."}
+                }
 
             with open(target_file_in_sandbox, "w") as f:
-                f.write(new_content)
+                f.write(transformed_content)
 
-            files_changed.append(rel_changed_path)
+            files_changed = [rel_changed_path]
 
             return {
                 "status": "TRANSFORMED",
@@ -232,9 +350,7 @@ class MigrationTransformer:
                 "strategy": pattern["strategy"],
                 "files_considered": list(set(files_considered)),
                 "files_changed": files_changed,
-                "unsupported_assumptions": [
-                    "Assumes PQC provider library wrapper compatibility during pilot testing."
-                ],
+                "unsupported_assumptions": [],
                 "changes_summary": {
                     "pattern_applied": pattern["name"],
                     "strategy": pattern["strategy"],
@@ -253,3 +369,4 @@ class MigrationTransformer:
                 "unsupported_assumptions": [f"Transformation error: {str(e)}"],
                 "changes_summary": {"error": str(e)}
             }
+

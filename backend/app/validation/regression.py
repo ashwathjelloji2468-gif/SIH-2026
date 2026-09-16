@@ -399,7 +399,7 @@ class RegressionValidationService:
                     dummy_asset = CryptoAsset(id="a_temp", algorithm_name="RSA", location="")
 
                 t_res = transformer.transform_sandbox_code(sandbox_dir, dummy_asset, None)
-                if t_res.get("status") in ["FAILED", "MANUAL_REVIEW_REQUIRED"]:
+                if t_res.get("status") == "FAILED":
                     migration_res = {"status": "FAILED", "error": t_res.get("changes_summary", {}).get("reason") or "Code transformation failed."}
 
             if migration_res and migration_res.get("status") == "FAILED":

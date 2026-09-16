@@ -141,7 +141,7 @@ class MigrationValidator:
         target_pqc = str(transformation_result.get("target_pqc_candidate", "ML-DSA-65"))
         markers = _target_markers(transformation_result, recommendation)
 
-        # Gather source files in sandbox_dir recursively to scan for PQC markers
+        # Gather source files in sandbox_dir (working_dir) recursively to scan for PQC markers
         files_to_scan = []
         if os.path.exists(sandbox_dir):
             for root, _, files in os.walk(sandbox_dir):
@@ -151,15 +151,29 @@ class MigrationValidator:
 
         crypto_passed = False
         matched_marker = None
+        old_op_removed = True
+
+        # Check transformed content for PQC target presence AND vulnerable operation removal
         for fp in files_to_scan:
             try:
                 with open(fp, "r", errors="ignore") as file_obj:
                     content = file_obj.read()
+
+                # Check if target PQC marker is present
                 for m in markers:
                     if m.lower() in content.lower():
                         crypto_passed = True
                         matched_marker = m
                         break
+
+                # For RSA/ECDSA/ECDH, check if vulnerable operation was properly replaced
+                if "RSA" in t_type or "DSA" in t_type:
+                    if "rsa.generate_private_key" in content or "rsa.generate_key()" in content:
+                        old_op_removed = False
+                elif "ECDH" in t_type or "KEM" in t_type:
+                    if "ec.ECDH()" in content or "private_key.exchange(" in content:
+                        old_op_removed = False
+
             except Exception:
                 pass
             if crypto_passed:
@@ -181,40 +195,36 @@ class MigrationValidator:
                 if crypto_passed:
                     break
 
-        if not crypto_passed and t_status in ["TRANSFORMED", "NO_PQC_TRANSFORMATION_REQUIRED"]:
-            crypto_passed = True
-            matched_marker = "transformation_verified" if t_status == "TRANSFORMED" else "retained_symmetric_primitive"
+        if t_status == "TRANSFORMED" and not old_op_removed:
+            crypto_passed = False
+            logs.append("[CryptoVerification] Fail: Vulnerable cryptographic operation was not completely removed/replaced.")
 
         crypto_check = {
             "check_type": ValidationCheckType.CRYPTO_CONFIGURATION.value,
             "status": (
                 ValidationCheckStatus.PASS.value
-                if crypto_passed
+                if (crypto_passed and old_op_removed)
                 else ValidationCheckStatus.FAIL.value
             ),
             "command": f"verify_target_markers ({target_pqc})",
-            "exit_code": 0 if crypto_passed else 1,
+            "exit_code": 0 if (crypto_passed and old_op_removed) else 1,
             "output_summary": (
                 f"Target marker '{matched_marker}' verified for PQC candidate '{target_pqc}'."
-                if crypto_passed
-                else f"Target marker for candidate '{target_pqc}' verified in sandbox source."
+                if (crypto_passed and old_op_removed)
+                else f"Target marker for candidate '{target_pqc}' failed semantic validation."
             ),
             "duration": 0.01,
             "evidence": {
                 "target_pqc_candidate": target_pqc,
                 "markers_searched": markers,
                 "matched": matched_marker,
-                "verified": crypto_passed,
+                "verified": crypto_passed and old_op_removed,
             },
         }
         check_runs.append(crypto_check)
 
-        if build_check_status in [ValidationCheckStatus.NOT_CONFIGURED.value, ValidationCheckStatus.NOT_SUPPORTED.value]:
-            effective_build_passed = syntax_passed or syntax_skipped or (t_status in ["TRANSFORMED", "NO_PQC_TRANSFORMATION_REQUIRED"])
-        else:
-            effective_build_passed = build_passed
-
-        all_checks_passed = crypto_passed and effective_build_passed and not is_timeout
+        effective_build_passed = build_passed
+        all_checks_passed = crypto_passed and old_op_removed and effective_build_passed and not is_timeout
 
         if is_timeout:
             final_status = ValidationStatus.TIMEOUT.value
@@ -232,15 +242,15 @@ class MigrationValidator:
             final_status = ValidationStatus.FAILED.value
             overall_result = "FAILED"
 
-        logs.append(f"[CryptoVerification] Status: PASS for candidate {target_pqc}" + (f" (matched '{matched_marker}')" if matched_marker else ""))
+        logs.append(f"[CryptoVerification] Status: {'PASS' if (crypto_passed and old_op_removed) else 'FAIL'} for candidate {target_pqc}" + (f" (matched '{matched_marker}')" if matched_marker else ""))
         logs.append(f"[ValidationResult] Overall status: {overall_result}")
 
         return {
             "status": final_status,
             "overall_result": overall_result,
             "build_passed": effective_build_passed,
-            "unit_tests_passed": True,
-            "crypto_tests_passed": crypto_passed,
+            "unit_tests_passed": False,  # Truthful: unit tests not run/configured unless explicitly executed
+            "crypto_tests_passed": crypto_passed and old_op_removed,
             "integration_tests_passed": all_checks_passed,
             "regression_passed": all_checks_passed,
             "api_compatible": all_checks_passed,
