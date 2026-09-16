@@ -272,18 +272,18 @@ export const AssetDetailDrawer: React.FC<AssetDetailDrawerProps> = ({ asset, onC
                 <div className="grid grid-cols-3 gap-3 text-center">
                   <div className="p-3 rounded-xl bg-cyan-950/40 border border-cyan-800/50">
                     <div className="text-[10px] font-mono text-cyan-400 uppercase font-bold">X (Data Lifetime)</div>
-                    <div className="text-xl font-bold font-mono text-cyan-200 mt-1">{asset.data_lifetime_years ?? 10}y</div>
-                    <div className="text-[10px] text-slate-400 mt-0.5">{asset.lifetime_label || 'LONG_TERM'}</div>
+                    <div className="text-xl font-bold font-mono text-cyan-200 mt-1">{asset.effective_x_years ?? asset.data_lifetime_years ?? 10}y</div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">{asset.lifetime_label || 'Project Context'}</div>
                   </div>
                   <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-800/50">
                     <div className="text-[10px] font-mono text-amber-400 uppercase font-bold">Y (Migration Time)</div>
-                    <div className="text-xl font-bold font-mono text-amber-200 mt-1">{asset.migration_time_years ?? 3}y</div>
-                    <div className="text-[10px] text-slate-400 mt-0.5">Execution Time</div>
+                    <div className="text-xl font-bold font-mono text-amber-200 mt-1">{asset.effective_y_years ?? asset.migration_time_years ?? 3}y</div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">{asset.effective_y_scenario || 'Project Context'}</div>
                   </div>
                   <div className="p-3 rounded-xl bg-purple-950/40 border border-purple-800/50">
                     <div className="text-[10px] font-mono text-purple-400 uppercase font-bold">Z (Threat Horizon)</div>
-                    <div className="text-xl font-bold font-mono text-purple-200 mt-1">{asset.quantum_threat_horizon ?? 2033}</div>
-                    <div className="text-[10px] text-slate-400 mt-0.5">CRQC Estimate</div>
+                    <div className="text-xl font-bold font-mono text-purple-200 mt-1">{asset.effective_z_target_year ?? asset.quantum_threat_horizon ?? 2033}</div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">ZEngine Target</div>
                   </div>
                 </div>
               </div>

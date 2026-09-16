@@ -161,9 +161,16 @@ class CryptoAssetResponse(BaseModel):
     classification_summary: Optional[str] = None
     migration_time_years: Optional[float] = None
     quantum_threat_horizon: Optional[int] = None
-    evidence_items: List[EvidenceResponse] = []
-
     model_config = ConfigDict(from_attributes=True)
+
+class InventoryAssetResponse(CryptoAssetResponse):
+    effective_x_years: float
+    effective_y_years: float
+    effective_y_scenario: str
+    effective_z_value: Optional[float] = None
+    effective_z_planning_horizon_years: Optional[int] = None
+    effective_z_target_year: Optional[int] = None
+    xyz_source: str = "CANONICAL_PROJECT_CONTEXT"
 
 class ReviewAssetRequest(BaseModel):
     algorithm_name: Optional[str] = None

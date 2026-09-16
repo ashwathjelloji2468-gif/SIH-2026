@@ -139,6 +139,13 @@ export interface CryptoAsset {
   business_criticality_label?: string | null;
   business_criticality_score?: number | null;
   classification_summary?: string | null;
+  effective_x_years?: number;
+  effective_y_years?: number;
+  effective_y_scenario?: string;
+  effective_z_value?: number | null;
+  effective_z_planning_horizon_years?: number | null;
+  effective_z_target_year?: number | null;
+  xyz_source?: string;
 }
 
 // Coverage

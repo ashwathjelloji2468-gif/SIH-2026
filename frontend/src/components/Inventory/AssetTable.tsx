@@ -348,9 +348,18 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, loading, onRefre
                 <th className="py-3 px-4 cursor-pointer hover:text-cyan-300 transition-colors" onClick={() => handleSort('asset_type')}>
                   Type {renderSortIcon('asset_type')}
                 </th>
-                <th className="py-3 px-4">Data Lifetime (X)</th>
-                <th className="py-3 px-4">Migration Time (Y)</th>
-                <th className="py-3 px-4">Threat Horizon (Z)</th>
+                <th className="py-3 px-4">
+                  <div>Data Lifetime (X)</div>
+                  <div className="text-[9px] text-cyan-400 font-sans normal-case tracking-normal">Project Context</div>
+                </th>
+                <th className="py-3 px-4">
+                  <div>Migration Time (Y)</div>
+                  <div className="text-[9px] text-amber-400 font-sans normal-case tracking-normal">Project Context</div>
+                </th>
+                <th className="py-3 px-4">
+                  <div>Threat Horizon (Z)</div>
+                  <div className="text-[9px] text-purple-400 font-sans normal-case tracking-normal">ZEngine Target</div>
+                </th>
                 <th className="py-3 px-4 cursor-pointer hover:text-cyan-300 transition-colors" onClick={() => handleSort('business_criticality')}>
                   Business Criticality {renderSortIcon('business_criticality')}
                 </th>
@@ -377,10 +386,10 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, loading, onRefre
 
                   // UNFABRICATED values: display real data or honest "Not assessed" / "Not available"
                   const confidence = ev?.confidence_score != null ? ev.confidence_score : null;
-                  const lifetimeYr = asset.data_lifetime_years != null ? `${asset.data_lifetime_years}y` : null;
+                  const lifetimeYr = asset.effective_x_years != null ? `${asset.effective_x_years}y` : (asset.data_lifetime_years != null ? `${asset.data_lifetime_years}y` : null);
                   const lifetimeLbl = asset.lifetime_label || null;
-                  const migrationYr = asset.migration_time_years != null ? `${asset.migration_time_years}y` : null;
-                  const threatZ = asset.quantum_threat_horizon != null ? asset.quantum_threat_horizon : null;
+                  const migrationYr = asset.effective_y_years != null ? `${asset.effective_y_years}y` : (asset.migration_time_years != null ? `${asset.migration_time_years}y` : null);
+                  const threatZ = asset.effective_z_target_year != null ? asset.effective_z_target_year : (asset.quantum_threat_horizon != null ? asset.quantum_threat_horizon : null);
                   const critLbl = asset.business_criticality_label || null;
 
                   return (

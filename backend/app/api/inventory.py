@@ -5,14 +5,72 @@ from app.core.database import get_db
 from app.repositories.asset_repository import AssetRepository
 from app.repositories.finding_repository import FindingRepository
 from app.discovery.coverage import CoverageEngine
-from app.models.schemas import CryptoAssetResponse, EvidenceResponse, CoverageReportResponse, ReviewAssetRequest
+from app.models.schemas import (
+    CryptoAssetResponse, InventoryAssetResponse, EvidenceResponse,
+    CoverageReportResponse, ReviewAssetRequest
+)
 
 router = APIRouter(tags=["Inventory"])
 
-@router.get("/projects/{project_id}/inventory", response_model=List[CryptoAssetResponse])
+@router.get("/projects/{project_id}/inventory", response_model=List[InventoryAssetResponse])
 def get_project_inventory(project_id: str, db: Session = Depends(get_db)):
     repo = AssetRepository(db)
-    return repo.get_by_project(project_id)
+    assets = repo.get_by_project(project_id)
+    if not assets:
+        return []
+
+    from app.models.db_models import Project
+    from app.engines.x_engine import XEngine
+    from app.engines.y_engine import YEngine
+    from app.engines.z_engine import ZEngine
+
+    project = db.query(Project).filter(Project.id == project_id).first() if db else None
+
+    user_x = getattr(project, "user_x_years", None) if project else None
+    user_domain = getattr(project, "user_domain", None) if project else None
+    user_y_scen = getattr(project, "user_y_scenario", None) if project else None
+
+    x_res = XEngine().evaluate_x(
+        user_x_years=user_x,
+        user_domain=user_domain,
+        project_name=getattr(project, "name", None) if project else None,
+        description=getattr(project, "description", None) if project else None,
+        repository_url=getattr(project, "repository_url", None) if project else None,
+        folder_contexts=getattr(project, "folder_contexts", None) if project else None
+    )
+    y_res = YEngine().evaluate_y(user_scenario=user_y_scen)
+
+    eff_x = float(x_res["value"])
+    eff_y = float(y_res["value"])
+    eff_y_scen = str(y_res["scenario"])
+
+    z_engine = ZEngine()
+    results = []
+    for asset in assets:
+        comp_dict = {
+            "id": asset.id,
+            "algorithm_name": asset.algorithm_name,
+            "primitive": asset.algorithm_name,
+            "purpose": asset.purpose.value if hasattr(asset.purpose, "value") else str(asset.purpose),
+            "asset_type": asset.asset_type.value if hasattr(asset.asset_type, "value") else str(asset.asset_type),
+            "location": asset.location,
+            "key_size": getattr(asset, "key_size", None)
+        }
+        z_res = z_engine.evaluate_component(comp_dict)
+
+        asset_dto = CryptoAssetResponse.model_validate(asset).model_dump()
+        asset_dto.update({
+            "effective_x_years": eff_x,
+            "effective_y_years": eff_y,
+            "effective_y_scenario": eff_y_scen,
+            "effective_z_value": z_res.get("z_value"),
+            "effective_z_planning_horizon_years": z_res.get("z_planning_horizon_years"),
+            "effective_z_target_year": z_res.get("z_target_year"),
+            "xyz_source": "CANONICAL_PROJECT_CONTEXT"
+        })
+        results.append(asset_dto)
+
+    return results
 
 @router.get("/projects/{project_id}/coverage", response_model=CoverageReportResponse)
 def get_project_coverage(project_id: str, db: Session = Depends(get_db)):
