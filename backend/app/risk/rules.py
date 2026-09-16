@@ -1,5 +1,5 @@
 import re
-from typing import Tuple, Dict, Any, List
+from typing import Tuple, Dict, Any, List, Optional
 from app.models.enums import QuantumSafety, CryptoPurpose
 
 # 1. Deterministic Quantum Vulnerability Classification
@@ -135,12 +135,15 @@ def get_migration_complexity_score(asset_type: str, detector_names: List[str]) -
 def get_lifetime_exposure_score(
     data_lifetime_years: float,
     migration_time_years: float,
-    quantum_threat_horizon_year: int,
+    quantum_threat_horizon_year: Optional[int],
     current_year: int = 2026
 ) -> Tuple[float, str]:
     """
     Calculates lifetime exposure subscore (0-100) based on protection window vs quantum threat horizon.
     """
+    if quantum_threat_horizon_year is None:
+        return (10.0, "Low lifetime exposure: Non-deadline component with no immediate quantum threat horizon.")
+
     remaining_years = max(1.0, float(quantum_threat_horizon_year - current_year))
     protection_window = float(data_lifetime_years + migration_time_years)
 

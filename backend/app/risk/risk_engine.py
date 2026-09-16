@@ -96,7 +96,7 @@ class RiskEngine:
         effective_x = float(m_eval["x"]["value"])
         effective_y = float(migration_time_years) if migration_time_years is not None else float(m_eval["y"]["value"])
         z_target = m_eval["z"].get("z_target_year")
-        resolved_z_year = int(quantum_threat_horizon_year) if quantum_threat_horizon_year is not None else (int(z_target) if z_target is not None else 2033)
+        resolved_z_year = int(quantum_threat_horizon_year) if quantum_threat_horizon_year is not None else (int(z_target) if z_target is not None else None)
 
         lifetime_score, lifetime_rationale = get_lifetime_exposure_score(
             data_lifetime_years=effective_x,

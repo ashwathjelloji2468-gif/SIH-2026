@@ -128,20 +128,25 @@ class ZEngine:
         dep_factor = self._calculate_dep_factor(refs)
         z_score = base_score * env_mult * dep_factor
 
-        # Component-wise classification
+        # Component-wise classification & artifact-specific Z_i calculation
         q_class, status, raw_z_value, c_bits, q_bits, explanation, confidence = self._classify_component(
             primitive=primitive,
             algorithm_name=algo_name,
             key_size=key_size,
             output_size=output_size,
-            t_q=t_q
+            t_q=t_q,
+            purpose=purpose,
+            asset_type=asset_type,
+            execution_environment=exec_env,
+            location=location,
+            crypto_refs=refs
         )
 
         z_value = raw_z_value
         if z_value is not None:
             z_value = float(z_value)
             z_planning_horizon_years = z_value
-            z_target_year = CURRENT_YEAR + int(z_value)
+            z_target_year = CURRENT_YEAR + int(round(z_value))
         else:
             z_planning_horizon_years = None
             z_target_year = None
@@ -185,7 +190,12 @@ class ZEngine:
         algorithm_name: str,
         key_size: Optional[int],
         output_size: Optional[int],
-        t_q: int
+        t_q: int,
+        purpose: str = "",
+        asset_type: str = "",
+        execution_environment: str = "",
+        location: str = "",
+        crypto_refs: Optional[List[Any]] = None
     ) -> Tuple[str, str, Optional[float], Optional[int], Optional[int], str, str]:
         text = f"{primitive} {algorithm_name}".upper().strip()
 
@@ -233,7 +243,29 @@ class ZEngine:
         ]
         if any(kw in text for kw in shor_keywords):
             classical_bits = 112
-            if "RSA" in text:
+            ref_bits = 112.0
+            if any(e in text for e in ["ECDSA", "ECDH", "ECC", "25519", "SECP", "PRIME", "EC"]):
+                ref_bits = 128.0
+                if key_size:
+                    if key_size <= 192:
+                        classical_bits = 96
+                    elif key_size <= 256:
+                        classical_bits = 128
+                    elif key_size <= 384:
+                        classical_bits = 192
+                    elif key_size >= 521:
+                        classical_bits = 256
+                    else:
+                        classical_bits = 128
+                else:
+                    if "384" in text:
+                        classical_bits = 192
+                    elif "521" in text:
+                        classical_bits = 256
+                    else:
+                        classical_bits = 128
+            elif "RSA" in text or "DSA" in text or "DH" in text:
+                ref_bits = 112.0
                 if key_size:
                     if key_size <= 1024:
                         classical_bits = 80
@@ -242,17 +274,37 @@ class ZEngine:
                     elif key_size <= 3072:
                         classical_bits = 128
                     else:
-                        classical_bits = 128
-            elif any(e in text for e in ["ECDSA", "ECDH", "ECC", "25519"]):
-                classical_bits = key_size if (key_size and key_size <= 521) else 128
+                        classical_bits = 144
+
+            # Calculate artifact-specific Z_i for Shor-vulnerable components
+            z_bits = float(t_q) * (float(classical_bits) / ref_bits)
+
+            # Purpose adjustment (e.g. HNDL risk for key exchange / encryption when explicitly specified)
+            purpose_text = f"{purpose}".upper().strip()
+            purpose_offset = 0.0
+            if purpose_text in ["ECDH", "DH", "KEY_EXCHANGE_HNDL", "HNDL"]:
+                purpose_offset = -1.0
+
+            # Environment adjustment
+            env_text = f"{execution_environment} {location}".upper()
+            env_offset = 0.0
+            if any(k in env_text for k in ["EMBEDDED", "IOT", "FIRMWARE"]):
+                env_offset = -0.5
+
+            # Dependency adjustment
+            dep_offset = 0.0
+            if crypto_refs and isinstance(crypto_refs, list) and len(crypto_refs) > 2:
+                dep_offset = -0.5
+
+            raw_z_value = round(max(1.0, z_bits + purpose_offset + env_offset + dep_offset), 1)
 
             return (
                 QUANTUM_CLASS_SHOR,
                 STATUS_VULNERABLE_AT_HORIZON,
-                float(t_q),
+                raw_z_value,
                 classical_bits,
                 0,
-                f"Fundamental public-key exposure: Dependent on prime factorization / discrete logarithms, vulnerable to polynomial-time quantum attack (Shor's algorithm). Reaches quantum deadline Z_i = T_Q ({t_q} years / ~{CURRENT_YEAR + t_q}).",
+                f"Fundamental public-key exposure: Dependent on prime factorization / discrete logarithms, vulnerable to polynomial-time quantum attack (Shor's algorithm). Component quantum deadline Z_i = {raw_z_value} years (~{CURRENT_YEAR + int(round(raw_z_value))}).",
                 "HIGH"
             )
 
@@ -260,13 +312,14 @@ class ZEngine:
         # Sub-case B1: Legacy / Weak Primitives
         legacy_keywords = ["DES", "3DES", "RC4", "MD5", "SHA1", "SHA-1", "BLOWFISH"]
         if any(kw in text for kw in legacy_keywords):
+            raw_z_value = float(t_q)
             return (
                 QUANTUM_CLASS_STRENGTH_REDUCTION,
                 STATUS_UNACCEPTABLE_AT_HORIZON,
-                float(t_q),
+                raw_z_value,
                 64 if ("DES" in text or "MD5" in text) else 80,
                 32 if ("DES" in text or "MD5" in text) else 40,
-                f"Security-strength reduction: Primitive is legacy/deprecated classically and further degraded under Grover/BHT quantum algorithms. Reaches unacceptable security strength at horizon Z_i = T_Q ({t_q} years / ~{CURRENT_YEAR + t_q}).",
+                f"Security-strength reduction: Primitive is legacy/deprecated classically and further degraded under Grover/BHT quantum algorithms. Component quantum deadline Z_i = {raw_z_value} years (~{CURRENT_YEAR + int(round(raw_z_value))}).",
                 "HIGH"
             )
 

@@ -67,14 +67,15 @@ def calculate_mosca_analysis(
     if current_year is None:
         current_year = 2026
 
+    protection_window = x_val + y_val
+
     if quantum_threat_horizon_year is not None:
-        z_years = max(1.0, float(quantum_threat_horizon_year - current_year))
+        z_years = float(quantum_threat_horizon_year - current_year)
         target_horizon_year = int(quantum_threat_horizon_year)
     else:
         z_years = 10.0
         target_horizon_year = int(current_year + z_years)
 
-    protection_window = x_val + y_val
     urgency_gap = protection_window - z_years  # M_i = X + Y - Z_i
 
     if urgency_gap > 5.0:

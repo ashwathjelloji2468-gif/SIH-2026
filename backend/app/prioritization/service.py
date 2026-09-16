@@ -72,7 +72,7 @@ class PrioritizationService:
             
             mosca_dict = assessment_dict.get("mosca", {})
             mosca_status = mosca_dict.get("mosca_status", "UNKNOWN")
-            quantum_threat_horizon = mosca_dict.get("quantum_threat_horizon", 2033)
+            quantum_threat_horizon = mosca_dict.get("quantum_threat_horizon")
 
             priority_tier = self.priority_engine.categorize_tier(
                 risk_score=risk_score,

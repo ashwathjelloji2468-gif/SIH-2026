@@ -6,7 +6,7 @@ class TechnicalAssessmentSchema(BaseModel):
     risk_level: str
     risk_score: float
     mosca_status: str
-    quantum_threat_horizon: int = 2033
+    quantum_threat_horizon: Optional[int] = None
 
 class BusinessContextSchema(BaseModel):
     system_criticality: str
