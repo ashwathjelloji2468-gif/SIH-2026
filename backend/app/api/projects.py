@@ -35,7 +35,8 @@ def update_project(project_id: str, project_in: ProjectUpdate, db: Session = Dep
     if not proj:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    if project_in.default_migration_profile and project_in.default_migration_profile != old_profile:
+    new_profile = getattr(project_in, "default_migration_profile", None)
+    if new_profile and new_profile != old_profile:
         from app.repositories.audit_repository import AuditRepository
         AuditRepository(db).log(
             action="MIGRATION_PROFILE_CHANGED",

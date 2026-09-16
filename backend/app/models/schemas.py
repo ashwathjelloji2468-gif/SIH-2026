@@ -34,6 +34,7 @@ class ProjectUpdate(BaseModel):
     user_x_years: Optional[int] = None
     user_domain: Optional[str] = None
     user_y_scenario: Optional[str] = None
+    default_migration_profile: Optional[str] = None
     folder_contexts: Optional[Dict[str, Any]] = None
     business_context: Optional[Dict[str, Any]] = None
 
