@@ -34,6 +34,9 @@ class RiskService:
         data_lifetime_years: Optional[float] = None,
         migration_time_years: Optional[float] = None,
         quantum_threat_horizon_year: Optional[int] = None,
+        user_x_years: Optional[float] = None,
+        user_domain: Optional[str] = None,
+        user_y_scenario: Optional[str] = None,
         force_reassessment: bool = True
     ) -> Dict[str, Any]:
         if not self.asset_repo:
@@ -50,6 +53,14 @@ class RiskService:
                 threats = self.risk_repo.get_threat_scenarios_for_asset(asset_id)
                 return self._assessment_to_dict(existing, asset, threats)
 
+        project = getattr(asset, "project", None) or (getattr(asset, "scan", None) and getattr(asset.scan, "project", None))
+        if user_x_years is None and project:
+            user_x_years = getattr(project, "user_x_years", None)
+        if user_domain is None and project:
+            user_domain = getattr(project, "user_domain", None)
+        if user_y_scenario is None and project:
+            user_y_scenario = getattr(project, "user_y_scenario", None)
+
         # Extract evidence information
         detector_names = [e.detector_name for e in (asset.evidence_items or [])]
         excerpts = [e.excerpt for e in (asset.evidence_items or []) if e.excerpt]
@@ -65,6 +76,9 @@ class RiskService:
             data_lifetime_years=data_lifetime_years,
             migration_time_years=migration_time_years,
             quantum_threat_horizon_year=quantum_threat_horizon_year,
+            user_x_years=user_x_years,
+            user_domain=user_domain,
+            user_y_scenario=user_y_scenario,
             evidence_excerpts=excerpts
         )
 
@@ -77,13 +91,25 @@ class RiskService:
         project_id: str,
         data_sensitivity_label: str = "UNKNOWN",
         business_criticality_label: str = "UNKNOWN",
-        quantum_threat_horizon_year: Optional[int] = None
+        quantum_threat_horizon_year: Optional[int] = None,
+        user_x_years: Optional[float] = None,
+        user_domain: Optional[str] = None,
+        user_y_scenario: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         if not self.asset_repo:
             raise RuntimeError("Database repository unavailable.")
         assets = self.asset_repo.get_by_project(project_id)
         if not assets:
             return []
+
+        from app.models.db_models import Project
+        project = self.db.query(Project).filter(Project.id == project_id).first() if self.db else None
+        if user_x_years is None and project:
+            user_x_years = getattr(project, "user_x_years", None)
+        if user_domain is None and project:
+            user_domain = getattr(project, "user_domain", None)
+        if user_y_scenario is None and project:
+            user_y_scenario = getattr(project, "user_y_scenario", None)
 
         to_eval = []
         for asset in assets:
@@ -101,6 +127,9 @@ class RiskService:
                 data_lifetime_years=None,
                 migration_time_years=None,
                 quantum_threat_horizon_year=quantum_threat_horizon_year,
+                user_x_years=user_x_years,
+                user_domain=user_domain,
+                user_y_scenario=user_y_scenario,
                 evidence_excerpts=excerpts
             )
             to_eval.append((asset, eval_result))
@@ -251,25 +280,24 @@ class RiskService:
         }
 
     def _assessment_to_dict(self, ra, asset, threats) -> Dict[str, Any]:
-        comp_dict = {
-            "id": asset.id if asset else ra.asset_id,
-            "primitive": asset.algorithm_name if asset else "UNKNOWN",
-            "algorithm_name": asset.algorithm_name if asset else "UNKNOWN",
-            "key_size": getattr(asset, "key_size", None),
-            "location": asset.location if asset else "",
-            "purpose": asset.purpose.value if asset and hasattr(asset.purpose, "value") else str(getattr(asset, "purpose", "")) if asset else "",
-            "execution_environment": getattr(asset, "execution_environment", None) if asset else None,
-            "cryptoRefArray": getattr(asset, "cryptoRefArray", None) or getattr(asset, "dependencies", None) if asset else None,
-        }
-        project = getattr(asset, "project", None) if asset else None
-        
-        from app.engines.mosca_engine import MoscaEngine
-        m_eval = MoscaEngine().evaluate_component_mosca(
-            component=comp_dict,
-            user_x_years=getattr(project, "user_x_years", None) if project else None,
-            user_domain=getattr(project, "user_domain", None) if project else None,
-            user_y_scenario=getattr(project, "user_y_scenario", None) if project else None
-        )
+        factors = ra.factors or {}
+        mosca_dict = factors.get("mosca") if isinstance(factors, dict) and isinstance(factors.get("mosca"), dict) else {}
+
+        x_val = mosca_dict.get("x_years") or factors.get("x_years") or 10.0
+        y_val = mosca_dict.get("y_years") or factors.get("y_years") or 3.0
+        z_target_year = ra.quantum_threat_horizon if ra.quantum_threat_horizon is not None else mosca_dict.get("quantum_threat_horizon")
+        if "z_horizon_years" in mosca_dict:
+            z_planning_horizon = mosca_dict.get("z_horizon_years")
+        elif z_target_year is not None:
+            z_planning_horizon = max(0, z_target_year - 2026)
+        else:
+            z_planning_horizon = None
+
+        z_score = mosca_dict.get("z_score") if mosca_dict.get("z_score") is not None else factors.get("z_score", 50.0)
+        mosca_score = mosca_dict.get("mosca_score") if mosca_dict.get("mosca_score") is not None else (ra.mosca_factor_score or factors.get("mosca_score"))
+        technical_urgency = mosca_dict.get("technical_urgency") or factors.get("technical_urgency", "MODERATE")
+        x_source = mosca_dict.get("x_source") or "canonical"
+        y_scenario = mosca_dict.get("y_scenario") or "STANDARD"
 
         return {
             "id": ra.id,
@@ -283,30 +311,27 @@ class RiskService:
             "risk_level": ra.risk_level.value if hasattr(ra.risk_level, "value") else str(ra.risk_level),
             "priority": ra.priority or "LOW",
             "confidence_score": ra.confidence_score,
-            "x": m_eval["x"],
-            "y": m_eval["y"],
-            "z": m_eval["z"],
-            "z_score": m_eval["z"].get("z_score"),
-            "z_planning_horizon_years": m_eval["z"].get("z_planning_horizon_years"),
-            "mosca_score": m_eval.get("mosca_score"),
-            "technical_urgency": m_eval.get("technical_urgency"),
-            "factors": ra.factors or {
-                "quantum_exposure": ra.quantum_exposure,
-                "data_sensitivity": ra.data_sensitivity_score,
-                "business_criticality": ra.business_criticality_score,
-                "migration_complexity": ra.migration_complexity_score,
-                "lifetime_exposure": ra.lifetime_exposure_score,
-                "mosca_score": ra.mosca_factor_score
+            "x": {"value": x_val, "value_years": x_val, "source": x_source},
+            "y": {"value": y_val, "value_years": y_val, "scenario": y_scenario},
+            "z": {
+                "z_target_year": z_target_year,
+                "z_planning_horizon_years": z_planning_horizon,
+                "z_score": z_score
             },
+            "z_score": z_score,
+            "z_planning_horizon_years": z_planning_horizon,
+            "mosca_score": mosca_score,
+            "technical_urgency": technical_urgency,
+            "factors": factors,
             "mosca": {
-                "mosca_status": ra.mosca_status or m_eval.get("urgency", "UNKNOWN"),
-                "quantum_threat_horizon": m_eval["z"].get("z_target_year") or ra.quantum_threat_horizon or 2036,
-                "mosca_score": m_eval.get("mosca_score"),
-                "x_years": m_eval["x"]["value"],
-                "y_years": m_eval["y"]["value"],
-                "z_horizon_years": m_eval["z"].get("z_planning_horizon_years"),
-                "z_score": m_eval["z"].get("z_score"),
-                "rationale": m_eval.get("explanation") or ra.explanation
+                "mosca_status": ra.mosca_status or mosca_dict.get("mosca_status") or "UNKNOWN",
+                "quantum_threat_horizon": z_target_year,
+                "mosca_score": mosca_score,
+                "x_years": x_val,
+                "y_years": y_val,
+                "z_horizon_years": z_planning_horizon,
+                "z_score": z_score,
+                "rationale": mosca_dict.get("rationale") or ra.explanation
             },
             "threat_scenarios": [
                 {
@@ -320,6 +345,6 @@ class RiskService:
                     "evidence": ts.evidence or []
                 } for ts in threats
             ],
-            "rationale": ra.rationale or [ra.explanation] if ra.explanation else [],
+            "rationale": ra.rationale or ([ra.explanation] if ra.explanation else []),
             "created_at": ra.created_at.isoformat() if ra.created_at and hasattr(ra.created_at, "isoformat") else str(ra.created_at)
         }

@@ -193,6 +193,9 @@ class RiskAssessRequest(BaseModel):
     data_lifetime_years: Optional[float] = None
     migration_time_years: Optional[float] = None
     quantum_threat_horizon_year: Optional[int] = None
+    user_x_years: Optional[float] = None
+    user_domain: Optional[str] = None
+    user_y_scenario: Optional[str] = None
     force_reassessment: Optional[bool] = True
 
 class RiskAssessmentResponse(BaseModel):

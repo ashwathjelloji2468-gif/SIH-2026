@@ -86,9 +86,12 @@ def assess_risk(
                 asset_id=req.asset_id,
                 data_sensitivity_label=req.data_sensitivity_label or "UNKNOWN",
                 business_criticality_label=req.business_criticality_label or "UNKNOWN",
-                data_lifetime_years=req.data_lifetime_years or 10.0,
-                migration_time_years=req.migration_time_years or 3.0,
+                data_lifetime_years=req.data_lifetime_years,
+                migration_time_years=req.migration_time_years,
                 quantum_threat_horizon_year=req.quantum_threat_horizon_year,
+                user_x_years=req.user_x_years,
+                user_domain=req.user_domain,
+                user_y_scenario=req.user_y_scenario,
                 force_reassessment=req.force_reassessment if req.force_reassessment is not None else True
             )
         except ValueError as e:
@@ -99,7 +102,10 @@ def assess_risk(
             project_id=req.project_id,
             data_sensitivity_label=req.data_sensitivity_label or "UNKNOWN",
             business_criticality_label=req.business_criticality_label or "UNKNOWN",
-            quantum_threat_horizon_year=req.quantum_threat_horizon_year
+            quantum_threat_horizon_year=req.quantum_threat_horizon_year,
+            user_x_years=req.user_x_years,
+            user_domain=req.user_domain,
+            user_y_scenario=req.user_y_scenario
         )
 
     else:
@@ -113,7 +119,10 @@ def assess_project_risk_legacy(project_id: str, req: RiskAssessRequest, db: Sess
         project_id=project_id,
         data_sensitivity_label=req.data_sensitivity_label or "UNKNOWN",
         business_criticality_label=req.business_criticality_label or "UNKNOWN",
-        quantum_threat_horizon_year=req.quantum_threat_horizon_year
+        quantum_threat_horizon_year=req.quantum_threat_horizon_year,
+        user_x_years=req.user_x_years,
+        user_domain=req.user_domain,
+        user_y_scenario=req.user_y_scenario
     )
 
 @router.get("/projects/{project_id}/risk/summary")

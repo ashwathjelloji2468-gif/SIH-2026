@@ -175,7 +175,7 @@ class RiskAssessment(Base):
     quantum_status = Column(String, nullable=True)
     crypto_purpose = Column(String, nullable=True)
     mosca_status = Column(String, nullable=True)
-    quantum_threat_horizon = Column(Integer, default=2033)
+    quantum_threat_horizon = Column(Integer, nullable=True)
     priority = Column(String, nullable=True)
     explanation = Column(Text, nullable=True)
     rationale = Column(JSON, nullable=True)
@@ -243,9 +243,9 @@ class ThreatScenario(Base):
     asset_id = Column(String, ForeignKey("crypto_assets.id", ondelete="CASCADE"), nullable=True)
     name = Column(String, nullable=False)
     scenario_type = Column(SQLEnum(ThreatScenarioType), default=ThreatScenarioType.MODERATE, nullable=False)
-    quantum_threat_horizon_year = Column(Integer, nullable=False, default=2033)  # Z
-    data_lifetime_years = Column(Integer, default=10, nullable=False)  # X
-    migration_time_years = Column(Integer, default=3, nullable=False)  # Y
+    quantum_threat_horizon_year = Column(Integer, nullable=True)  # Z
+    data_lifetime_years = Column(Float, nullable=True)  # X
+    migration_time_years = Column(Float, nullable=True)  # Y
     severity = Column(String, default="HIGH")
     urgency = Column(String, default="HIGH")
     description = Column(Text, nullable=True)

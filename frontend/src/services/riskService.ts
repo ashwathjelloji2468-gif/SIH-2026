@@ -15,6 +15,9 @@ export const riskService = {
       quantum_threat_horizon_year?: number;
       data_sensitivity_score?: number;
       business_criticality_score?: number;
+      user_x_years?: number;
+      user_domain?: string;
+      user_y_scenario?: string;
     }
   ): Promise<RiskAssessment[]> => {
     return await api.post<RiskAssessment[]>(`/projects/${projectId}/risk/assess`, params || {});

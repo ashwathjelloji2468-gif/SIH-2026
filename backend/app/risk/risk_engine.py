@@ -39,6 +39,9 @@ class RiskEngine:
         data_lifetime_years: Optional[float] = None,
         migration_time_years: Optional[float] = None,
         quantum_threat_horizon_year: Optional[int] = None,
+        user_x_years: Optional[float] = None,
+        user_domain: Optional[str] = None,
+        user_y_scenario: Optional[str] = None,
         evidence_excerpts: Optional[List[str]] = None
     ) -> Dict[str, Any]:
 
@@ -75,21 +78,46 @@ class RiskEngine:
         # 4. Migration Complexity
         complexity_score, complexity_rationale = get_migration_complexity_score(asset_type, detector_names or [])
 
-        # 5. Lifetime Exposure & Mosca Analysis
-        effective_x = float(data_lifetime_years) if data_lifetime_years is not None else float(XEngine().evaluate_x()["value"])
-        effective_y = float(migration_time_years) if migration_time_years is not None else float(YEngine().evaluate_y()["value"])
+        # 5. Canonical Mosca Evaluation & Single Z Consistency
+        comp_dict = {
+            "primitive": algorithm_name,
+            "algorithm_name": algorithm_name,
+            "purpose": final_purpose.value if hasattr(final_purpose, "value") else str(final_purpose),
+            "asset_type": asset_type
+        }
+        from app.engines.mosca_engine import MoscaEngine
+        m_eval = MoscaEngine().evaluate_component_mosca(
+            component=comp_dict,
+            user_x_years=user_x_years if user_x_years is not None else data_lifetime_years,
+            user_domain=user_domain,
+            user_y_scenario=user_y_scenario
+        )
+
+        effective_x = float(m_eval["x"]["value"])
+        effective_y = float(migration_time_years) if migration_time_years is not None else float(m_eval["y"]["value"])
+        z_target = m_eval["z"].get("z_target_year")
+        resolved_z_year = int(quantum_threat_horizon_year) if quantum_threat_horizon_year is not None else (int(z_target) if z_target is not None else 2033)
 
         lifetime_score, lifetime_rationale = get_lifetime_exposure_score(
             data_lifetime_years=effective_x,
             migration_time_years=effective_y,
-            quantum_threat_horizon_year=quantum_threat_horizon_year or 2033
+            quantum_threat_horizon_year=resolved_z_year
         )
 
         mosca = calculate_mosca_analysis(
             data_lifetime_years=effective_x,
             migration_time_years=effective_y,
-            quantum_threat_horizon_year=quantum_threat_horizon_year
+            quantum_threat_horizon_year=resolved_z_year
         )
+        mosca["quantum_threat_horizon"] = resolved_z_year
+        mosca["x_years"] = effective_x
+        mosca["y_years"] = effective_y
+        mosca["z_horizon_years"] = m_eval["z"].get("z_planning_horizon_years")
+        mosca["z_score"] = m_eval["z"].get("z_score")
+        mosca["mosca_score"] = m_eval.get("mosca_score", mosca.get("mosca_score", 50.0))
+        mosca["technical_urgency"] = m_eval.get("technical_urgency", "MODERATE")
+        mosca["x_source"] = m_eval["x"].get("source", "default")
+        mosca["y_scenario"] = m_eval["y"].get("scenario", "STANDARD")
 
         # 6. Overall Deterministic Risk Score
         risk_score = calculate_deterministic_risk_score(
@@ -143,7 +171,10 @@ class RiskEngine:
             "business_criticality": criticality_score,
             "migration_complexity": complexity_score,
             "lifetime_exposure": lifetime_score,
-            "mosca_score": mosca["mosca_score"]
+            "mosca_score": mosca["mosca_score"],
+            "x_years": effective_x,
+            "y_years": effective_y,
+            "z_score": m_eval["z"].get("z_score")
         }
 
         return {
@@ -155,6 +186,9 @@ class RiskEngine:
             "risk_level": risk_level.value if hasattr(risk_level, "value") else str(risk_level),
             "priority": priority,
             "confidence_score": confidence_score,
+            "x": m_eval["x"],
+            "y": m_eval["y"],
+            "z": m_eval["z"],
             "factors": factors,
             "mosca": mosca,
             "threat_scenarios": scenarios,

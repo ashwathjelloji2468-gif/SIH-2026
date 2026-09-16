@@ -15,6 +15,8 @@ class RiskRepository:
     def store_assessment(self, asset_id: str, eval_result: Dict[str, Any]) -> RiskAssessment:
         factors = eval_result.get("factors", {})
         mosca = eval_result.get("mosca", {})
+        factors_to_store = dict(factors)
+        factors_to_store["mosca"] = mosca
         
         level_str = eval_result.get("risk_level", "LOW")
         try:
@@ -38,11 +40,11 @@ class RiskRepository:
             quantum_status=eval_result.get("quantum_status"),
             crypto_purpose=eval_result.get("crypto_purpose"),
             mosca_status=mosca.get("mosca_status"),
-            quantum_threat_horizon=mosca.get("quantum_threat_horizon", 2033),
+            quantum_threat_horizon=mosca.get("quantum_threat_horizon"),
             priority=eval_result.get("priority", "LOW"),
             explanation=eval_result.get("explanation"),
             rationale=eval_result.get("rationale"),
-            factors=factors
+            factors=factors_to_store
         )
         self.db.add(ra)
         self.db.commit()
@@ -60,7 +62,7 @@ class RiskRepository:
                 asset_id=asset_id,
                 name=sc.get("name", "Threat Scenario"),
                 scenario_type=stype,
-                quantum_threat_horizon_year=mosca.get("quantum_threat_horizon", 2033),
+                quantum_threat_horizon_year=mosca.get("quantum_threat_horizon"),
                 severity=sc.get("severity", "HIGH"),
                 urgency=sc.get("urgency", "HIGH"),
                 description=sc.get("description"),
@@ -78,6 +80,8 @@ class RiskRepository:
         for asset_id, eval_result in assessments_data:
             factors = eval_result.get("factors", {})
             mosca = eval_result.get("mosca", {})
+            factors_to_store = dict(factors)
+            factors_to_store["mosca"] = mosca
             
             level_str = eval_result.get("risk_level", "LOW")
             try:
@@ -101,11 +105,11 @@ class RiskRepository:
                 quantum_status=eval_result.get("quantum_status"),
                 crypto_purpose=eval_result.get("crypto_purpose"),
                 mosca_status=mosca.get("mosca_status"),
-                quantum_threat_horizon=mosca.get("quantum_threat_horizon", 2033),
+                quantum_threat_horizon=mosca.get("quantum_threat_horizon"),
                 priority=eval_result.get("priority", "LOW"),
                 explanation=eval_result.get("explanation"),
                 rationale=eval_result.get("rationale"),
-                factors=factors
+                factors=factors_to_store
             )
             ra_objs.append(ra)
 
@@ -120,7 +124,7 @@ class RiskRepository:
                     asset_id=asset_id,
                     name=sc.get("name", "Threat Scenario"),
                     scenario_type=stype,
-                    quantum_threat_horizon_year=mosca.get("quantum_threat_horizon", 2033),
+                    quantum_threat_horizon_year=mosca.get("quantum_threat_horizon"),
                     severity=sc.get("severity", "HIGH"),
                     urgency=sc.get("urgency", "HIGH"),
                     description=sc.get("description"),

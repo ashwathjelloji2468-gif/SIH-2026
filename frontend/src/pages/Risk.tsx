@@ -116,7 +116,7 @@ export const Risk: React.FC = () => {
             name: n.label || n.id,
             location: n.metadata?.location || null,
             quantum_risk: n.metadata?.quantum_safety || (n.metadata?.algorithm_name?.includes('RSA') ? 'QUANTUM_VULNERABLE' : 'LOW'),
-            mosca_x: 10,
+            mosca_x: n.metadata?.x_years ?? n.metadata?.x ?? currentProject?.user_x_years ?? 10,
             business_criticality: 50,
             extra_metadata: n.metadata
           })),
@@ -192,7 +192,11 @@ export const Risk: React.FC = () => {
     setReassessing(true);
     setErrorMessage(null);
     try {
-      await riskService.assessProjectRisk(currentProject.id);
+      await riskService.assessProjectRisk(currentProject.id, {
+        user_x_years: currentProject.user_x_years ?? undefined,
+        user_domain: currentProject.user_domain ?? undefined,
+        user_y_scenario: currentProject.user_y_scenario ?? undefined
+      });
       await fetchRiskData(true);
     } catch (err: any) {
       console.error('Failed to reassess project risk:', err);
@@ -377,14 +381,14 @@ export const Risk: React.FC = () => {
             <h3 className="text-sm font-semibold text-slate-100 font-mono">3D Threat Horizon & Risk Exposure Space</h3>
           </div>
           <span className="text-xs font-mono text-cyan-300 bg-cyan-950/60 border border-cyan-800/60 px-2.5 py-1 rounded-full">
-            Theorem: X ({xContext?.x_result?.value || riskSummary?.mosca?.data_lifetime_years || 20}y) + Y ({yContext?.y_result?.value || riskSummary?.mosca?.migration_time_years || 10}y) &gt; Z ({riskSummary?.mosca?.quantum_threat_horizon || 2033})
+            Theorem: X ({xContext?.x_result?.value ?? currentProject?.user_x_years ?? riskSummary?.mosca?.data_lifetime_years ?? 10}y) + Y ({yContext?.y_result?.value ?? riskSummary?.mosca?.migration_time_years ?? 10}y) &gt; Z ({zContext?.target_horizon_year ?? riskSummary?.mosca?.quantum_threat_horizon ?? 2033})
           </span>
         </div>
         <div className="h-[380px] w-full rounded-xl overflow-hidden bg-[#06080F]/90 border border-slate-800/60 relative">
           <MoscaGraph3D
-            dataLifetime={xContext?.x_result?.value || riskSummary?.mosca?.data_lifetime_years || 20}
-            migrationTime={yContext?.y_result?.value || riskSummary?.mosca?.migration_time_years || 10}
-            threatHorizon={riskSummary?.mosca?.quantum_threat_horizon || 2033}
+            dataLifetime={xContext?.x_result?.value ?? currentProject?.user_x_years ?? riskSummary?.mosca?.data_lifetime_years ?? 10}
+            migrationTime={yContext?.y_result?.value ?? riskSummary?.mosca?.migration_time_years ?? 10}
+            threatHorizon={zContext?.target_horizon_year ?? riskSummary?.mosca?.quantum_threat_horizon ?? 2033}
             className="w-full h-full"
           />
         </div>
