@@ -384,12 +384,12 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, loading, onRefre
                 paginatedAssets.map((asset) => {
                   const ev = asset.evidence_items && asset.evidence_items[0];
 
-                  // UNFABRICATED values: display real data or honest "Not assessed" / "Not available"
+                  // UNFABRICATED values: display canonical effective data or honest "Not assessed"
                   const confidence = ev?.confidence_score != null ? ev.confidence_score : null;
-                  const lifetimeYr = asset.effective_x_years != null ? `${asset.effective_x_years}y` : (asset.data_lifetime_years != null ? `${asset.data_lifetime_years}y` : null);
+                  const lifetimeYr = asset.effective_x_years != null ? `${asset.effective_x_years}y` : null;
                   const lifetimeLbl = asset.lifetime_label || null;
-                  const migrationYr = asset.effective_y_years != null ? `${asset.effective_y_years}y` : (asset.migration_time_years != null ? `${asset.migration_time_years}y` : null);
-                  const threatZ = asset.effective_z_target_year != null ? asset.effective_z_target_year : (asset.quantum_threat_horizon != null ? asset.quantum_threat_horizon : null);
+                  const migrationYr = asset.effective_y_years != null ? `${asset.effective_y_years}y` : null;
+                  const threatZ = asset.effective_z_target_year != null ? asset.effective_z_target_year : null;
                   const critLbl = asset.business_criticality_label || null;
 
                   return (
