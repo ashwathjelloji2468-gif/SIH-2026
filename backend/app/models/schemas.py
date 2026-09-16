@@ -158,8 +158,8 @@ class CryptoAssetResponse(BaseModel):
     business_criticality_label: Optional[str] = None
     business_criticality_score: Optional[float] = None
     classification_summary: Optional[str] = None
-    migration_time_years: Optional[float] = 3.0
-    quantum_threat_horizon: Optional[int] = 2033
+    migration_time_years: Optional[float] = None
+    quantum_threat_horizon: Optional[int] = None
     evidence_items: List[EvidenceResponse] = []
 
     model_config = ConfigDict(from_attributes=True)
@@ -190,9 +190,9 @@ class RiskAssessRequest(BaseModel):
     project_id: Optional[str] = None
     data_sensitivity_label: Optional[str] = "UNKNOWN"
     business_criticality_label: Optional[str] = "UNKNOWN"
-    data_lifetime_years: Optional[float] = 10.0
-    migration_time_years: Optional[float] = 3.0
-    quantum_threat_horizon_year: Optional[int] = 2033
+    data_lifetime_years: Optional[float] = None
+    migration_time_years: Optional[float] = None
+    quantum_threat_horizon_year: Optional[int] = None
     force_reassessment: Optional[bool] = True
 
 class RiskAssessmentResponse(BaseModel):
@@ -237,9 +237,9 @@ class RecommendationResponse(BaseModel):
 class ThreatScenarioBase(BaseModel):
     name: str
     scenario_type: ThreatScenarioType = ThreatScenarioType.MODERATE
-    quantum_threat_horizon_year: int = 2033
-    data_lifetime_years: int = 10
-    migration_time_years: int = 3
+    quantum_threat_horizon_year: Optional[int] = None
+    data_lifetime_years: Optional[int] = None
+    migration_time_years: Optional[int] = None
     description: Optional[str] = None
 
 class ThreatScenarioCreate(ThreatScenarioBase):

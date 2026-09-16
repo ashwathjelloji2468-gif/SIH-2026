@@ -18,6 +18,9 @@ from app.risk.scoring import (
 )
 from app.risk.scenarios import evaluate_threat_scenarios
 
+from app.engines.x_engine import XEngine
+from app.engines.y_engine import YEngine
+
 class RiskEngine:
     """
     Deterministic Quantum Risk Engine for Prompt 3.
@@ -33,8 +36,8 @@ class RiskEngine:
         business_criticality_label: str = "UNKNOWN",
         data_sensitivity: Optional[float] = None,
         business_criticality: Optional[float] = None,
-        data_lifetime_years: float = 10.0,
-        migration_time_years: float = 3.0,
+        data_lifetime_years: Optional[float] = None,
+        migration_time_years: Optional[float] = None,
         quantum_threat_horizon_year: Optional[int] = None,
         evidence_excerpts: Optional[List[str]] = None
     ) -> Dict[str, Any]:
@@ -43,8 +46,8 @@ class RiskEngine:
         classification = classify_crypto_asset(algorithm_name, asset_type=asset_type, purpose=purpose)
         if business_criticality_label == "UNKNOWN":
             business_criticality_label = classification["business_criticality_label"]
-        if data_lifetime_years == 10.0 and classification["data_lifetime_years"] != 10.0:
-            data_lifetime_years = classification["data_lifetime_years"]
+        if data_lifetime_years is None and classification.get("data_lifetime_years") != 10.0:
+            data_lifetime_years = classification.get("data_lifetime_years")
 
         # 1. Quantum Vulnerability Classification
         classified_qs, quantum_exposure, qs_rationale = classify_algorithm_vulnerability(algorithm_name)
@@ -73,15 +76,18 @@ class RiskEngine:
         complexity_score, complexity_rationale = get_migration_complexity_score(asset_type, detector_names or [])
 
         # 5. Lifetime Exposure & Mosca Analysis
+        effective_x = float(data_lifetime_years) if data_lifetime_years is not None else float(XEngine().evaluate_x()["value"])
+        effective_y = float(migration_time_years) if migration_time_years is not None else float(YEngine().evaluate_y()["value"])
+
         lifetime_score, lifetime_rationale = get_lifetime_exposure_score(
-            data_lifetime_years=data_lifetime_years,
-            migration_time_years=migration_time_years,
+            data_lifetime_years=effective_x,
+            migration_time_years=effective_y,
             quantum_threat_horizon_year=quantum_threat_horizon_year or 2033
         )
 
         mosca = calculate_mosca_analysis(
-            data_lifetime_years=data_lifetime_years,
-            migration_time_years=migration_time_years,
+            data_lifetime_years=effective_x,
+            migration_time_years=effective_y,
             quantum_threat_horizon_year=quantum_threat_horizon_year
         )
 
@@ -116,7 +122,7 @@ class RiskEngine:
             quantum_safety=final_qs,
             purpose=final_purpose,
             data_sensitivity_label=data_sensitivity_label,
-            data_lifetime_years=data_lifetime_years,
+            data_lifetime_years=effective_x,
             mosca_status=mosca["mosca_status"],
             evidence_excerpts=evidence_excerpts
         )

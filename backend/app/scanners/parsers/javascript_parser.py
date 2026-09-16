@@ -224,33 +224,66 @@ def parse_javascript_file(file_path: str) -> List[Dict[str, Any]]:
     return findings
 
 
+JS_CRYPTO_PATTERNS = [
+    (r"createHash\s*\(\s*['\"](sha256|sha-256)['\"]", "SHA-256", CryptoPurpose.HASHING, "SHA-256 Hash creation"),
+    (r"createHash\s*\(\s*['\"](sha512|sha-512)['\"]", "SHA-512", CryptoPurpose.HASHING, "SHA-512 Hash creation"),
+    (r"createHash\s*\(\s*['\"]md5['\"]", "MD5", CryptoPurpose.HASHING, "MD5 Hash creation"),
+    (r"createHash\s*\(\s*([a-zA-Z0-9_]+)\s*\)", "UNKNOWN_DYNAMIC", CryptoPurpose.HASHING, "Dynamic Hash creation"),
+    (r"createCipheriv\s*\(\s*['\"]aes-256-gcm['\"]", "AES", CryptoPurpose.ENCRYPTION, "AES-256-GCM Cipher creation"),
+    (r"createCipheriv\s*\(\s*['\"]aes-128-cbc['\"]", "AES", CryptoPurpose.ENCRYPTION, "AES-128-CBC Cipher creation"),
+    (r"crypto\.sign\s*\(", "RSA", CryptoPurpose.SIGNATURE, "RSA Signature creation"),
+    (r"crypto\.verify\s*\(", "RSA", CryptoPurpose.SIGNATURE, "RSA Verification"),
+    (r"CryptoJS\.AES", "AES", CryptoPurpose.ENCRYPTION, "CryptoJS AES Encryption"),
+    (r"CryptoJS\.SHA256", "SHA-256", CryptoPurpose.HASHING, "CryptoJS SHA-256 Hash"),
+    (r"CryptoJS\.MD5", "MD5", CryptoPurpose.HASHING, "CryptoJS MD5 Hash"),
+]
+
+JS_IMPORT_PATTERNS = [
+    (r"require\s*\(\s*['\"]crypto['\"]\s*\)", "CryptoLibrary", CryptoPurpose.UNKNOWN, "Node.js Crypto Require"),
+    (r"require\s*\(\s*['\"]crypto-js['\"]\s*\)", "CryptoLibrary", CryptoPurpose.UNKNOWN, "CryptoJS Require"),
+    (r"import\s+.*from\s+['\"]crypto['\"]", "CryptoLibrary", CryptoPurpose.UNKNOWN, "Node.js Crypto Import"),
+    (r"import\s+.*from\s+['\"]crypto-js['\"]", "CryptoLibrary", CryptoPurpose.UNKNOWN, "CryptoJS Import"),
+]
+
+
 def _fallback_regex_parse(code_str: str) -> List[Dict[str, Any]]:
-    from app.scanners.parsers.javascript_parser import JS_CRYPTO_PATTERNS, JS_IMPORT_PATTERNS
     findings = []
     lines = code_str.splitlines()
     for idx, line in enumerate(lines, start=1):
         line_str = line.strip()
         for pattern, alg, purpose, desc in JS_CRYPTO_PATTERNS:
-            if re.search(pattern, line_str):
+            if re.search(pattern, line_str, re.IGNORECASE):
+                mode = None
+                key_size = None
+                if "aes-256" in line_str.lower():
+                    key_size = 256
+                elif "aes-128" in line_str.lower():
+                    key_size = 128
+
+                if "gcm" in line_str.lower():
+                    mode = "GCM"
+                elif "cbc" in line_str.lower():
+                    mode = "CBC"
+
                 findings.append({
                     "line": idx,
                     "algorithm": alg,
                     "purpose": purpose,
-                    "mode": None,
+                    "mode": mode,
                     "padding": None,
-                    "key_size": None,
+                    "key_size": key_size,
                     "library": "crypto",
                     "api_call": pattern,
                     "matched_text": line_str,
                     "type": "API_CALL",
                     "description": desc,
-                    "confidence": 0.85,
+                    "confidence": 0.75 if alg == "UNKNOWN_DYNAMIC" else 0.85,
                     "detector": "regex_fallback",
                     "evidence_type": "OBSERVED",
-                    "parameters": {}
+                    "parameters": {"mode": mode, "key_size": key_size} if mode or key_size else {}
                 })
         for pattern, alg, purpose, desc in JS_IMPORT_PATTERNS:
-            if re.search(pattern, line_str):
+            if re.search(pattern, line_str, re.IGNORECASE):
                 findings.append({
                     "line": idx,
                     "algorithm": alg,

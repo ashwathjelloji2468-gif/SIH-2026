@@ -31,11 +31,14 @@ class YEngine:
             source = "SYSTEM_DEFAULT"
 
         return {
+            "value_years": float(info["value"]),
             "value": info["value"],
             "unit": "years",
             "scenario": info["key"],
             "scenarioTitle": info["title"],
             "source": source,
+            "rationale": explanation,
             "explanation": explanation,
             "details": info["details"]
         }
+

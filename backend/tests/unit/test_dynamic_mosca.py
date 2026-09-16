@@ -10,20 +10,9 @@ from app.models.enums import AssetType, QuantumSafety
 
 
 def test_estimate_migration_time_from_stats():
-    # Empty stats fall back to default 3.0
+    # Canonical YEngine default STANDARD scenario is 10.0 years
     y_default = estimate_migration_time_from_stats()
-    assert y_default == 3.0
-
-    # Repo with 25 RSA/ECDSA assets, 10 legacy ciphers, and HSM
-    y_complex = estimate_migration_time_from_stats(
-        total_assets=35,
-        total_rsa_ecc_assets=25,
-        hardcoded_crypto_instances=5,
-        legacy_ciphers_count=5,
-        has_vendor_managed_or_hsm=True
-    )
-    # 1.0 (base) + 2.5 (RSA/ECC) + 0.5 (hardcoded+legacy) + 2.5 (HSM) + 0.5 (>20 assets) = 7.0
-    assert y_complex >= 6.0 and y_complex <= 15.0
+    assert y_default == 10.0
 
 
 def test_estimate_migration_time_from_assets():
@@ -42,7 +31,7 @@ def test_estimate_migration_time_from_assets():
     ]
 
     y_val = estimate_migration_time_from_assets(assets)
-    assert y_val > 3.0
+    assert y_val == 10.0
 
 
 def test_build_dynamic_mosca_inputs():
@@ -56,14 +45,14 @@ def test_build_dynamic_mosca_inputs():
     x, y, z = build_dynamic_mosca_inputs(asset)
 
     assert x == 15.0
-    assert y >= 1.0
-    assert z == 2033
+    assert y == 10.0
+    assert z == 2036
 
 
 def test_calculate_mosca_urgency_backward_compatibility():
     # Calling with default parameters
     res = calculate_mosca_urgency()
-    assert res["data_lifetime_years"] == 10.0
-    assert res["migration_time_years"] == 3.0
-    assert res["quantum_threat_horizon"] == 2033
+    assert res["data_lifetime_years"] == 20.0
+    assert res["migration_time_years"] == 10.0
+    assert res["quantum_threat_horizon"] == 2036
     assert "urgency_level" in res

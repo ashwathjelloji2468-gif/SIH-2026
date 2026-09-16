@@ -153,6 +153,8 @@ class MoscaEngine:
             "y": y_result,
             "z": z_result,
             "mosca_score": mosca_score,
+            "mosca_score_years": mosca_score,
+            "mosca_status": technical_urgency,
             "urgency": technical_urgency,
             "technical_urgency": technical_urgency,
             "business_priority": business_priority,

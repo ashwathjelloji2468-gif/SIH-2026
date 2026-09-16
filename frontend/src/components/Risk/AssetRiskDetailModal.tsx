@@ -122,26 +122,41 @@ export const AssetRiskDetailModal: React.FC<AssetRiskDetailModalProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs font-mono">
             <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 space-y-1">
               <span className="text-slate-400 text-[10px] uppercase block">Lifetime ($X$)</span>
-              <span className="text-cyan-300 text-sm font-bold">{assessment?.x?.value ?? assessment?.mosca?.x_years ?? 20} years</span>
+              <span className="text-cyan-300 text-sm font-bold">
+                {assessment?.x?.value ?? assessment?.mosca?.x_years ? `${assessment?.x?.value ?? assessment?.mosca?.x_years} years` : 'Not assessed'}
+              </span>
               <span className="text-[10px] text-slate-500 block truncate">{assessment?.x?.source || 'Confidentiality'}</span>
             </div>
 
             <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 space-y-1">
               <span className="text-slate-400 text-[10px] uppercase block">Migration ($Y$)</span>
-              <span className="text-cyan-300 text-sm font-bold">{assessment?.y?.value ?? assessment?.mosca?.y_years ?? 10} years</span>
+              <span className="text-cyan-300 text-sm font-bold">
+                {assessment?.y?.value ?? assessment?.mosca?.y_years ? `${assessment?.y?.value ?? assessment?.mosca?.y_years} years` : 'Not assessed'}
+              </span>
               <span className="text-[10px] text-slate-500 block truncate">{assessment?.y?.scenario || 'STANDARD'}</span>
             </div>
 
             <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 space-y-1">
               <span className="text-slate-400 text-[10px] uppercase block">Threat Horizon ($Z_i$)</span>
-              <span className="text-amber-300 text-sm font-bold">{assessment?.z?.z_planning_horizon_years ?? assessment?.z_planning_horizon_years ?? assessment?.mosca?.z_horizon_years ?? 15} years</span>
-              <span className="text-[10px] text-slate-500 block truncate">Target: {assessment?.z?.z_target_year || assessment?.mosca?.quantum_threat_horizon || 2041}</span>
+              <span className="text-amber-300 text-sm font-bold">
+                {assessment?.z?.z_planning_horizon_years ?? assessment?.z_planning_horizon_years ?? assessment?.mosca?.z_horizon_years
+                  ? `${assessment?.z?.z_planning_horizon_years ?? assessment?.z_planning_horizon_years ?? assessment?.mosca?.z_horizon_years} years`
+                  : 'Not assessed'}
+              </span>
+              <span className="text-[10px] text-slate-500 block truncate">
+                Target: {assessment?.z?.z_target_year || assessment?.mosca?.quantum_threat_horizon ? String(assessment?.z?.z_target_year || assessment?.mosca?.quantum_threat_horizon) : 'N/A'}
+              </span>
             </div>
 
             <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 space-y-1">
               <span className="text-slate-400 text-[10px] uppercase block">Relative $Z$ Score</span>
-              <span className="text-rose-300 text-sm font-bold">{assessment?.z?.z_score ?? assessment?.z_score ?? assessment?.mosca?.z_score ?? 5.00}</span>
-              <span className="text-[10px] text-slate-500 block truncate">Base: {assessment?.z?.base_score ?? 5} | Env: {assessment?.z?.env_multiplier ?? 1}</span>
+              <span className="text-rose-300 text-sm font-bold">
+                {(assessment?.z?.z_score ?? assessment?.z_score ?? assessment?.mosca?.z_score) !== undefined &&
+                (assessment?.z?.z_score ?? assessment?.z_score ?? assessment?.mosca?.z_score) !== null
+                  ? String(assessment?.z?.z_score ?? assessment?.z_score ?? assessment?.mosca?.z_score)
+                  : 'N/A'}
+              </span>
+              <span className="text-[10px] text-slate-500 block truncate">Base: {assessment?.z?.base_score ?? 'N/A'} | Env: {assessment?.z?.env_multiplier ?? 'N/A'}</span>
             </div>
           </div>
         </div>

@@ -5,7 +5,7 @@ from app.services.domain_classifier import DomainClassifier
 class XEngine:
     """
     Dedicated X Engine — Confidentiality Lifetime Engine for SENTRIQ.
-    Determines X: remaining number of years for which information must remain confidential.
+    Determines X: required confidentiality/data-protection lifetime in RELATIVE YEARS.
     
     Implements 3-Layer Hierarchy:
     X = X_user (if user provided)
@@ -54,24 +54,27 @@ class XEngine:
         effective_user_x = folder_override_x if folder_override_x is not None else user_x_years
 
         if effective_user_x is not None and effective_user_x > 0:
+            val = float(effective_user_x)
             context_scope = "FOLDER" if folder_override_x is not None else "REPOSITORY"
             explanation_str = (
-                f"Organization-selected confidentiality horizon of {effective_user_x} years is active "
+                f"Organization-selected confidentiality horizon of {int(val)} years is active "
                 f"({context_scope.lower()}-level override). System domain baseline estimate is {estimated_domain_x} years."
             )
             if folder_notes:
                 explanation_str += f" Folder note: {folder_notes}."
 
             return {
-                "value": int(effective_user_x),
+                "value_years": val,
+                "value": int(val),
                 "unit": "years",
                 "source": "USER",
                 "domain": classification.get("domain"),
                 "domainTitle": classification.get("title"),
                 "confidence": "HIGH",
+                "rationale": explanation_str,
                 "explanation": explanation_str,
                 "overrideAvailable": True,
-                "userX": int(effective_user_x),
+                "userX": int(val),
                 "estimatedDomainX": estimated_domain_x,
                 "contextLevel": context_scope,
                 "matchedIndicators": classification.get("matched_indicators", [])
@@ -79,39 +82,47 @@ class XEngine:
 
         # LAYER 2: Confident Domain / Category Baseline
         if classification["confidence"] in ("HIGH", "MEDIUM") and classification["domain"] != "unclassified":
+            val = float(classification["baseline_x_years"])
+            explanation_str = (
+                f"Domain baseline estimated at {int(val)} years based on "
+                f"'{classification['title']}' classification ({classification['confidence']} confidence)."
+            )
             return {
-                "value": classification["baseline_x_years"],
+                "value_years": val,
+                "value": int(val),
                 "unit": "years",
                 "source": "DOMAIN_BASELINE",
                 "domain": classification["domain"],
                 "domainTitle": classification["title"],
                 "confidence": classification["confidence"],
-                "explanation": (
-                    f"Domain baseline estimated at {classification['baseline_x_years']} years based on "
-                    f"'{classification['title']}' classification ({classification['confidence']} confidence)."
-                ),
+                "rationale": explanation_str,
+                "explanation": explanation_str,
                 "overrideAvailable": True,
                 "userX": None,
-                "estimatedDomainX": classification["baseline_x_years"],
+                "estimatedDomainX": int(val),
                 "contextLevel": "REPOSITORY",
                 "matchedIndicators": classification["matched_indicators"]
             }
 
         # LAYER 3: Conservative System Default Fallback
+        val = float(DEFAULT_CONFIDENTIALITY_HORIZON_YEARS)
+        explanation_str = (
+            "Insufficient organizational context was available. A conservative 20-year confidentiality planning "
+            "horizon has been applied to avoid underestimating long-term cryptographic risk."
+        )
         return {
-            "value": DEFAULT_CONFIDENTIALITY_HORIZON_YEARS,
+            "value_years": val,
+            "value": int(val),
             "unit": "years",
             "source": "SYSTEM_DEFAULT",
             "domain": "unclassified",
             "domainTitle": "Unclassified Repository",
             "confidence": "LOW",
-            "explanation": (
-                "Insufficient organizational context was available. A conservative 20-year confidentiality planning "
-                "horizon has been applied to avoid underestimating long-term cryptographic risk."
-            ),
+            "rationale": explanation_str,
+            "explanation": explanation_str,
             "overrideAvailable": True,
             "userX": None,
-            "estimatedDomainX": DEFAULT_CONFIDENTIALITY_HORIZON_YEARS,
+            "estimatedDomainX": int(val),
             "contextLevel": "REPOSITORY",
             "matchedIndicators": []
         }

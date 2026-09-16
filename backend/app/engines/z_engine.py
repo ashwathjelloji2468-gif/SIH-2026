@@ -4,24 +4,16 @@ Dedicated Z Engine — Component-Wise Quantum Exposure Engine for SENTRIQ.
 Evaluates Z_i (quantum threat deadline for cryptographic component i)
 under a configurable CRQC threat horizon T_Q (default: 10 years).
 
-Distinguishes:
-1. Category A (SHOR_VULNERABLE): Public-key algorithms (RSA, ECC, ECDSA, ECDH) dependent on factoring/discrete log.
-   -> Fundamental exposure, Z_i = T_Q (e.g. 10 years).
-2. Category B (QUANTUM_STRENGTH_REDUCTION): Symmetric ciphers & hashes (AES, SHA, ChaCha20, 3DES).
-   -> Evaluates classical vs quantum security strength (Grover/BHT).
-   -> Statuses: QUANTUM_UNACCEPTABLE_AT_HORIZON, REQUIRES_REVIEW, REDUCED_BUT_ACCEPTABLE.
-3. Category C (PQC_RESISTANT): Post-quantum algorithms (ML-KEM, ML-DSA, SLH-DSA, etc.).
-   -> Status: NO_IMMEDIATE_QUANTUM_DEADLINE.
-4. Category D (HYBRID): Composite classical + PQC algorithms.
-   -> Status: REDUCED_BUT_ACCEPTABLE / NO_IMMEDIATE_QUANTUM_DEADLINE.
-5. Category E (UNKNOWN): Insufficient information for classification.
-   -> Status: REQUIRES_REVIEW, confidence: LOW.
+Canonical Semantic Contract:
+- Z_i (value_years_remaining): remaining years until the component's quantum threat/deadline.
+- target_year: calendar year for reference (CURRENT_YEAR + Z_i when numeric).
+- Z_i is numeric ONLY for deadline-based components (Shor-vulnerable public key, legacy deprecated ciphers).
+- For non-deadline components (AES-256, SHA-256, ML-KEM), value_years_remaining is None.
 """
 
-from typing import Dict, Any, List, Optional, Tuple, Union
-from app.config.mosca_config import map_z_score_to_horizon, Z_SCORE_LOOKUP_TABLE
+from typing import Dict, Any, List, Optional, Tuple
 
-DEFAULT_QUANTUM_HORIZON = 10  # T_Q = 10 years (relative horizon ~2036 for 2026)
+DEFAULT_QUANTUM_HORIZON = 10  # T_Q = 10 years (relative horizon: ~2036 for 2026)
 CURRENT_YEAR = 2026
 
 # Enums / Literal Constants
@@ -56,12 +48,12 @@ class ZEngine:
     ) -> float:
         text = f"{primitive} {algorithm_name} {purpose} {asset_type}".upper().strip()
 
-        # Signature -> 4
+        # Signature -> 4.0
         sig_keywords = ["SIGNATURE", "SIG", "ECDSA", "ED25519", "SLH-DSA", "ML-DSA", "DILITHIUM", "FALCON", "SPHINCS", "DSA"]
         if any(kw in text for kw in sig_keywords) or "SIGN" in text:
             return 4.0
 
-        # Key Exchange / Asymmetric / Certificate / Public Key -> 5
+        # Key Exchange / Asymmetric / Certificate / Public Key -> 5.0
         key_keywords = [
             "RSA", "ECC", "ECDH", "DH", "DIFFIE", "X25519", "KEY_EXCHANGE", "KEY_ESTABLISHMENT",
             "ASYMMETRIC", "CERTIFICATE", "CERT", "X509", "PUBLIC_KEY", "ML-KEM", "KYBER", "PQC"
@@ -69,7 +61,7 @@ class ZEngine:
         if any(kw in text for kw in key_keywords):
             return 5.0
 
-        # Hash / Symmetric -> 1
+        # Hash / Symmetric -> 1.0
         sym_keywords = [
             "AES", "SHA", "DES", "3DES", "CHACHA", "SALSA", "BLOWFISH", "HMAC", "MD5",
             "HASH", "SYMMETRIC", "CIPHER"
@@ -91,7 +83,6 @@ class ZEngine:
             return 3.0
         if any(kw in text for kw in ["ON_PREM", "ON-PREM", "ONPREM", "SERVER"]):
             return 2.0
-        # Software / Cloud / Container / Web / App (default 1 with documented assumption)
         return 1.0
 
     def _calculate_dep_factor(self, crypto_refs: Optional[List[Any]] = None) -> float:
@@ -106,8 +97,7 @@ class ZEngine:
     ) -> Dict[str, Any]:
         """
         Evaluate a single cryptographic component.
-        Accepts dict with keys: id/component_id, primitive, algorithm_name/algorithm, key_size, output_size, purpose, location, repository_path.
-        Returns ZResult dict.
+        Returns canonical ZResult dict with consistent Z_i (value_years_remaining) and target_year.
         """
         comp_id = str(component.get("id") or component.get("component_id") or component.get("name") or "unknown-component")
         algo_name = str(component.get("algorithm_name") or component.get("algorithm") or component.get("primitive") or "").strip()
@@ -136,14 +126,9 @@ class ZEngine:
         base_score = self._calculate_base_score(primitive, algo_name, purpose, asset_type)
         env_mult = self._calculate_env_multiplier(exec_env, location)
         dep_factor = self._calculate_dep_factor(refs)
-
         z_score = base_score * env_mult * dep_factor
-        mapped_horizon_years, mapped_target_year = map_z_score_to_horizon(z_score)
 
-        z_planning_horizon_years = mapped_horizon_years
-        z_target_year = CURRENT_YEAR + z_planning_horizon_years
-
-        # Perform component-wise classification using t_q
+        # Component-wise classification
         q_class, status, raw_z_value, c_bits, q_bits, explanation, confidence = self._classify_component(
             primitive=primitive,
             algorithm_name=algo_name,
@@ -153,6 +138,13 @@ class ZEngine:
         )
 
         z_value = raw_z_value
+        if z_value is not None:
+            z_value = float(z_value)
+            z_planning_horizon_years = z_value
+            z_target_year = CURRENT_YEAR + int(z_value)
+        else:
+            z_planning_horizon_years = None
+            z_target_year = None
 
         return {
             "component_id": comp_id,
@@ -160,26 +152,30 @@ class ZEngine:
             "algorithm": algo_name or primitive or "UNKNOWN",
             "key_size": key_size,
             "location": location,
-            "quantum_horizon": z_planning_horizon_years,
-            "target_horizon_year": z_target_year,
             "quantum_class": q_class,
+            "classification": q_class,
             "status": status,
             "z_value": z_value,
+            "value_years_remaining": z_value,
             "z_score": round(z_score, 2),
             "z_planning_horizon_years": z_planning_horizon_years,
+            "quantum_horizon": z_planning_horizon_years,
             "z_target_year": z_target_year,
+            "target_year": z_target_year,
+            "target_horizon_year": z_target_year,
             "base_score": base_score,
             "env_multiplier": env_mult,
             "dep_factor": round(dep_factor, 2),
             "classical_security_bits": c_bits,
             "quantum_security_bits": q_bits,
             "explanation": explanation,
+            "rationale": explanation,
             "confidence": confidence,
             "metadata": {
-                "model": "DYNAMIC_Z_SCORE_LOOKUP_MODEL",
+                "model": "CANONICAL_Z_ENGINE",
                 "current_year": CURRENT_YEAR,
                 "threat_horizon_year": z_target_year,
-                "disclaimer": "Component-wise relative Z score mapped to threat horizon via lookup table."
+                "disclaimer": "Component-wise relative Z_i deadline."
             }
         }
 
@@ -225,7 +221,7 @@ class ZEngine:
                 None,
                 256,
                 256,
-                "Post-quantum cryptographic primitive (NIST PQC standard/candidate). No immediate CRQC deadline assigned under the MVP model.",
+                "Post-quantum cryptographic primitive (NIST PQC standard/candidate). No immediate CRQC deadline assigned.",
                 "HIGH"
             )
 
@@ -256,7 +252,7 @@ class ZEngine:
                 float(t_q),
                 classical_bits,
                 0,
-                f"Fundamental public-key exposure: Dependent on prime factorization / discrete logarithms, vulnerable to polynomial-time quantum attack (Shor's algorithm). Reaches quantum deadline Zi = TQ ({t_q} years / ~{CURRENT_YEAR + t_q}).",
+                f"Fundamental public-key exposure: Dependent on prime factorization / discrete logarithms, vulnerable to polynomial-time quantum attack (Shor's algorithm). Reaches quantum deadline Z_i = T_Q ({t_q} years / ~{CURRENT_YEAR + t_q}).",
                 "HIGH"
             )
 
@@ -270,7 +266,7 @@ class ZEngine:
                 float(t_q),
                 64 if ("DES" in text or "MD5" in text) else 80,
                 32 if ("DES" in text or "MD5" in text) else 40,
-                f"Security-strength reduction: Primitive is legacy/deprecated classically and further degraded under Grover/BHT quantum algorithms. Reaches unacceptable security strength at horizon Zi = TQ ({t_q} years / ~{CURRENT_YEAR + t_q}).",
+                f"Security-strength reduction: Primitive is legacy/deprecated classically and further degraded under Grover/BHT quantum algorithms. Reaches unacceptable security strength at horizon Z_i = T_Q ({t_q} years / ~{CURRENT_YEAR + t_q}).",
                 "HIGH"
             )
 
@@ -354,10 +350,7 @@ class ZEngine:
         assets: List[Any],
         quantum_horizon: Optional[int] = None
     ) -> Dict[str, Any]:
-        """
-        Evaluate all cryptographic components in a project.
-        Returns component-wise Z results and aggregated metrics.
-        """
+        """Evaluate all cryptographic components in a project."""
         t_q = quantum_horizon if quantum_horizon is not None and quantum_horizon > 0 else self.default_horizon
         results = [self.evaluate_asset(asset, quantum_horizon=t_q) for asset in assets]
 

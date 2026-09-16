@@ -21,7 +21,7 @@ export const MoscaComponentTable: React.FC<MoscaComponentTableProps> = ({
 
   // Dynamic override state for X, Y, Z parameters
   const [customX, setCustomX] = useState<number | ''>('');
-  const [customYScenario, setCustomYScenario] = useState<string>('MODERATE');
+  const [customYScenario, setCustomYScenario] = useState<string>('STANDARD');
   const [customZ, setCustomZ] = useState<number | ''>('');
 
   const [activeMoscaContext, setActiveMoscaContext] = useState<MoscaProjectEvaluationResponse | null>(initialMoscaContext);
@@ -60,7 +60,7 @@ export const MoscaComponentTable: React.FC<MoscaComponentTableProps> = ({
 
   const handleReset = async () => {
     setCustomX('');
-    setCustomYScenario('MODERATE');
+    setCustomYScenario('STANDARD');
     setCustomZ('');
     if (!projectId) return;
     setLoading(true);
@@ -193,9 +193,10 @@ export const MoscaComponentTable: React.FC<MoscaComponentTableProps> = ({
               onChange={(e) => setCustomYScenario(e.target.value)}
               className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-cyan-300 focus:outline-none focus:border-cyan-500"
             >
-              <option value="MODERATE">MODERATE (Standard 3-5y)</option>
-              <option value="AGGRESSIVE">AGGRESSIVE (Accelerated 1-2y)</option>
-              <option value="CONSERVATIVE">CONSERVATIVE (Complex 5-10y)</option>
+              <option value="FAST">FAST (5 years)</option>
+              <option value="STANDARD">STANDARD (10 years)</option>
+              <option value="COMPLEX">COMPLEX (15 years)</option>
+              <option value="LEGACY_HEAVY">LEGACY_HEAVY (20 years)</option>
             </select>
           </div>
 

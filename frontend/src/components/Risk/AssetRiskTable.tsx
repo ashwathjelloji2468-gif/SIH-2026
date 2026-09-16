@@ -43,11 +43,8 @@ export const AssetRiskTable: React.FC<AssetRiskTableProps> = ({
         list.push({ asset: matchAsset, assessment: ass });
       });
     } else {
-      // Fallback: create assessment representation from assets if not yet assessed
+      // Representation from assets if not yet assessed by RiskEngine
       assets.forEach((ast) => {
-        const isVuln = String(ast.quantum_safety).toUpperCase().includes('VULNERABLE');
-        const fallbackScore = isVuln ? 85.0 : 15.0;
-        const fallbackLevel = isVuln ? 'HIGH' : 'LOW';
         list.push({
           asset: ast,
           assessment: {
@@ -56,12 +53,12 @@ export const AssetRiskTable: React.FC<AssetRiskTableProps> = ({
             location: ast.location,
             quantum_status: String(ast.quantum_safety),
             crypto_purpose: String(ast.purpose),
-            risk_score: fallbackScore,
-            risk_level: fallbackLevel,
-            priority: fallbackLevel,
-            confidence_score: 0.95,
-            explanation: `Asset ${ast.algorithm_name} evaluated based on discovery findings.`,
-            rationale: [`Asset ${ast.algorithm_name} evaluated based on discovery findings.`],
+            risk_score: 0,
+            risk_level: 'UNASSESSED',
+            priority: 'UNASSESSED',
+            confidence_score: 0.0,
+            explanation: `Asset ${ast.algorithm_name} awaiting formal RiskEngine evaluation.`,
+            rationale: [`Asset ${ast.algorithm_name} awaiting formal RiskEngine evaluation.`],
           },
         });
       });

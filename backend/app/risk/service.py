@@ -31,8 +31,8 @@ class RiskService:
         asset_id: str,
         data_sensitivity_label: str = "UNKNOWN",
         business_criticality_label: str = "UNKNOWN",
-        data_lifetime_years: float = 10.0,
-        migration_time_years: float = 3.0,
+        data_lifetime_years: Optional[float] = None,
+        migration_time_years: Optional[float] = None,
         quantum_threat_horizon_year: Optional[int] = None,
         force_reassessment: bool = True
     ) -> Dict[str, Any]:
@@ -53,16 +53,6 @@ class RiskService:
         # Extract evidence information
         detector_names = [e.detector_name for e in (asset.evidence_items or [])]
         excerpts = [e.excerpt for e in (asset.evidence_items or []) if e.excerpt]
-
-        # Dynamically estimate repo-level migration time Y if default 3.0 is passed
-        if migration_time_years == 3.0 and self.asset_repo and hasattr(asset, "scan_id"):
-            try:
-                project_assets = self.asset_repo.get_by_scan(asset.scan_id)
-                if project_assets:
-                    from app.risk.mosca import estimate_migration_time_from_assets
-                    migration_time_years = estimate_migration_time_from_assets(project_assets)
-            except Exception:
-                pass
 
         eval_result = self.engine.evaluate_asset_risk(
             algorithm_name=asset.algorithm_name,
@@ -94,10 +84,6 @@ class RiskService:
         assets = self.asset_repo.get_by_project(project_id)
         if not assets:
             return []
-        
-        # Calculate dynamic Y for the repository
-        from app.risk.mosca import estimate_migration_time_from_assets
-        dynamic_y = estimate_migration_time_from_assets(assets)
 
         to_eval = []
         for asset in assets:
@@ -112,8 +98,8 @@ class RiskService:
                 detector_names=detector_names,
                 data_sensitivity_label=data_sensitivity_label,
                 business_criticality_label=business_criticality_label,
-                data_lifetime_years=10.0,
-                migration_time_years=dynamic_y,
+                data_lifetime_years=None,
+                migration_time_years=None,
                 quantum_threat_horizon_year=quantum_threat_horizon_year,
                 evidence_excerpts=excerpts
             )

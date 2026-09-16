@@ -165,12 +165,27 @@ def _fallback_java_regex_parse(code_str: str) -> List[Dict[str, Any]]:
     for idx, line in enumerate(lines, start=1):
         line_str = line.strip()
         if "Cipher.getInstance" in line_str:
+            alg = "AES"
+            mode = None
+            padding = None
+            parameters = {}
+            m = re.search(r'Cipher\.getInstance\s*\(\s*["\']([^"\']+)["\']', line_str)
+            if m:
+                parts = m.group(1).split("/")
+                alg = parts[0].upper()
+                if len(parts) > 1:
+                    mode = parts[1].upper()
+                    parameters["mode"] = mode
+                if len(parts) > 2:
+                    padding = parts[2]
+                    parameters["padding"] = padding
+
             findings.append({
                 "line": idx,
-                "algorithm": "AES",
+                "algorithm": alg,
                 "purpose": CryptoPurpose.ENCRYPTION,
-                "mode": None,
-                "padding": None,
+                "mode": mode,
+                "padding": padding,
                 "key_size": None,
                 "library": "javax.crypto",
                 "api_call": "Cipher.getInstance",
@@ -180,12 +195,17 @@ def _fallback_java_regex_parse(code_str: str) -> List[Dict[str, Any]]:
                 "confidence": 0.85,
                 "detector": "regex_fallback",
                 "evidence_type": "OBSERVED",
-                "parameters": {}
+                "parameters": parameters
             })
         elif "MessageDigest.getInstance" in line_str:
+            alg = "SHA-256"
+            m = re.search(r'MessageDigest\.getInstance\s*\(\s*["\']([^"\']+)["\']', line_str)
+            if m:
+                raw_alg = m.group(1).upper()
+                alg = raw_alg.replace("SHA", "SHA-") if "SHA" in raw_alg and "-" not in raw_alg else raw_alg
             findings.append({
                 "line": idx,
-                "algorithm": "SHA-256",
+                "algorithm": alg,
                 "purpose": CryptoPurpose.HASHING,
                 "mode": None,
                 "padding": None,
@@ -195,6 +215,65 @@ def _fallback_java_regex_parse(code_str: str) -> List[Dict[str, Any]]:
                 "matched_text": line_str,
                 "type": "API_CALL",
                 "description": "Java MessageDigest.getInstance match",
+                "confidence": 0.85,
+                "detector": "regex_fallback",
+                "evidence_type": "OBSERVED",
+                "parameters": {}
+            })
+        elif "Signature.getInstance" in line_str:
+            alg = "RSA"
+            parameters = {}
+            m = re.search(r'Signature\.getInstance\s*\(\s*["\']([^"\']+)["\']', line_str)
+            if m:
+                raw_alg = m.group(1).upper()
+                if "WITH" in raw_alg:
+                    hash_part, alg_part = raw_alg.split("WITH", 1)
+                    alg = alg_part.strip()
+                    parameters["hash"] = hash_part.strip()
+                else:
+                    alg = raw_alg
+                if alg in ["ECDSA", "EC"]:
+                    alg = "ECDSA"
+
+            findings.append({
+                "line": idx,
+                "algorithm": alg,
+                "purpose": CryptoPurpose.SIGNATURE,
+                "mode": None,
+                "padding": None,
+                "key_size": None,
+                "library": "java.security",
+                "api_call": "Signature.getInstance",
+                "matched_text": line_str,
+                "type": "API_CALL",
+                "description": "Java Signature.getInstance match",
+                "confidence": 0.85,
+                "detector": "regex_fallback",
+                "evidence_type": "OBSERVED",
+                "parameters": parameters
+            })
+        elif "KeyPairGenerator.getInstance" in line_str or "KeyFactory.getInstance" in line_str:
+            alg = "RSA"
+            m = re.search(r'(?:KeyPairGenerator|KeyFactory)\.getInstance\s*\(\s*["\']([^"\']+)["\']', line_str)
+            if m:
+                raw_alg = m.group(1).upper()
+                if raw_alg in ["EC", "ECDSA"]:
+                    alg = "ECDSA"
+                else:
+                    alg = raw_alg
+
+            findings.append({
+                "line": idx,
+                "algorithm": alg,
+                "purpose": CryptoPurpose.KEY_ESTABLISHMENT,
+                "mode": None,
+                "padding": None,
+                "key_size": None,
+                "library": "java.security",
+                "api_call": "KeyPairGenerator.getInstance",
+                "matched_text": line_str,
+                "type": "API_CALL",
+                "description": "Java KeyPairGenerator.getInstance match",
                 "confidence": 0.85,
                 "detector": "regex_fallback",
                 "evidence_type": "OBSERVED",
