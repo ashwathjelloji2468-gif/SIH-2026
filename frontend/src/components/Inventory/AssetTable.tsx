@@ -357,8 +357,8 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, loading, onRefre
                   <div className="text-[9px] text-amber-400 font-sans normal-case tracking-normal">Project Context</div>
                 </th>
                 <th className="py-3 px-4">
-                  <div>Threat Horizon (Z)</div>
-                  <div className="text-[9px] text-purple-400 font-sans normal-case tracking-normal">ZEngine Target</div>
+                  <div>Threat Horizon (Z_i)</div>
+                  <div className="text-[9px] text-purple-400 font-sans normal-case tracking-normal">Remaining & Target</div>
                 </th>
                 <th className="py-3 px-4 cursor-pointer hover:text-cyan-300 transition-colors" onClick={() => handleSort('business_criticality')}>
                   Business Criticality {renderSortIcon('business_criticality')}
@@ -389,7 +389,8 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, loading, onRefre
                   const lifetimeYr = asset.effective_x_years != null ? `${asset.effective_x_years}y` : null;
                   const lifetimeLbl = asset.lifetime_label || null;
                   const migrationYr = asset.effective_y_years != null ? `${asset.effective_y_years}y` : null;
-                  const threatZ = asset.effective_z_target_year != null ? asset.effective_z_target_year : null;
+                  const zVal = asset.effective_z_value ?? asset.effective_z_planning_horizon_years;
+                  const threatTargetYear = asset.effective_z_target_year;
                   const critLbl = asset.business_criticality_label || null;
 
                   return (
@@ -450,12 +451,20 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, loading, onRefre
 
                       {/* Horizon Z */}
                       <td className="py-3 px-4">
-                        {threatZ ? (
-                          <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-purple-950/60 border border-purple-800/60 text-purple-200">
-                            {threatZ}
-                          </span>
+                        {zVal != null ? (
+                          <div className="flex flex-col gap-0.5 font-mono">
+                            <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-purple-950/80 border border-purple-800/80 text-purple-200 w-fit">
+                              Z_i: {zVal}y
+                            </span>
+                            <span className="text-[9px] text-purple-400/90 pl-0.5">
+                              Target: {threatTargetYear ?? '—'}
+                            </span>
+                          </div>
                         ) : (
-                          <span className="text-[10px] text-slate-600 font-sans">Not assessed</span>
+                          <div className="flex flex-col gap-0.5 font-mono">
+                            <span className="text-[10px] text-slate-500 font-sans">Z_i: No immediate deadline</span>
+                            <span className="text-[9px] text-slate-600">Target: —</span>
+                          </div>
                         )}
                       </td>
 

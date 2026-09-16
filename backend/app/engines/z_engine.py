@@ -113,6 +113,13 @@ class ZEngine:
         elif not isinstance(key_size, int):
             key_size = None
 
+        if key_size is None:
+            text_for_size = f"{algo_name} {primitive}".upper()
+            import re
+            m = re.search(r'(4096|3072|2048|1024|521|384|256|192)', text_for_size)
+            if m:
+                key_size = int(m.group(1))
+
         output_size = component.get("output_size")
         if isinstance(output_size, str) and output_size.isdigit():
             output_size = int(output_size)
@@ -280,10 +287,11 @@ class ZEngine:
             z_bits = float(t_q) * (float(classical_bits) / ref_bits)
 
             # Purpose adjustment (e.g. HNDL risk for key exchange / encryption when explicitly specified)
-            purpose_text = f"{purpose}".upper().strip()
+            purpose_text = f"{purpose} {primitive} {algorithm_name}".upper().strip()
             purpose_offset = 0.0
-            if purpose_text in ["ECDH", "DH", "KEY_EXCHANGE_HNDL", "HNDL"]:
-                purpose_offset = -1.0
+            if any(k in purpose_text for k in ["ECDH", "DH", "KEY_EXCHANGE", "KEY_AGREEMENT", "HNDL"]):
+                if not any(s in purpose_text for s in ["ECDSA", "SIGNATURE", "PSS"]):
+                    purpose_offset = -1.0
 
             # Environment adjustment
             env_text = f"{execution_environment} {location}".upper()

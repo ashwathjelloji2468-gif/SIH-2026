@@ -281,9 +281,15 @@ export const AssetDetailDrawer: React.FC<AssetDetailDrawerProps> = ({ asset, onC
                     <div className="text-[10px] text-slate-400 mt-0.5">{asset.effective_y_scenario || 'Project Context'}</div>
                   </div>
                   <div className="p-3 rounded-xl bg-purple-950/40 border border-purple-800/50">
-                    <div className="text-[10px] font-mono text-purple-400 uppercase font-bold">Z (Threat Horizon)</div>
-                    <div className="text-xl font-bold font-mono text-purple-200 mt-1">{asset.effective_z_target_year != null ? asset.effective_z_target_year : 'Not assessed'}</div>
-                    <div className="text-[10px] text-slate-400 mt-0.5">ZEngine Target</div>
+                    <div className="text-[10px] font-mono text-purple-400 uppercase font-bold">Z_i (Threat Deadline)</div>
+                    <div className="text-sm font-bold font-mono text-purple-200 mt-1">
+                      {(asset.effective_z_value ?? asset.effective_z_planning_horizon_years) != null
+                        ? `Z_i: ${asset.effective_z_value ?? asset.effective_z_planning_horizon_years}y`
+                        : 'No immediate deadline'}
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">
+                      Target: {asset.effective_z_target_year != null ? asset.effective_z_target_year : '—'}
+                    </div>
                   </div>
                 </div>
               </div>

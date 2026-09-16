@@ -168,7 +168,7 @@ class InventoryAssetResponse(CryptoAssetResponse):
     effective_y_years: float
     effective_y_scenario: str
     effective_z_value: Optional[float] = None
-    effective_z_planning_horizon_years: Optional[int] = None
+    effective_z_planning_horizon_years: Optional[float] = None
     effective_z_target_year: Optional[int] = None
     xyz_source: str = "CANONICAL_PROJECT_CONTEXT"
 
