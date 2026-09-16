@@ -137,6 +137,27 @@ class ScanOrchestrator:
             except Exception as e:
                 logger.warning(f"Scan {scan_id}: Pre-computing blast radius graph warning: {e}")
 
+            try:
+                if created_assets and getattr(scan, "project_id", None):
+                    from app.migration.planner import MigrationPlanner
+                    from app.repositories.migration_repository import MigrationRepository
+                    mig_repo = MigrationRepository(db)
+                    existing_plans = mig_repo.get_plans_by_project(scan.project_id)
+                    if not existing_plans:
+                        planner = MigrationPlanner()
+                        proj_name = getattr(getattr(scan, "project", None), "name", None) or scan.project_id
+                        planner.create_plan_for_project(
+                            db=db,
+                            project_id=scan.project_id,
+                            plan_name=f"PQC Modernization Plan — {proj_name}",
+                            assets=created_assets
+                        )
+                        logger.info(f"Scan {scan_id}: MigrationPlanner completed automatic plan generation for project {scan.project_id}.")
+                    else:
+                        logger.info(f"Scan {scan_id}: Migration plan already exists for project {scan.project_id}, skipping auto-creation.")
+            except Exception as e:
+                logger.warning(f"Scan {scan_id}: Pre-computing migration plan warning: {e}")
+
             scan_repo.update_status(scan_id, ScanStatus.COMPLETED, cbom_json=cbom_json)
             logger.info(f"Scan {scan_id} completed successfully with {len(created_assets)} assets detected.")
 

@@ -31,7 +31,17 @@ def test_knowledge_versions_api():
         data = res.json()
         assert data["cbom_schema_version"] == "1.6"
 
-def test_migration_simulation_patterns_api():
+def test_migration_simulation_patterns_api(tmp_path):
+    app_dir = tmp_path / "app"
+    app_dir.mkdir(parents=True, exist_ok=True)
+    crypto_file = app_dir / "crypto.py"
+    crypto_file.write_text(
+        'from cryptography.hazmat.primitives.asymmetric import ec\n'
+        'from cryptography.hazmat.primitives import hashes\n\n'
+        'private_key = ec.generate_private_key(ec.SECP256R1())\n'
+        'signature = private_key.sign(b"data", ec.ECDSA(hashes.SHA256()))\n'
+    )
+
     with TestClient(app) as client:
         proj_res = client.post("/api/v1/projects", json={"name": "Sim Project"})
         proj_id = proj_res.json()["id"]
@@ -42,7 +52,7 @@ def test_migration_simulation_patterns_api():
             scan = Scan(
                 project_id=proj_id,
                 status=ScanStatus.COMPLETED,
-                target_path="app/"
+                target_path=str(tmp_path)
             )
             db.add(scan)
             db.commit()
@@ -71,4 +81,5 @@ def test_migration_simulation_patterns_api():
         sim_data = sim_res.json()
         assert sim_data["status"] == "SIMULATION_COMPLETED"
         assert "transformation" in sim_data
-        assert "sandbox_path" in sim_data
+        assert sim_data["transformation"]["status"] in ["PASSED", "PASSED_WITH_LIMITATIONS", "TRANSFORMED"]
+        assert len(sim_data["transformation"]["files_changed"]) > 0
