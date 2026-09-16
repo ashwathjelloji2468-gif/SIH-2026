@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Play, ChevronDown, Check, Activity, Clock, Layers, Sparkles } from 'lucide-react';
+import { Play, ChevronDown, Check, Activity, Layers, Sparkles } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 import { auditService } from '../../services/auditService';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -114,12 +114,6 @@ export const Navbar: React.FC = () => {
 
       {/* Right Action Items */}
       <div className="flex items-center gap-3">
-        {/* Threat Horizon Alert Pill */}
-        <div className="hidden lg:flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-950/40 px-3 py-1 text-[11px] font-mono text-amber-300">
-          <Clock className="w-3.5 h-3.5 text-amber-400" />
-          <span>Threat Horizon: <strong>2033</strong></span>
-        </div>
-
         {/* Backend API Health Pill */}
         <div
           className="flex items-center gap-1.5 rounded-full border border-slate-800 bg-slate-900/60 px-3 py-1 text-[11px] font-mono text-slate-300"
