@@ -21,6 +21,56 @@ from app.cbom.cyclonedx_adapter import generate_cbom_json
 from app.models.enums import ScanStatus, ReviewStatus
 from app.core.logging import logger
 
+import threading
+from typing import Optional
+
+_project_workspace_locks = {}
+_project_workspace_locks_guard = threading.Lock()
+
+def _get_project_workspace_lock(project_id: str) -> threading.Lock:
+    with _project_workspace_locks_guard:
+        if project_id not in _project_workspace_locks:
+            _project_workspace_locks[project_id] = threading.Lock()
+        return _project_workspace_locks[project_id]
+
+def _normalize_git_url(url: str) -> str:
+    if not url:
+        return ""
+    cleaned = url.strip().rstrip("/")
+    if cleaned.endswith(".git"):
+        cleaned = cleaned[:-4]
+    return cleaned.lower()
+
+def _is_valid_git_repository(workspace_path: str) -> bool:
+    if not os.path.isdir(workspace_path):
+        return False
+    try:
+        res = subprocess.run(
+            ["git", "-C", workspace_path, "rev-parse", "--is-inside-work-tree"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=10
+        )
+        return res.returncode == 0 and res.stdout.strip() == "true"
+    except Exception:
+        return False
+
+def _get_workspace_remote_url(workspace_path: str) -> Optional[str]:
+    try:
+        res = subprocess.run(
+            ["git", "-C", workspace_path, "config", "--get", "remote.origin.url"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=10
+        )
+        if res.returncode == 0:
+            return res.stdout.strip()
+    except Exception:
+        pass
+    return None
+
 class ScanOrchestrator:
     def run_scan(self, scan_id: str, db: Session):
         scan_repo = ScanRepository(db)
@@ -40,18 +90,49 @@ class ScanOrchestrator:
 
             # Check if target_path is a Git repository URL
             if target_dir.startswith(("http://", "https://", "git@")):
-                logger.info(f"Cloning Git repository '{target_dir}' for scan {scan_id}...")
-                temp_dir = tempfile.mkdtemp(prefix="sentriq_git_")
-                clone_res = subprocess.run(
-                    ["git", "clone", "--depth", "1", target_dir, temp_dir],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    timeout=120
-                )
-                if clone_res.returncode != 0:
-                    err_msg = clone_res.stderr.decode("utf-8", errors="ignore") or "Git clone failed"
-                    raise RuntimeError(f"Failed to clone Git repository '{target_dir}': {err_msg}")
-                target_dir = temp_dir
+                from app.core.config import settings
+                workspace_root = os.path.abspath(os.path.join(settings.STORAGE_PATH, "workspaces"))
+                os.makedirs(workspace_root, exist_ok=True)
+
+                project_id = scan.project_id
+                workspace = os.path.join(workspace_root, project_id)
+
+                project_lock = _get_project_workspace_lock(project_id)
+                with project_lock:
+                    is_valid_checkout = _is_valid_git_repository(workspace)
+
+                    if is_valid_checkout:
+                        remote_url = _get_workspace_remote_url(workspace)
+                        if not remote_url or _normalize_git_url(remote_url) != _normalize_git_url(target_dir):
+                            logger.warning(
+                                f"Scan {scan_id}: Existing workspace '{workspace}' remote '{remote_url}' "
+                                f"does not match target '{target_dir}'. Cleaning up for fresh clone..."
+                            )
+                            shutil.rmtree(workspace, ignore_errors=True)
+                            is_valid_checkout = False
+
+                    if os.path.exists(workspace) and not is_valid_checkout:
+                        logger.warning(f"Scan {scan_id}: Existing workspace '{workspace}' is invalid or corrupted. Cleaning up...")
+                        shutil.rmtree(workspace, ignore_errors=True)
+                        is_valid_checkout = False
+
+                    if not is_valid_checkout:
+                        logger.info(f"Cloning Git repository '{target_dir}' into workspace '{workspace}' for scan {scan_id}...")
+                        clone_res = subprocess.run(
+                            ["git", "clone", "--depth", "1", target_dir, workspace],
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            timeout=120
+                        )
+                        if clone_res.returncode != 0:
+                            err_msg = clone_res.stderr.decode("utf-8", errors="ignore") or "Git clone failed"
+                            raise RuntimeError(f"Failed to clone Git repository '{target_dir}': {err_msg}")
+                    else:
+                        logger.info(f"Reusing existing valid Git workspace '{workspace}' for scan {scan_id}.")
+
+                target_dir = os.path.abspath(workspace)
+                scan.target_path = target_dir
+                db.commit()
 
             scanners = [
                 SourceScanner(),
