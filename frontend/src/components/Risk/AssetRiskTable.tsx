@@ -272,7 +272,7 @@ export const AssetRiskTable: React.FC<AssetRiskTableProps> = ({
               <tr className="border-b border-slate-800 text-slate-400 uppercase tracking-wider text-[11px]">
                 <th className="py-3 px-4">Cryptographic Asset & Location</th>
                 <th className="py-3 px-4">Type</th>
-                <th className="py-3 px-4">Lifetime (X)</th>
+                <th className="py-3 px-4">Lifetime (X) — Project Context</th>
                 <th className="py-3 px-4">Criticality</th>
                 <th className="py-3 px-4">Risk Score</th>
                 <th className="py-3 px-4">Risk Level</th>
@@ -312,8 +312,14 @@ export const AssetRiskTable: React.FC<AssetRiskTableProps> = ({
                   const qStat = (assessment.quantum_status || asset?.quantum_safety || 'UNKNOWN').toString();
 
                   const typeStr = asset?.asset_type || 'ALGORITHM';
-                  const lifetimeYr = asset?.data_lifetime_years ?? (alg.includes('RSA') || alg.includes('ECDSA') ? 10 : 7);
-                  const lifetimeLbl = asset?.lifetime_label || (lifetimeYr >= 10 ? 'LONG_TERM' : 'MEDIUM_TERM');
+                  const canonicalX =
+                    assessment?.x?.value ??
+                    assessment?.mosca?.x_years ??
+                    null;
+
+                  const canonicalXLabel =
+                    assessment?.x?.source ||
+                    'Project Context';
                   const critLbl = asset?.business_criticality_label || (qStat.includes('VULNERABLE') ? 'HIGH' : 'MEDIUM');
 
                   const shortExplanation = assessment.explanation || (assessment.rationale && assessment.rationale[0]) || 'Risk evaluated by RiskEngine.';
@@ -340,9 +346,15 @@ export const AssetRiskTable: React.FC<AssetRiskTableProps> = ({
 
                       {/* Lifetime X */}
                       <td className="py-3 px-4">
-                        <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-cyan-950/60 border border-cyan-800/60 text-cyan-200">
-                          {lifetimeLbl} ({lifetimeYr}y)
-                        </span>
+                        {canonicalX !== null ? (
+                          <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-cyan-950/60 border border-cyan-800/60 text-cyan-200">
+                            {canonicalX}y
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-slate-600 font-sans">
+                            Not assessed
+                          </span>
+                        )}
                       </td>
 
                       {/* Business Criticality */}
