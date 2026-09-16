@@ -30,7 +30,6 @@ export const AssetRiskTable: React.FC<AssetRiskTableProps> = ({
 
   // Combine assets and risk assessments into unified table items
   const combinedList = useMemo(() => {
-    // Reconstruct list from priority_list if available, otherwise from assessments or assets
     const list: Array<{ asset: CryptoAsset | null; assessment: RiskAssessment }> = [];
 
     const assessedItems = riskSummary?.priority_list && riskSummary.priority_list.length > 0
@@ -41,26 +40,6 @@ export const AssetRiskTable: React.FC<AssetRiskTableProps> = ({
       assessedItems.forEach((ass) => {
         const matchAsset = assets.find((a) => a.id === ass.asset_id) || null;
         list.push({ asset: matchAsset, assessment: ass });
-      });
-    } else {
-      // Representation from assets if not yet assessed by RiskEngine
-      assets.forEach((ast) => {
-        list.push({
-          asset: ast,
-          assessment: {
-            asset_id: ast.id,
-            algorithm_name: ast.algorithm_name,
-            location: ast.location,
-            quantum_status: String(ast.quantum_safety),
-            crypto_purpose: String(ast.purpose),
-            risk_score: 0,
-            risk_level: 'UNASSESSED',
-            priority: 'UNASSESSED',
-            confidence_score: 0.0,
-            explanation: `Asset ${ast.algorithm_name} awaiting formal RiskEngine evaluation.`,
-            rationale: [`Asset ${ast.algorithm_name} awaiting formal RiskEngine evaluation.`],
-          },
-        });
       });
     }
 
@@ -289,9 +268,15 @@ export const AssetRiskTable: React.FC<AssetRiskTableProps> = ({
                     <div className="flex justify-center mb-1">
                       <AlertCircle className="w-8 h-8 text-cyan-400" />
                     </div>
-                    <div className="text-slate-200 font-bold text-sm">No cryptographic assets found for evaluation</div>
+                    <div className="text-slate-200 font-bold text-sm">
+                      {assets.length > 0
+                        ? 'No risk assessment data available for discovered assets'
+                        : 'No cryptographic assets found for evaluation'}
+                    </div>
                     <div className="text-xs text-slate-400 max-w-md mx-auto">
-                      Run a new discovery scan to inspect your codebase primitives, or select a project with discovered assets.
+                      {assets.length > 0
+                        ? 'Click "Run Full Risk Assessment" above to generate RiskEngine assessments.'
+                        : 'Run a new discovery scan to inspect your codebase primitives, or select a project with discovered assets.'}
                     </div>
                   </td>
                 </tr>

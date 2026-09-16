@@ -59,6 +59,7 @@ export const Risk: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [reassessing, setReassessing] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const autoAssessedProjectsRef = React.useRef<Set<string>>(new Set());
 
   const fetchRiskData = async (skipCache: boolean = false) => {
     if (!currentProject) {
@@ -72,6 +73,7 @@ export const Risk: React.FC = () => {
       setYContext(null);
       setZContext(null);
       setMoscaContext(null);
+      setErrorMessage(null);
       setLoading(false);
       return;
     }
@@ -93,13 +95,52 @@ export const Risk: React.FC = () => {
       ]);
 
       if (invRes.status === 'fulfilled') setAssets(invRes.value || []);
-      if (sumRes.status === 'fulfilled' && sumRes.value) {
-        setRiskSummary(sumRes.value);
-        if (sumRes.value.priority_list) {
-          setAssessments(sumRes.value.priority_list);
-        }
-      }
       if (scenRes.status === 'fulfilled') setScenarios(scenRes.value || []);
+
+      let summaryData: RiskSummary | null = null;
+      if (sumRes.status === 'fulfilled' && sumRes.value) {
+        summaryData = sumRes.value;
+      }
+
+      // Check if persisted assessment results exist
+      const hasPersistedAssessments = Boolean(
+        summaryData && summaryData.priority_list && summaryData.priority_list.length > 0
+      );
+
+      if (hasPersistedAssessments && summaryData) {
+        // Step B1: Summary contains persisted assessments -> DO NOT call POST /risk/assess, render returned data
+        setRiskSummary(summaryData);
+        setAssessments(summaryData.priority_list || []);
+      } else if (!autoAssessedProjectsRef.current.has(currentProject.id)) {
+        // Step B2: Summary contains no persisted assessments -> Call POST /risk/assess exactly ONCE
+        autoAssessedProjectsRef.current.add(currentProject.id);
+        try {
+          await riskService.assessProjectRisk(currentProject.id, {
+            user_x_years: currentProject.user_x_years ?? undefined,
+            user_domain: currentProject.user_domain ?? undefined,
+            user_y_scenario: currentProject.user_y_scenario ?? undefined
+          });
+
+          // Re-fetch GET /projects/{projectId}/risk/summary
+          const refreshedSummary = await riskService.getRiskSummary(currentProject.id, { skipCache: true });
+          if (refreshedSummary) {
+            setRiskSummary(refreshedSummary);
+            setAssessments(refreshedSummary.priority_list || []);
+          }
+        } catch (assessErr: any) {
+          console.error('Automatic risk assessment failed:', assessErr);
+          setErrorMessage(assessErr?.message || 'Failed to complete RiskEngine evaluation for project assets.');
+          if (summaryData) {
+            setRiskSummary(summaryData);
+            setAssessments([]);
+          }
+        }
+      } else if (summaryData) {
+        setRiskSummary(summaryData);
+        setAssessments(summaryData.priority_list || []);
+      } else if (sumRes.status === 'rejected') {
+        setErrorMessage(sumRes.reason?.message || 'Failed to load project risk summary.');
+      }
 
       if (graphRes.status === 'fulfilled' && graphRes.value) {
         const rawGraph = graphRes.value;
@@ -227,8 +268,21 @@ export const Risk: React.FC = () => {
   };
 
   useEffect(() => {
+    // Clear previous project state immediately on project switch
+    setAssets([]);
+    setRiskSummary(null);
+    setAssessments([]);
+    setGraph(null);
+    setSummaryData(null);
+    setScanGraphData(null);
+    setXContext(null);
+    setYContext(null);
+    setZContext(null);
+    setMoscaContext(null);
+    setErrorMessage(null);
+
     fetchRiskData();
-  }, [currentProject, latestScan]);
+  }, [currentProject?.id, latestScan?.id]);
 
   return (
     <div className="space-y-8 pb-12">
