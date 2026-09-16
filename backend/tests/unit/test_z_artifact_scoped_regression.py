@@ -1,4 +1,5 @@
 import pytest
+import uuid
 from app.engines.z_engine import ZEngine, CURRENT_YEAR
 from app.engines.mosca_engine import MoscaEngine
 from app.engines.x_engine import XEngine
@@ -142,16 +143,17 @@ def test_inventory_endpoint_z_propagation():
     from app.models.enums import AssetType, CryptoPurpose, QuantumSafety, ScanStatus
     from app.api.inventory import get_project_inventory
 
+    pid = f"proj-inv-z-{uuid.uuid4().hex[:8]}"
     db = SessionLocal()
     try:
-        proj = Project(id="proj-inv-z", name="Inventory Z Test Project", user_x_years=5, user_y_scenario="STANDARD")
-        scan = Scan(id="scan-inv-z", project_id=proj.id, target_path="/src", status=ScanStatus.COMPLETED)
+        proj = Project(id=pid, name="Inventory Z Test Project", user_x_years=5, user_y_scenario="STANDARD")
+        scan = Scan(id=f"scan-{pid}", project_id=proj.id, target_path="/src", status=ScanStatus.COMPLETED)
 
-        a_rsa_2048 = CryptoAsset(id="a-rsa-2048", scan_id=scan.id, name="RSA-2048 Key", algorithm_name="RSA-2048", key_size=2048, asset_type=AssetType.ALGORITHM, purpose=CryptoPurpose.DIGITAL_SIGNATURE, location="a.py", quantum_safety=QuantumSafety.QUANTUM_VULNERABLE)
-        a_rsa_3072 = CryptoAsset(id="a-rsa-3072", scan_id=scan.id, name="RSA-3072 Key", algorithm_name="RSA-3072", key_size=3072, asset_type=AssetType.ALGORITHM, purpose=CryptoPurpose.DIGITAL_SIGNATURE, location="b.py", quantum_safety=QuantumSafety.QUANTUM_VULNERABLE)
-        a_rsa_4096 = CryptoAsset(id="a-rsa-4096", scan_id=scan.id, name="RSA-4096 Key", algorithm_name="RSA-4096", key_size=4096, asset_type=AssetType.ALGORITHM, purpose=CryptoPurpose.DIGITAL_SIGNATURE, location="c.py", quantum_safety=QuantumSafety.QUANTUM_VULNERABLE)
-        a_ecdh = CryptoAsset(id="a-ecdh", scan_id=scan.id, name="ECDH Key", algorithm_name="ECDH-P256", key_size=256, asset_type=AssetType.ALGORITHM, purpose=CryptoPurpose.KEY_ESTABLISHMENT, location="d.py", quantum_safety=QuantumSafety.QUANTUM_VULNERABLE)
-        a_aes = CryptoAsset(id="a-aes", scan_id=scan.id, name="AES Key", algorithm_name="AES-256", key_size=256, asset_type=AssetType.ALGORITHM, purpose=CryptoPurpose.ENCRYPTION, location="e.py", quantum_safety=QuantumSafety.QUANTUM_SAFE)
+        a_rsa_2048 = CryptoAsset(id=f"a-2048-{pid}", scan_id=scan.id, name="RSA-2048 Key", algorithm_name="RSA-2048", key_size=2048, asset_type=AssetType.ALGORITHM, purpose=CryptoPurpose.DIGITAL_SIGNATURE, location="a.py", quantum_safety=QuantumSafety.QUANTUM_VULNERABLE)
+        a_rsa_3072 = CryptoAsset(id=f"a-3072-{pid}", scan_id=scan.id, name="RSA-3072 Key", algorithm_name="RSA-3072", key_size=3072, asset_type=AssetType.ALGORITHM, purpose=CryptoPurpose.DIGITAL_SIGNATURE, location="b.py", quantum_safety=QuantumSafety.QUANTUM_VULNERABLE)
+        a_rsa_4096 = CryptoAsset(id=f"a-4096-{pid}", scan_id=scan.id, name="RSA-4096 Key", algorithm_name="RSA-4096", key_size=4096, asset_type=AssetType.ALGORITHM, purpose=CryptoPurpose.DIGITAL_SIGNATURE, location="c.py", quantum_safety=QuantumSafety.QUANTUM_VULNERABLE)
+        a_ecdh = CryptoAsset(id=f"a-ecdh-{pid}", scan_id=scan.id, name="ECDH Key", algorithm_name="ECDH-P256", key_size=256, asset_type=AssetType.ALGORITHM, purpose=CryptoPurpose.KEY_ESTABLISHMENT, location="d.py", quantum_safety=QuantumSafety.QUANTUM_VULNERABLE)
+        a_aes = CryptoAsset(id=f"a-aes-{pid}", scan_id=scan.id, name="AES Key", algorithm_name="AES-256", key_size=256, asset_type=AssetType.ALGORITHM, purpose=CryptoPurpose.ENCRYPTION, location="e.py", quantum_safety=QuantumSafety.QUANTUM_SAFE)
 
         db.add_all([proj, scan, a_rsa_2048, a_rsa_3072, a_rsa_4096, a_ecdh, a_aes])
         db.commit()
@@ -166,11 +168,11 @@ def test_inventory_endpoint_z_propagation():
             assert "effective_z_target_year" in item
 
         # Verify RSA-2048, RSA-3072, RSA-4096, ECDH have distinct Z values directly matching ZEngine
-        z_2048 = inv_map["a-rsa-2048"]["effective_z_value"]
-        z_3072 = inv_map["a-rsa-3072"]["effective_z_value"]
-        z_4096 = inv_map["a-rsa-4096"]["effective_z_value"]
-        z_ecdh = inv_map["a-ecdh"]["effective_z_value"]
-        z_aes = inv_map["a-aes"]["effective_z_value"]
+        z_2048 = inv_map[a_rsa_2048.id]["effective_z_value"]
+        z_3072 = inv_map[a_rsa_3072.id]["effective_z_value"]
+        z_4096 = inv_map[a_rsa_4096.id]["effective_z_value"]
+        z_ecdh = inv_map[a_ecdh.id]["effective_z_value"]
+        z_aes = inv_map[a_aes.id]["effective_z_value"]
 
         assert z_2048 == 10.0
         assert z_3072 == 11.4
@@ -179,10 +181,10 @@ def test_inventory_endpoint_z_propagation():
         assert z_aes is None
 
         # Verify target years
-        assert inv_map["a-rsa-2048"]["effective_z_target_year"] == 2036
-        assert inv_map["a-rsa-3072"]["effective_z_target_year"] == 2037
-        assert inv_map["a-rsa-4096"]["effective_z_target_year"] == 2039
-        assert inv_map["a-ecdh"]["effective_z_target_year"] == 2035
-        assert inv_map["a-aes"]["effective_z_target_year"] is None
+        assert inv_map[a_rsa_2048.id]["effective_z_target_year"] == 2036
+        assert inv_map[a_rsa_3072.id]["effective_z_target_year"] == 2037
+        assert inv_map[a_rsa_4096.id]["effective_z_target_year"] == 2039
+        assert inv_map[a_ecdh.id]["effective_z_target_year"] == 2035
+        assert inv_map[a_aes.id]["effective_z_target_year"] is None
     finally:
         db.close()
