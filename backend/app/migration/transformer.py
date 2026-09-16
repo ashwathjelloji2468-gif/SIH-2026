@@ -217,45 +217,46 @@ class MigrationTransformer:
                 if "from cryptography.hazmat.primitives.asymmetric import ec" in transformed_content:
                     transformed_content = transformed_content.replace(
                         "from cryptography.hazmat.primitives.asymmetric import ec",
-                        "from pqcrypto.kem import ml_kem_768  # ML-KEM-768 (FIPS 203)"
+                        "from pqcrypto.kem.ml_kem_768 import generate_keypair, encrypt, decrypt  # ML-KEM-768 (FIPS 203)"
                     )
                     replaced = True
                 elif "import ec" in transformed_content:
                     transformed_content = transformed_content.replace(
                         "import ec",
-                        "from pqcrypto.kem import ml_kem_768  # ML-KEM-768 (FIPS 203)"
+                        "from pqcrypto.kem.ml_kem_768 import generate_keypair, encrypt, decrypt  # ML-KEM-768 (FIPS 203)"
                     )
                     replaced = True
 
-                # Replace key generation
-                if "ec.generate_private_key(ec.SECP256R1())" in transformed_content:
-                    transformed_content = transformed_content.replace(
-                        "ec.generate_private_key(ec.SECP256R1())",
-                        "ml_kem_768.generate_keypair()"
-                    )
-                    replaced = True
-                elif "ec.generate_private_key" in transformed_content:
+                # Replace full block if present (e.g. derive_shared_secret)
+                ecdh_block_pattern = r"private_key\s*=\s*ec\.generate_private_key\(ec\.SECP256R1\(\)\)\s*\n\s*peer_public_key\s*=\s*ec\.generate_private_key\(ec\.SECP256R1\(\)\)\.public_key\(\)\s*\n\s*shared_key\s*=\s*private_key\.exchange\(ec\.ECDH\(\),\s*peer_public_key\)"
+                if re.search(ecdh_block_pattern, transformed_content):
                     transformed_content = re.sub(
-                        r"ec\.generate_private_key\([^)]*\)",
-                        "ml_kem_768.generate_keypair()",
+                        ecdh_block_pattern,
+                        "public_key, secret_key = generate_keypair()\n    ciphertext, shared_secret_sender = encrypt(public_key)\n    shared_secret_receiver = decrypt(secret_key, ciphertext)\n    shared_key = shared_secret_receiver",
                         transformed_content
                     )
                     replaced = True
-
-                # Replace exchange call with KEM encapsulation call
-                if "private_key.exchange(ec.ECDH(), peer_public_key)" in transformed_content:
-                    transformed_content = transformed_content.replace(
-                        "private_key.exchange(ec.ECDH(), peer_public_key)",
-                        "ml_kem_768.encapsulate(peer_public_key)"
-                    )
-                    replaced = True
-                elif ".exchange(" in transformed_content:
-                    transformed_content = re.sub(
-                        r"\b\w+\.exchange\([^)]*\)",
-                        "ml_kem_768.encapsulate(public_key)",
-                        transformed_content
-                    )
-                    replaced = True
+                else:
+                    # Fallback line-by-line replacements
+                    if "ec.generate_private_key(ec.SECP256R1())" in transformed_content:
+                        transformed_content = transformed_content.replace(
+                            "ec.generate_private_key(ec.SECP256R1())",
+                            "generate_keypair()"
+                        )
+                        replaced = True
+                    if "private_key.exchange(ec.ECDH(), peer_public_key)" in transformed_content:
+                        transformed_content = transformed_content.replace(
+                            "private_key.exchange(ec.ECDH(), peer_public_key)",
+                            "decrypt(secret_key, ciphertext)"
+                        )
+                        replaced = True
+                    elif ".exchange(" in transformed_content:
+                        transformed_content = re.sub(
+                            r"\b\w+\.exchange\([^)]*\)",
+                            "decrypt(secret_key, ciphertext)",
+                            transformed_content
+                        )
+                        replaced = True
 
             elif "RSA" in pattern_key or "ECDSA" in pattern_key or "DSA" in pattern_key:
                 # Deterministic RSA/ECDSA -> ML-DSA replacement

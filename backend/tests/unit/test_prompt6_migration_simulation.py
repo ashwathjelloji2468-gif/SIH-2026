@@ -383,7 +383,7 @@ def test_19_api_migration_simulation_endpoints(client, db_session):
         assert response.status_code == 200
         data = response.json()
         assert "simulation_id" in data
-    assert data["status"] in ["PASSED", "TRANSFORMED", "MANUAL_REVIEW_REQUIRED"]
+        assert data["status"] in ["PASSED", "PASSED_WITH_LIMITATIONS", "TRANSFORMED", "MANUAL_REVIEW_REQUIRED"]
 
     sim_id = data["simulation_id"]
     get_res = client.get(f"/api/v1/migration/simulations/{sim_id}")
@@ -487,7 +487,7 @@ def test_23_prompt_1_to_5_regression_safety(db_session):
 
         simulator = MigrationSimulator()
         res = simulator.run_simulation(db_session, asset_id="asset_reg")
-        assert res["status"] in ["PASSED", "TRANSFORMED", "NO_PQC_TRANSFORMATION_REQUIRED"]
+        assert res["status"] in ["PASSED", "PASSED_WITH_LIMITATIONS", "TRANSFORMED", "NO_PQC_TRANSFORMATION_REQUIRED"]
         assert res["recommendation"]["current_algorithm"] == "AES-256-GCM"
 
 

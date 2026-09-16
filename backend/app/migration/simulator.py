@@ -222,17 +222,23 @@ class MigrationSimulator:
             if post_migration_risk:
                 val_summary["post_migration_risk"] = post_migration_risk
 
-            # 9. Determine Final Simulation Status (Requirement 12)
+            # 9. Determine Final Simulation Status (Requirement 5)
             if sim_status == SimulationStatus.BLOCKED:
                 final_sim_status = SimulationStatus.BLOCKED
             elif sim_status == SimulationStatus.MANUAL_REVIEW_REQUIRED:
                 final_sim_status = SimulationStatus.MANUAL_REVIEW_REQUIRED
+            elif val_summary.get("overall_result") in ["FAILED", "TIMEOUT", "ERROR"]:
+                final_sim_status = SimulationStatus.FAILED
             elif (
                 (t_status_str == "NO_PQC_TRANSFORMATION_REQUIRED" or (t_status_str == "TRANSFORMED" and before_hash != after_hash)) and
-                val_summary.get("crypto_tests_passed", False) is True and
-                val_summary.get("overall_result") not in ["FAILED", "TIMEOUT", "ERROR"]
+                val_summary.get("crypto_tests_passed", False) is True
             ):
-                final_sim_status = SimulationStatus.PASSED
+                if val_summary.get("overall_result") == "PASSED" and val_summary.get("build_passed", False) is True:
+                    final_sim_status = SimulationStatus.PASSED
+                elif val_summary.get("overall_result") in ["NOT_SUPPORTED", "NOT_CONFIGURED"]:
+                    final_sim_status = SimulationStatus.PASSED_WITH_LIMITATIONS
+                else:
+                    final_sim_status = SimulationStatus.PASSED_WITH_LIMITATIONS
             else:
                 final_sim_status = SimulationStatus.FAILED
 
