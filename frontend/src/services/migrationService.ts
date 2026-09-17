@@ -41,8 +41,12 @@ export const migrationService = {
     return api.post<MigrationPlan>(url);
   },
 
-  simulateTransformation: async (planId: string, pattern = 'RSA_TO_ML_DSA'): Promise<SandboxSimulationResult> => {
-    return api.post<SandboxSimulationResult>(`/migration/plans/${planId}/simulate?pattern=${encodeURIComponent(pattern)}`);
+  simulateTransformation: async (planId: string, pattern = 'RSA_TO_ML_DSA', assetId?: string): Promise<SandboxSimulationResult> => {
+    let url = `/migration/plans/${planId}/simulate?pattern=${encodeURIComponent(pattern)}`;
+    if (assetId) {
+      url += `&asset_id=${encodeURIComponent(assetId)}`;
+    }
+    return api.post<SandboxSimulationResult>(url);
   },
 
   /** Trigger a Prompt 6 asset-level migration simulation */

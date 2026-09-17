@@ -24,7 +24,7 @@ import { migrationService } from '../../services/migrationService';
 import { validationService } from '../../services/validationService';
 import { inventoryService } from '../../services/inventoryService';
 import { recommendationService } from '../../services/recommendationService';
-import { SandboxSimulationResult, ValidationRun } from '../../types';
+import { MigrationPlan, SandboxSimulationResult, ValidationRun } from '../../types';
 
 interface MigrationWizardProps {
   planId: string;
@@ -133,10 +133,22 @@ function getDemoSnippets(asset: TargetAssetCandidate | null): { original: string
 export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
   const { currentProject } = useProject();
   const [currentStep, setCurrentStep] = useState<number>(1);
+  const [currentPlan, setCurrentPlan] = useState<MigrationPlan | null>(null);
   const [candidates, setCandidates] = useState<TargetAssetCandidate[]>([]);
   const [selectedAsset, setSelectedAsset] = useState<TargetAssetCandidate | null>(null);
   const [pattern, setPattern] = useState<string>('RSA_TO_ML_DSA');
   const [loadingDbAssets, setLoadingDbAssets] = useState<boolean>(false);
+
+  // Fetch MigrationPlan when planId changes to associate tasks with candidate assets
+  useEffect(() => {
+    if (!planId) {
+      setCurrentPlan(null);
+      return;
+    }
+    migrationService.getPlan(planId)
+      .then((p) => setCurrentPlan(p))
+      .catch((_) => setCurrentPlan(null));
+  }, [planId]);
 
   // Simulation state
   const [simulationResult, setSimulationResult] = useState<SandboxSimulationResult | null>(null);
@@ -264,13 +276,17 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
 
   const handleRunSimulation = async () => {
     if (simulating) return;
+    if (!selectedAsset || !selectedAsset.id) {
+      setSimError('No candidate asset selected. Please select a candidate asset first.');
+      return;
+    }
     setSimulating(true);
     setSimError(null);
     setValidationRun(null);
     setPatchError(null);
     setDeployNotice(null);
     try {
-      const res = await migrationService.simulateTransformation(planId, pattern);
+      const res = await migrationService.simulateTransformation(planId, pattern, selectedAsset.id);
       setSimulationResult(res);
     } catch (err: any) {
       setSimError(err.message || 'Simulation execution failed.');
@@ -1030,7 +1046,15 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
 
                   <div className="p-3.5 rounded-2xl bg-[#0B0F19]/80 border border-slate-800">
                     <div className="text-[10px] text-[#94A3B8] uppercase">Refactoring Effort</div>
-                    <div className="text-lg font-bold text-[#F8FAFC]">2 Days</div>
+                    <div className="text-lg font-bold text-[#F8FAFC]">
+                      {(() => {
+                        const selectedAssetTasks = currentPlan?.tasks?.filter((t) => t.asset_id === selectedAsset?.id) || [];
+                        const totalPersonDays = selectedAssetTasks.reduce((acc, t) => acc + (t.person_days || 0), 0);
+                        return selectedAssetTasks.length > 0 && totalPersonDays > 0
+                          ? `${totalPersonDays} ${totalPersonDays === 1 ? 'Day' : 'Days'}`
+                          : '—';
+                      })()}
+                    </div>
                     <div className="text-[10px] text-[#94A3B8]">Automated AST</div>
                   </div>
                 </div>

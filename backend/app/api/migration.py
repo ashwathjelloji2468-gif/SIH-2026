@@ -218,19 +218,43 @@ def recalculate_migration_plan(plan_id: str, profile: Optional[str] = Query(None
     return plan
 
 @router.post("/migration/plans/{plan_id}/simulate")
-def simulate_migration_plan(plan_id: str, pattern: Optional[str] = None, db: Session = Depends(get_db)):
+def simulate_migration_plan(
+    plan_id: str,
+    pattern: Optional[str] = None,
+    asset_id: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
     repo = MigrationRepository(db)
     plan = repo.get_plan(plan_id)
     if not plan:
         raise HTTPException(status_code=404, detail="Migration plan not found.")
 
     target_asset = None
-    if plan.tasks and plan.tasks[0].asset_id:
-        target_asset = AssetRepository(db).get(plan.tasks[0].asset_id)
-    if not target_asset:
-        assets = AssetRepository(db).get_by_project(plan.project_id)
-        if assets:
-            target_asset = assets[0]
+    if asset_id:
+        target_asset = AssetRepository(db).get(asset_id)
+        if not target_asset:
+            raise HTTPException(status_code=404, detail=f"Cryptographic asset '{asset_id}' not found.")
+        
+        # Verify that the asset belongs to the requested migration plan
+        plan_asset_ids = set()
+        if plan.tasks:
+            plan_asset_ids = {t.asset_id for t in plan.tasks if t.asset_id}
+        if not plan_asset_ids:
+            project_assets = AssetRepository(db).get_by_project(plan.project_id)
+            plan_asset_ids = {a.id for a in project_assets}
+
+        if target_asset.id not in plan_asset_ids:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Asset '{asset_id}' does not belong to migration plan '{plan_id}'."
+            )
+    else:
+        if plan.tasks and plan.tasks[0].asset_id:
+            target_asset = AssetRepository(db).get(plan.tasks[0].asset_id)
+        if not target_asset:
+            assets = AssetRepository(db).get_by_project(plan.project_id)
+            if assets:
+                target_asset = assets[0]
 
     if not target_asset:
         raise HTTPException(
