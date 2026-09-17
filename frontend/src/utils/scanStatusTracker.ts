@@ -37,3 +37,14 @@ export function evaluateActiveScanTracker(
     shouldShowActiveRunning,
   };
 }
+
+export function computeIsLivePollingActive(
+  scans: Scan[],
+  activeScanId: string | null
+): boolean {
+  if (!activeScanId) return false;
+  const activeScan = scans.find((s) => s.id === activeScanId);
+  return Boolean(
+    !activeScan || !['COMPLETED', 'FAILED', 'CANCELLED'].includes(activeScan.status)
+  );
+}

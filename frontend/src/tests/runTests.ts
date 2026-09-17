@@ -1,11 +1,16 @@
 import { runActiveScanTrackerTests } from './scanStatusTracker.test';
+import { runPollingLabelTests } from './pollingLabel.test';
 
-console.log('=== RUNNING FRONTEND ACTIVE SCAN ISOLATION TESTS ===');
-const results = runActiveScanTrackerTests();
+console.log('=== RUNNING FRONTEND ACTIVE SCAN & POLLING LABEL TESTS ===');
+
+const activeScanResults = runActiveScanTrackerTests();
+const pollingLabelResults = runPollingLabelTests();
+
+const allResults = [...activeScanResults, ...pollingLabelResults];
 let passed = 0;
 let failed = 0;
 
-results.forEach((res) => {
+allResults.forEach((res) => {
   if (res.passed) {
     passed++;
     console.log(`✓ [PASS] ${res.name} (${res.details})`);
@@ -15,4 +20,4 @@ results.forEach((res) => {
   }
 });
 
-console.log(`\nSummary: ${passed} passed, ${failed} failed out of ${results.length} tests.`);
+console.log(`\nSummary: ${passed} passed, ${failed} failed out of ${allResults.length} frontend tests.`);

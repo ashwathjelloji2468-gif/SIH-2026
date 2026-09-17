@@ -82,6 +82,11 @@ export const Scan: React.FC = () => {
     }
   };
 
+  const activeScan = activeScanId ? scans.find((s) => s.id === activeScanId) : null;
+  const isLivePollingActive = Boolean(
+    activeScanId && (!activeScan || !['COMPLETED', 'FAILED', 'CANCELLED'].includes(activeScan.status))
+  );
+
   return (
     <div className="space-y-6 pb-12">
       {/* Header */}
@@ -119,7 +124,7 @@ export const Scan: React.FC = () => {
       <div className="rounded-2xl border border-slate-800 bg-[#0B0F19] overflow-hidden shadow-xl">
         <div className="p-4 bg-slate-900/80 border-b border-slate-800 flex items-center justify-between text-xs font-mono">
           <span className="font-semibold text-slate-200">Scan Execution History ({scans.length})</span>
-          <span className="text-slate-500">Live Polling Active</span>
+          {isLivePollingActive && <span className="text-slate-500">Live Polling Active</span>}
         </div>
 
         {scans.length === 0 ? (
