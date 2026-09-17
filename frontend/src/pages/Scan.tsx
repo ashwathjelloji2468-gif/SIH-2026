@@ -7,7 +7,7 @@ import { ScanSearch, Play, RefreshCw, XCircle, RotateCcw, Clock, Terminal, Alert
 import { Link } from 'react-router-dom';
 
 export const Scan: React.FC = () => {
-  const { currentProject, setIsScanModalOpen, refreshLatestScan } = useProject();
+  const { currentProject, setIsScanModalOpen, refreshLatestScan, activeScanId, setActiveScanId } = useProject();
   const [scans, setScans] = useState<ScanType[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -36,10 +36,14 @@ export const Scan: React.FC = () => {
     fetchScans();
   }, [currentProject]);
 
-  // Polling if any scan is RUNNING or QUEUED
+  // Polling ONLY for the active scan launched by current session action
   useEffect(() => {
-    const hasActiveScan = scans.some((s) => s.status === 'RUNNING' || s.status === 'QUEUED');
-    if (!hasActiveScan) return;
+    if (!activeScanId) return;
+
+    const currentActive = scans.find((s) => s.id === activeScanId);
+    // If active scan reaches terminal state (COMPLETED, FAILED, CANCELLED), stop polling
+    const isTerminal = currentActive && ['COMPLETED', 'FAILED', 'CANCELLED'].includes(currentActive.status);
+    if (isTerminal) return;
 
     const interval = setInterval(() => {
       fetchScans();
@@ -47,7 +51,7 @@ export const Scan: React.FC = () => {
     }, 2500);
 
     return () => clearInterval(interval);
-  }, [scans, currentProject]);
+  }, [scans, currentProject, activeScanId]);
 
   const handleCancelScan = async (scanId: string) => {
     setActionLoading(scanId);
@@ -65,7 +69,10 @@ export const Scan: React.FC = () => {
   const handleRerunScan = async (scanId: string) => {
     setActionLoading(scanId);
     try {
-      await scanService.rerunScan(scanId);
+      const newScan = await scanService.rerunScan(scanId);
+      if (newScan && newScan.id) {
+        setActiveScanId(newScan.id);
+      }
       await fetchScans();
       await refreshLatestScan();
     } catch (err) {

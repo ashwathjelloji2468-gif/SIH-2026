@@ -12,6 +12,8 @@ interface ProjectContextType {
   refreshProjects: () => Promise<void>;
   latestScan: Scan | null;
   refreshLatestScan: () => Promise<void>;
+  activeScanId: string | null;
+  setActiveScanId: (id: string | null) => void;
   isScanModalOpen: boolean;
   setIsScanModalOpen: (open: boolean) => void;
 }
@@ -24,6 +26,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentProject, setCurrentProjectState] = useState<Project | null>(null);
   const [latestScan, setLatestScan] = useState<Scan | null>(null);
+  const [activeScanId, setActiveScanId] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [isScanModalOpen, setIsScanModalOpen] = useState<boolean>(false);
@@ -77,6 +80,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const setCurrentProject = (proj: Project | null) => {
     setCurrentProjectState(proj);
+    setActiveScanId(null);
     if (proj) {
       localStorage.setItem(SAVED_PROJECT_KEY, proj.id);
     } else {
@@ -125,6 +129,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         refreshProjects: fetchProjects,
         latestScan,
         refreshLatestScan: fetchLatestScan,
+        activeScanId,
+        setActiveScanId,
         isScanModalOpen,
         setIsScanModalOpen,
       }}

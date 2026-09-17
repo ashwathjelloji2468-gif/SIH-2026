@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom';
 export type InputMode = 'git' | 'local' | 'binary' | 'container';
 
 export const ScanModal: React.FC = () => {
-  const { isScanModalOpen, setIsScanModalOpen, currentProject, refreshLatestScan } = useProject();
+  const { isScanModalOpen, setIsScanModalOpen, currentProject, refreshLatestScan, setActiveScanId } = useProject();
   const navigate = useNavigate();
 
   const defaultLocalPath = currentProject?.name.includes('cryptography')
@@ -38,11 +38,12 @@ export const ScanModal: React.FC = () => {
     setError(null);
 
     try {
+      let createdScan;
       if (inputMode === 'binary') {
         if (!selectedFile) {
           throw new Error('Please select a binary file to upload.');
         }
-        await scanService.uploadBinaryAndScan(currentProject.id, selectedFile);
+        createdScan = await scanService.uploadBinaryAndScan(currentProject.id, selectedFile);
       } else {
         let target = localPath;
         let sType = 'source';
@@ -61,10 +62,14 @@ export const ScanModal: React.FC = () => {
           sType = 'source';
         }
 
-        await scanService.startScan(currentProject.id, {
+        createdScan = await scanService.startScan(currentProject.id, {
           target_path: target,
           scan_type: sType,
         });
+      }
+
+      if (createdScan && createdScan.id) {
+        setActiveScanId(createdScan.id);
       }
 
       setSuccess(true);
