@@ -194,51 +194,6 @@ class ScanOrchestrator:
                 )
 
             cbom_json = generate_cbom_json(scan, created_assets)
-            try:
-                from app.risk.service import RiskService
-                risk_service = RiskService(db)
-                risk_service.assess_project(scan.project_id)
-                logger.info(f"Scan {scan_id}: RiskEngine completed assessment for all assets in project {scan.project_id}.")
-            except Exception as e:
-                logger.warning(f"Scan {scan_id}: Pre-computing risk assessments warning: {e}")
-
-            try:
-                from app.recommend.service import RecommendationService
-                rec_service = RecommendationService(db)
-                rec_service.recommend_project(scan.project_id, force_regeneration=True)
-                logger.info(f"Scan {scan_id}: RecommendationEngine completed PQC evaluation for all assets in project {scan.project_id}.")
-            except Exception as e:
-                logger.warning(f"Scan {scan_id}: Pre-computing recommendations warning: {e}")
-
-            try:
-                from app.graph.blast_radius_engine import BlastRadiusEngine
-                graph_engine = BlastRadiusEngine()
-                graph_engine.build_graph_for_scan(scan_id, db)
-                logger.info(f"Scan {scan_id}: BlastRadiusEngine completed graph construction and edge inference.")
-            except Exception as e:
-                logger.warning(f"Scan {scan_id}: Pre-computing blast radius graph warning: {e}")
-
-            try:
-                if created_assets and getattr(scan, "project_id", None):
-                    from app.migration.planner import MigrationPlanner
-                    from app.repositories.migration_repository import MigrationRepository
-                    mig_repo = MigrationRepository(db)
-                    existing_plans = mig_repo.get_plans_by_project(scan.project_id)
-                    if not existing_plans:
-                        planner = MigrationPlanner()
-                        proj_name = getattr(getattr(scan, "project", None), "name", None) or scan.project_id
-                        planner.create_plan_for_project(
-                            db=db,
-                            project_id=scan.project_id,
-                            plan_name=f"PQC Modernization Plan — {proj_name}",
-                            assets=created_assets
-                        )
-                        logger.info(f"Scan {scan_id}: MigrationPlanner completed automatic plan generation for project {scan.project_id}.")
-                    else:
-                        logger.info(f"Scan {scan_id}: Migration plan already exists for project {scan.project_id}, skipping auto-creation.")
-            except Exception as e:
-                logger.warning(f"Scan {scan_id}: Pre-computing migration plan warning: {e}")
-
             scan_repo.update_status(scan_id, ScanStatus.COMPLETED, cbom_json=cbom_json)
             logger.info(f"Scan {scan_id} completed successfully with {len(created_assets)} assets detected.")
 
@@ -248,4 +203,60 @@ class ScanOrchestrator:
         finally:
             if temp_dir and os.path.exists(temp_dir):
                 shutil.rmtree(temp_dir, ignore_errors=True)
+
+    def run_post_scan_enrichment(self, scan_id: str, db: Session):
+        scan_repo = ScanRepository(db)
+        scan = scan_repo.get(scan_id)
+        if not scan:
+            logger.error(f"Scan {scan_id} not found for post-scan enrichment.")
+            return
+
+        project_id = scan.project_id
+
+        try:
+            from app.risk.service import RiskService
+            risk_service = RiskService(db)
+            risk_service.assess_project(project_id)
+            logger.info(f"Scan {scan_id}: RiskEngine completed assessment for all assets in project {project_id}.")
+        except Exception as e:
+            logger.warning(f"Scan {scan_id}: Pre-computing risk assessments warning: {e}")
+
+        try:
+            from app.recommend.service import RecommendationService
+            rec_service = RecommendationService(db)
+            rec_service.recommend_project(project_id, force_regeneration=True)
+            logger.info(f"Scan {scan_id}: RecommendationEngine completed PQC evaluation for all assets in project {project_id}.")
+        except Exception as e:
+            logger.warning(f"Scan {scan_id}: Pre-computing recommendations warning: {e}")
+
+        try:
+            from app.graph.blast_radius_engine import BlastRadiusEngine
+            graph_engine = BlastRadiusEngine()
+            graph_engine.build_graph_for_scan(scan_id, db)
+            logger.info(f"Scan {scan_id}: BlastRadiusEngine completed graph construction and edge inference.")
+        except Exception as e:
+            logger.warning(f"Scan {scan_id}: Pre-computing blast radius graph warning: {e}")
+
+        try:
+            asset_repo = AssetRepository(db)
+            created_assets = asset_repo.get_by_scan(scan_id)
+            if created_assets and project_id:
+                from app.migration.planner import MigrationPlanner
+                from app.repositories.migration_repository import MigrationRepository
+                mig_repo = MigrationRepository(db)
+                existing_plans = mig_repo.get_plans_by_project(project_id)
+                if not existing_plans:
+                    planner = MigrationPlanner()
+                    proj_name = getattr(getattr(scan, "project", None), "name", None) or project_id
+                    planner.create_plan_for_project(
+                        db=db,
+                        project_id=project_id,
+                        plan_name=f"PQC Modernization Plan — {proj_name}",
+                        assets=created_assets
+                    )
+                    logger.info(f"Scan {scan_id}: MigrationPlanner completed automatic plan generation for project {project_id}.")
+                else:
+                    logger.info(f"Scan {scan_id}: Migration plan already exists for project {project_id}, skipping auto-creation.")
+        except Exception as e:
+            logger.warning(f"Scan {scan_id}: Pre-computing migration plan warning: {e}")
 

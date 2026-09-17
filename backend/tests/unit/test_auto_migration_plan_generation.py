@@ -37,6 +37,7 @@ def test_auto_migration_plan_generation_on_scan(db_session):
 
         orchestrator = ScanOrchestrator()
         orchestrator.run_scan(scan.id, db_session)
+        orchestrator.run_post_scan_enrichment(scan.id, db_session)
 
         # TEST 1 & TEST 2: Successful scan creates and persists MigrationPlan
         repo = MigrationRepository(db_session)
