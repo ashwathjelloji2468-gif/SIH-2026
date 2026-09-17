@@ -28,6 +28,7 @@ import { MigrationPlan, SandboxSimulationResult, ValidationRun } from '../../typ
 
 interface MigrationWizardProps {
   planId: string;
+  onProceedToPhase4?: () => void;
 }
 
 interface TargetAssetCandidate {
@@ -218,7 +219,7 @@ export function getSimulationDisplayDetails(
 }
 
 
-export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
+export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId, onProceedToPhase4 }) => {
   const { currentProject } = useProject();
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [currentPlan, setCurrentPlan] = useState<MigrationPlan | null>(null);
@@ -1078,37 +1079,62 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
                             ? `${(Math.min(validationRun.confidence, 0.99) * 100).toFixed(1)}%`
                             : '—'}
                         </div>
-                        <div className="text-[9px] text-[#22D3EE] uppercase tracking-wider font-bold">Confidence</div>
+                        <div className="text-[9px] text-[#22D3EE] uppercase tracking-wider font-bold">
+                          {(validationRun?.status || '').toUpperCase() === 'NOT_SUPPORTED'
+                            ? 'Baseline Heuristic Confidence'
+                            : 'Confidence'}
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-mono text-[11px] font-bold border ${
-                      validationRun && (validationRun.status === 'SUCCESS' || (validationRun.status as string) === 'PASSED' || (validationRun.confidence ?? 0) >= 0.85)
-                        ? 'bg-emerald-950/70 border-emerald-800 text-emerald-300'
-                        : 'bg-amber-950/70 border-amber-800 text-amber-300'
-                    }`}>
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      {validationRun
-                        ? ((validationRun.status === 'SUCCESS' || (validationRun.status as string) === 'PASSED' || (validationRun.confidence ?? 0) >= 0.85)
-                            ? 'Validated — High Confidence'
-                            : 'Validation Review Required')
-                        : 'Pending Stage 3 Validation'}
-                    </div>
-                    <h4 className="text-xl font-bold font-mono text-[#F8FAFC]">NIST FIPS 203/204 Migration Validated</h4>
-                    <p className="text-xs text-[#94A3B8] max-w-md leading-relaxed">
-                      {(() => {
-                        const simDisplayDetails = getSimulationDisplayDetails(simulationResult, selectedAsset);
-                        return (
-                          <>
-                            Transformation from classical <code className="text-rose-300">{simDisplayDetails.sourceAlg}</code> to{' '}
-                            <code className="text-emerald-300">{simDisplayDetails.targetAlg}</code> passed all 4 build, KAT, and regression check gates.
-                          </>
-                        );
-                      })()}
-                    </p>
-                  </div>
+                  {(() => {
+                    const simDisplayDetails = getSimulationDisplayDetails(simulationResult, selectedAsset);
+                    const valStatus = (validationRun?.status || '').toUpperCase();
+
+                    let headerText = 'Migration Validation Pending';
+                    let descriptionText = 'Complete Stage 3 validation to evaluate migration confidence.';
+                    let badgeClass = 'bg-amber-950/70 border-amber-800 text-amber-300';
+                    let badgeLabel = 'Pending Stage 3 Validation';
+
+                    if (valStatus === 'PASSED' || valStatus === 'SUCCESS' || valStatus === 'FULL PASS' || valStatus === 'PASS') {
+                      headerText = 'Migration Validation Passed';
+                      descriptionText = `Transformation from classical ${simDisplayDetails.sourceAlg} to ${simDisplayDetails.targetAlg} passed all verification checks.`;
+                      badgeClass = 'bg-emerald-950/70 border-emerald-800 text-emerald-300';
+                      badgeLabel = 'Validated — High Confidence';
+                    } else if (valStatus === 'PASSED_WITH_LIMITATIONS') {
+                      headerText = 'Migration Validation — Review Required';
+                      descriptionText = `Transformation from classical ${simDisplayDetails.sourceAlg} to ${simDisplayDetails.targetAlg} passed syntax/AST checks, but limitations require manual cryptographer review.`;
+                      badgeClass = 'bg-amber-950/70 border-amber-800 text-amber-300';
+                      badgeLabel = 'Validation Review Required';
+                    } else if (valStatus === 'NOT_SUPPORTED') {
+                      headerText = 'Migration Validation — Execution Not Supported';
+                      descriptionText = 'AST transformation for this primitive is not supported by the current automated runner. Confidence score reflects baseline heuristic assessment.';
+                      badgeClass = 'bg-slate-900 border-slate-700 text-slate-300';
+                      badgeLabel = 'Execution Not Supported';
+                    } else if (valStatus === 'FAILED' || valStatus === 'ERROR' || valStatus === 'TIMEOUT') {
+                      headerText = 'Migration Validation Failed';
+                      descriptionText = `Transformation from classical ${simDisplayDetails.sourceAlg} to ${simDisplayDetails.targetAlg} failed validation checks.`;
+                      badgeClass = 'bg-rose-950/70 border-rose-800 text-rose-300';
+                      badgeLabel = 'Validation Failed';
+                    } else if (validationRun) {
+                      headerText = 'Migration Validation Completed';
+                      descriptionText = `Transformation from classical ${simDisplayDetails.sourceAlg} to ${simDisplayDetails.targetAlg} evaluated with status ${validationRun.status}.`;
+                      badgeClass = 'bg-cyan-950/70 border-cyan-800 text-cyan-300';
+                      badgeLabel = `Status: ${validationRun.status}`;
+                    }
+
+                    return (
+                      <div className="space-y-1.5">
+                        <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-mono text-[11px] font-bold border ${badgeClass}`}>
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          {badgeLabel}
+                        </div>
+                        <h4 className="text-xl font-bold font-mono text-[#F8FAFC]">{headerText}</h4>
+                        <p className="text-xs text-[#94A3B8] max-w-md leading-relaxed">{descriptionText}</p>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Right: Metrics Grid */}
@@ -1180,6 +1206,15 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
                 </div>
 
                 <div className="flex items-center gap-3">
+                  {onProceedToPhase4 && (
+                    <button
+                      onClick={onProceedToPhase4}
+                      className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold font-mono text-xs shadow-lg shadow-emerald-950/50 cursor-pointer transition-all flex items-center gap-2"
+                    >
+                      <span>Proceed to CBOM Comparison (Phase 4) →</span>
+                    </button>
+                  )}
+
                   <button
                     onClick={handleDownloadPatch}
                     className="px-4 py-2.5 rounded-xl border border-[#1E293B] bg-[#0B0F19] hover:bg-[#1E293B] text-[#F8FAFC] font-semibold cursor-pointer transition-all flex items-center gap-2"
