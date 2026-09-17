@@ -144,6 +144,15 @@ class BuildDetector:
                 "details": "Discovered Python project files. No explicit build command configured."
             }
 
+        for root, _, files in os.walk(workspace_dir):
+            if any(f.endswith(".py") for f in files):
+                return {
+                    "status": "CONFIGURED",
+                    "framework": "Python (syntax build)",
+                    "commands": [["python3", "-m", "compileall", "-q", "."]],
+                    "details": "Discovered Python source files; using deterministic Python syntax compilation as the build validation step."
+                }
+
         # 7. Unsupported Framework / Unknown Repository
         return {
             "status": "NOT_SUPPORTED",

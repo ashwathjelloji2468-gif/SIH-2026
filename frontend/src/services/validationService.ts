@@ -57,7 +57,7 @@ export const validationService = {
     if (params?.planId) searchParams.append('migration_plan_id', params.planId);
 
     const queryStr = searchParams.toString() ? `?${searchParams.toString()}` : '';
-    return api.post<any>(`/projects/${projectId}/validation/regression${queryStr}`);
+    return api.post<any>(`/projects/${projectId}/validation/regression${queryStr}`, undefined, { timeoutMs: 240000 });
   },
 
   /** Execute Before/After CBOM Comparison Validation for a project/repository (Task #8) */

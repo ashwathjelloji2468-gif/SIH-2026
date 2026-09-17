@@ -296,20 +296,22 @@ export const ValidationRunner: React.FC<ValidationRunnerProps> = ({ planId, proj
             <div className="flex items-center gap-4 text-slate-300 text-[11px]">
               <div>
                 <span className="text-slate-500">Framework: </span>
-                <span className="text-cyan-300 font-bold">{validationRun.framework || 'Detected from repo'}</span>
+                <span className="text-cyan-300 font-bold">{validationRun.framework ?? '—'}</span>
               </div>
               <div>
                 <span className="text-slate-500">Exit Code: </span>
                 <span className={validationRun.exit_code === 0 ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
-                  {validationRun.exit_code !== undefined && validationRun.exit_code !== null ? validationRun.exit_code : 'N/A'}
+                  {validationRun.exit_code ?? 'N/A'}
                 </span>
               </div>
               <div>
                 <span className="text-slate-500">Duration: </span>
                 <span className="text-slate-200">
-                  {validationRun.duration_ms !== undefined && validationRun.duration_ms !== 0
+                  {validationRun.duration_ms !== undefined && validationRun.duration_ms !== null && validationRun.duration_ms !== 0
                     ? `${validationRun.duration_ms} ms`
-                    : `${validationRun.duration} s`}
+                    : (validationRun.duration !== undefined && validationRun.duration !== null
+                        ? `${validationRun.duration} s`
+                        : 'N/A')}
                 </span>
               </div>
             </div>

@@ -173,6 +173,27 @@ def test_api_regression_validation_mismatched_scan_400(client, db_session):
     response = client.post("/api/v1/projects/p1_reg/validation/regression?scan_id=scan_p2_reg")
     assert response.status_code == 400
 
+def test_api_regression_validation_generic_exception_500(client, db_session, monkeypatch):
+    p = Project(id="p_gen_err", name="p_err")
+    s = Scan(id="scan_gen_err", project_id="p_gen_err", target_path="/tmp")
+    db_session.add_all([p, s])
+    db_session.commit()
+
+    def mock_run_pipeline(*args, **kwargs):
+        raise RuntimeError("Simulated unexpected engine exception")
+
+    monkeypatch.setattr(
+        "app.validation.regression.RegressionValidationService.run_full_regression_pipeline",
+        mock_run_pipeline
+    )
+
+    response = client.post("/api/v1/projects/p_gen_err/validation/regression?scan_id=scan_gen_err")
+    assert response.status_code == 500
+    assert response.json() == {
+        "detail": "Regression validation execution failed.",
+        "error_code": "REGRESSION_EXECUTION_ERROR"
+    }
+
 # --- 3. END-TO-END FIXTURE VALIDATION TESTS ---
 
 def test_e2e_regression_pipeline_no_regression(client, db_session):

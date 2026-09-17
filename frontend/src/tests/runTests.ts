@@ -1,12 +1,16 @@
 import { runActiveScanTrackerTests } from './scanStatusTracker.test';
 import { runPollingLabelTests } from './pollingLabel.test';
+import { runRegressionTimeoutTests } from './regressionTimeout.test';
+import { runCBOMDiffTelemetryTests } from './cbomDiffTelemetry.test';
 
-console.log('=== RUNNING FRONTEND ACTIVE SCAN & POLLING LABEL TESTS ===');
+console.log('=== RUNNING FRONTEND ACTIVE SCAN, POLLING LABEL, REGRESSION TIMEOUT & CBOM TELEMETRY TESTS ===');
 
 const activeScanResults = runActiveScanTrackerTests();
 const pollingLabelResults = runPollingLabelTests();
+const regressionTimeoutResults = runRegressionTimeoutTests();
+const cbomTelemetryResults = runCBOMDiffTelemetryTests();
 
-const allResults = [...activeScanResults, ...pollingLabelResults];
+const allResults = [...activeScanResults, ...pollingLabelResults, ...regressionTimeoutResults, ...cbomTelemetryResults];
 let passed = 0;
 let failed = 0;
 

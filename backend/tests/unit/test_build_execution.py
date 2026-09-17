@@ -159,6 +159,17 @@ def test_detector_python_returns_not_configured():
         assert res["status"] == "NOT_CONFIGURED"
         assert "Python" in res["framework"]
 
+def test_detector_python_syntax_build_fallback():
+    detector = BuildDetector()
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with open(os.path.join(tmpdir, "app.py"), "w") as f:
+            f.write("print('Hello World')\n")
+
+        res = detector.detect_build_config(tmpdir)
+        assert res["status"] == "CONFIGURED"
+        assert res["framework"] == "Python (syntax build)"
+        assert res["commands"] == [["python3", "-m", "compileall", "-q", "."]]
+
 def test_detector_unsupported_returns_not_supported():
     detector = BuildDetector()
     with tempfile.TemporaryDirectory() as tmpdir:

@@ -2,8 +2,10 @@ import os
 from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from app.core.database import get_db
+from app.core.logging import logger
 from app.repositories.migration_repository import MigrationRepository
 from app.repositories.migration_simulation_repository import MigrationSimulationRepository
 from app.repositories.validation_repository import ValidationRepository
@@ -382,6 +384,15 @@ def execute_project_regression_validation(
             raise HTTPException(status_code=400, detail=err_msg)
         else:
             raise HTTPException(status_code=409, detail=err_msg)
+    except Exception as e:
+        logger.exception(f"Unhandled exception during regression validation execution for project '{project_id}': {e}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "detail": "Regression validation execution failed.",
+                "error_code": "REGRESSION_EXECUTION_ERROR"
+            }
+        )
 
 @router.post("/projects/{project_id}/validation/cbom-diff")
 def execute_project_cbom_diff_validation(
@@ -392,6 +403,23 @@ def execute_project_cbom_diff_validation(
     asset_id: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ):
+    if not migration_plan_id:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "detail": "migration_plan_id is required for CBOM diff validation.",
+                "error_code": "MISSING_MIGRATION_PLAN_ID"
+            }
+        )
+    if not simulation_id:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "detail": "A valid migration simulation is required before CBOM diff validation.",
+                "error_code": "MISSING_MIGRATION_SIMULATION"
+            }
+        )
+
     from app.validation.cbom_diff import CBOMDiffValidationService
     service = CBOMDiffValidationService(db)
     try:
@@ -405,7 +433,15 @@ def execute_project_cbom_diff_validation(
         return res
     except ValueError as e:
         err_msg = str(e)
-        if "not found" in err_msg.lower():
+        if "valid migration simulation is required" in err_msg.lower():
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "detail": "A valid migration simulation is required before CBOM diff validation.",
+                    "error_code": "MISSING_MIGRATION_SIMULATION"
+                }
+            )
+        elif "not found" in err_msg.lower():
             raise HTTPException(status_code=404, detail=err_msg)
         elif "does not belong" in err_msg.lower():
             raise HTTPException(status_code=400, detail=err_msg)

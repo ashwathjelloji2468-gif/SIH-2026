@@ -7,8 +7,8 @@ import os
 
 from app.main import app
 from app.core.database import get_db, Base
-from app.models.db_models import Project, Scan, CryptoAsset
-from app.models.enums import ScanStatus, AssetType, CryptoPurpose
+from app.models.db_models import Project, Scan, CryptoAsset, MigrationPlan, MigrationSimulation
+from app.models.enums import ScanStatus, AssetType, CryptoPurpose, SimulationStatus
 from app.validation.cbom_diff import CBOMDiffValidationService
 from app.orchestration.scan_orchestrator import ScanOrchestrator
 
@@ -67,11 +67,25 @@ def test_before_cbom_uses_stored_scan_cbom(db_session, tmp_path):
         ]
     }
     before_scan = Scan(id="scan-before-1", project_id=proj.id, target_path=str(test_dir), status=ScanStatus.COMPLETED, cbom_json=stored_cbom)
-    db_session.add_all([proj, before_scan])
+    plan = MigrationPlan(id="plan-before-1", project_id=proj.id, name="Test Plan")
+    sim = MigrationSimulation(
+        id="sim-before-1",
+        migration_plan_id=plan.id,
+        project_id=proj.id,
+        asset_id="asset-1",
+        status=SimulationStatus.TRANSFORMED,
+        sandbox_path=str(test_dir)
+    )
+    db_session.add_all([proj, before_scan, plan, sim])
     db_session.commit()
 
     service = CBOMDiffValidationService(db_session)
-    res = service.run_cbom_diff_pipeline(project_id=proj.id, scan_id=before_scan.id)
+    res = service.run_cbom_diff_pipeline(
+        project_id=proj.id,
+        scan_id=before_scan.id,
+        simulation_id=sim.id,
+        migration_plan_id=plan.id
+    )
 
     db_session.refresh(before_scan)
     # Original scan.cbom_json must remain untouched
@@ -87,12 +101,26 @@ def test_missing_before_cbom_returns_honest_error(db_session, tmp_path):
 
     proj = Project(id="proj-no-cbom", name="No CBOM Project")
     scan_no_cbom = Scan(id="scan-no-cbom", project_id=proj.id, target_path=str(test_dir), status=ScanStatus.COMPLETED, cbom_json=None)
-    db_session.add_all([proj, scan_no_cbom])
+    plan = MigrationPlan(id="plan-no-cbom", project_id=proj.id, name="Test Plan")
+    sim = MigrationSimulation(
+        id="sim-no-cbom",
+        migration_plan_id=plan.id,
+        project_id=proj.id,
+        asset_id="asset-1",
+        status=SimulationStatus.TRANSFORMED,
+        sandbox_path=str(test_dir)
+    )
+    db_session.add_all([proj, scan_no_cbom, plan, sim])
     db_session.commit()
 
     service = CBOMDiffValidationService(db_session)
     with pytest.raises(ValueError) as exc_info:
-        service.run_cbom_diff_pipeline(project_id=proj.id, scan_id=scan_no_cbom.id)
+        service.run_cbom_diff_pipeline(
+            project_id=proj.id,
+            scan_id=scan_no_cbom.id,
+            simulation_id=sim.id,
+            migration_plan_id=plan.id
+        )
 
     assert "CBOM not available" in str(exc_info.value)
 
@@ -105,7 +133,16 @@ def test_after_cbom_uses_canonical_scanner_pipeline(db_session, tmp_path):
 
     proj = Project(id="proj-after-pipe", name="After Pipeline Project")
     before_scan = Scan(id="scan-b", project_id=proj.id, target_path=str(test_dir), status=ScanStatus.COMPLETED)
-    db_session.add_all([proj, before_scan])
+    plan = MigrationPlan(id="plan-after-pipe", project_id=proj.id, name="Test Plan")
+    sim = MigrationSimulation(
+        id="sim-after-pipe",
+        migration_plan_id=plan.id,
+        project_id=proj.id,
+        asset_id="asset-1",
+        status=SimulationStatus.TRANSFORMED,
+        sandbox_path=str(test_dir)
+    )
+    db_session.add_all([proj, before_scan, plan, sim])
     db_session.commit()
 
     # Run initial scan to populate canonical before_scan.cbom_json
@@ -117,7 +154,12 @@ def test_after_cbom_uses_canonical_scanner_pipeline(db_session, tmp_path):
     original_cbom_copy = dict(before_scan.cbom_json)
 
     service = CBOMDiffValidationService(db_session)
-    res = service.run_cbom_diff_pipeline(project_id=proj.id, scan_id=before_scan.id)
+    res = service.run_cbom_diff_pipeline(
+        project_id=proj.id,
+        scan_id=before_scan.id,
+        simulation_id=sim.id,
+        migration_plan_id=plan.id
+    )
 
     db_session.refresh(before_scan)
     # Original Scan remains untouched
@@ -139,16 +181,30 @@ def test_cbom_diff_endpoint_via_client(client, db_session, tmp_path):
 
     proj = Project(id="proj-api-diff", name="API Diff Project")
     scan = Scan(id="scan-api-1", project_id=proj.id, target_path=str(test_dir), status=ScanStatus.QUEUED)
-    db_session.add_all([proj, scan])
+    plan = MigrationPlan(id="plan-api-1", project_id=proj.id, name="Test Plan")
+    sim = MigrationSimulation(
+        id="sim-api-1",
+        migration_plan_id=plan.id,
+        project_id=proj.id,
+        asset_id="asset-1",
+        status=SimulationStatus.TRANSFORMED,
+        sandbox_path=str(test_dir)
+    )
+    db_session.add_all([proj, scan, plan, sim])
     db_session.commit()
 
     ScanOrchestrator().run_scan(scan.id, db_session)
 
-    resp = client.post(f"/api/v1/projects/{proj.id}/validation/cbom-diff?scan_id={scan.id}")
+    resp = client.post(
+        f"/api/v1/projects/{proj.id}/validation/cbom-diff"
+        f"?scan_id={scan.id}&migration_plan_id={plan.id}&simulation_id={sim.id}"
+    )
     assert resp.status_code == 200
     data = resp.json()
     assert data["project_id"] == proj.id
     assert data["source_scan_id"] == scan.id
+    assert data["migration_plan_id"] == plan.id
+    assert data["simulation_id"] == sim.id
     assert data["check_type"] == "CBOM_DIFF"
     assert "cbom_diff" in data
     assert "regression_result" in data

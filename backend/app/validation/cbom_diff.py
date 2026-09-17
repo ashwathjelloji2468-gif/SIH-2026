@@ -96,154 +96,95 @@ class CBOMDiffValidationService:
                 "migration_plan_id": migration_plan_id,
                 "check_type": "CBOM_DIFF",
                 "status": "INVALID_CBOM",
+                "framework": None,
+                "exit_code": None,
+                "duration": round((datetime.now(timezone.utc) - dt_started).total_seconds(), 2),
                 "cbom_diff": self.comparator.compare(None, None),
                 "regression_result": None,
                 "summary": ["BEFORE CBOM failed validation."],
                 "created_at": datetime.now(timezone.utc).isoformat()
             }
 
-        # 5. Prepare Migration Sandbox & Execute Code Transformation
-        sandbox = None
-        sandbox_dir = None
-        migration_res = None
+        # 5. Retrieve & Validate Migration Simulation Context
+        if not simulation_id:
+            raise ValueError("A valid migration simulation is required before CBOM diff validation.")
 
-        if simulation_id:
-            sim = self.db.query(MigrationSimulation).filter(MigrationSimulation.id == simulation_id).first()
-            if sim and sim.sandbox_path and os.path.exists(sim.sandbox_path):
-                sandbox_dir = sim.sandbox_path
-            else:
-                import uuid
-                sim_id = simulation_id or f"sim_cbom_{uuid.uuid4().hex[:8]}"
-                sandbox = SandboxEnvironment(simulation_id=sim_id)
-                sandbox_dir = sandbox.prepare_sandbox(source_path=original_target_path)
-        else:
-            import uuid
-            temp_sim_id = f"sim_cbom_{uuid.uuid4().hex[:8]}"
-            sandbox = SandboxEnvironment(simulation_id=temp_sim_id)
-            sandbox_dir = sandbox.prepare_sandbox(source_path=original_target_path)
+        sim = self.db.query(MigrationSimulation).filter(MigrationSimulation.id == simulation_id).first()
+        if not sim:
+            raise ValueError("A valid migration simulation is required before CBOM diff validation.")
+        if sim.project_id != project_id:
+            raise ValueError(f"Simulation '{simulation_id}' does not belong to project '{project_id}'.")
+        if migration_plan_id and sim.migration_plan_id != migration_plan_id:
+            raise ValueError(f"Simulation '{simulation_id}' does not belong to migration plan '{migration_plan_id}'.")
+        if not sim.asset_id:
+            raise ValueError("A valid migration simulation is required before CBOM diff validation.")
+        if not sim.sandbox_path or not os.path.exists(sim.sandbox_path):
+            raise ValueError("A valid migration simulation is required before CBOM diff validation.")
 
-        try:
-            # If new sandbox created, apply transformation
-            if not simulation_id or not (sim and sim.sandbox_path and os.path.exists(sim.sandbox_path)):
-                transformer = MigrationTransformer()
-                target_asset = None
-                if asset_id:
-                    target_asset = self.db.query(CryptoAsset).filter(CryptoAsset.id == asset_id).first()
-                if not target_asset:
-                    target_asset = self.db.query(CryptoAsset).filter(CryptoAsset.scan_id == target_scan.id).first()
-                if not target_asset:
-                    target_asset = CryptoAsset(id="a_temp", algorithm_name="RSA", location="")
-
-                t_res = transformer.transform_sandbox_code(sandbox_dir, target_asset, None)
-                if t_res.get("status") in ["FAILED", "MANUAL_REVIEW_REQUIRED"]:
-                    migration_res = {"status": "FAILED", "error": t_res.get("changes_summary", {}).get("reason") or "Code transformation failed."}
-
-            if migration_res and migration_res.get("status") == "FAILED":
-                val_run = self._create_failed_validation_run(
-                    project_id=project_id,
-                    scan_id=target_scan.id,
-                    simulation_id=simulation_id,
-                    plan_id=migration_plan_id,
-                    status=ValidationStatus.MIGRATION_FAILED,
-                    error_msg=migration_res["error"],
-                    dt_started=dt_started
-                )
-                return {
-                    "id": val_run.id,
-                    "project_id": project_id,
-                    "source_scan_id": target_scan.id,
-                    "after_scan_id": None,
-                    "simulation_id": simulation_id,
-                    "migration_plan_id": migration_plan_id,
-                    "check_type": "CBOM_DIFF",
-                    "status": "MIGRATION_FAILED",
-                    "cbom_diff": None,
-                    "regression_result": {
-                        "status": "MIGRATION_FAILED",
-                        "regression_detected": False,
-                        "reasons": [migration_res["error"]]
-                    },
-                    "summary": [f"Migration failed: {migration_res['error']}"],
-                    "created_at": datetime.now(timezone.utc).isoformat()
-                }
-
-            # 6. Execute Canonical Scanner Pipeline against Migrated Sandbox to produce AFTER Scan & AFTER CBOM
-            after_scan = self.scan_repo.create(
-                project_id=project_id,
-                target_path=sandbox_dir,
-                scan_type="after_migration"
-            )
-
-            self.orchestrator.run_scan(after_scan.id, self.db)
-            self.db.refresh(after_scan)
-
-            after_cbom = after_scan.cbom_json
-            if not after_cbom:
-                raise RuntimeError("Scanner pipeline failed to generate AFTER CBOM for migrated sandbox.")
-
-            # 7. Validate AFTER CBOM
-            if not self.validator.validate(after_cbom):
-                val_run = self._create_failed_validation_run(
-                    project_id=project_id,
-                    scan_id=target_scan.id,
-                    simulation_id=simulation_id,
-                    plan_id=migration_plan_id,
-                    status=ValidationStatus.ERROR,
-                    error_msg="AFTER CBOM failed CycloneDX 1.6 validation rules.",
-                    dt_started=dt_started
-                )
-                return {
-                    "id": val_run.id,
-                    "project_id": project_id,
-                    "source_scan_id": target_scan.id,
-                    "after_scan_id": after_scan.id,
-                    "simulation_id": simulation_id,
-                    "migration_plan_id": migration_plan_id,
-                    "check_type": "CBOM_DIFF",
-                    "status": "INVALID_CBOM",
-                    "cbom_diff": self.comparator.compare(before_cbom, None),
-                    "regression_result": None,
-                    "summary": ["AFTER CBOM failed validation."],
-                    "created_at": datetime.now(timezone.utc).isoformat()
-                }
-
-            # 8. Deterministic CBOM Comparison
-            cbom_diff_result = self.comparator.compare(before_cbom, after_cbom)
-
-            # 9. Execute Task #7 Regression Validation (Build & Test checks)
-            before_build = self.regression_service.execute_build_check(original_target_path, project_id, target_scan.id)
-            before_test = self.regression_service.execute_test_check(original_target_path, project_id, target_scan.id)
-            after_build = self.regression_service.execute_build_check(sandbox_dir, project_id, after_scan.id)
-            after_test = self.regression_service.execute_test_check(sandbox_dir, project_id, after_scan.id)
-
-            regression_analysis = self.regression_service.analyzer.analyze(before_build, before_test, after_build, after_test)
-
-            dt_completed = datetime.now(timezone.utc)
-            val_status_str = cbom_diff_result["status"]
-
-            val_run_status = ValidationStatus.NO_REGRESSION if regression_analysis["status"] == "NO_REGRESSION" else ValidationStatus.REGRESSION
-
-            # 10. Persist Traceable ValidationRun
-            val_run = self.val_repo.create_validation_run(
+        # Check if existing simulation itself has terminal failure status
+        if sim.status in ["FAILED", "MANUAL_REVIEW_REQUIRED", "BLOCKED"]:
+            err_reason = sim.changes_summary.get("reason") if isinstance(sim.changes_summary, dict) else "Migration simulation failed."
+            val_run = self._create_failed_validation_run(
                 project_id=project_id,
                 scan_id=target_scan.id,
                 simulation_id=simulation_id,
                 plan_id=migration_plan_id,
-                check_type="CBOM_DIFF",
-                status=val_run_status,
-                output_summary=cbom_diff_result["summary"][0] if cbom_diff_result["summary"] else "",
-                evidence={
-                    "before_scan_id": target_scan.id,
-                    "after_scan_id": after_scan.id,
-                    "cbom_diff": cbom_diff_result,
-                    "regression_result": regression_analysis
-                },
-                duration=round((dt_completed - dt_started).total_seconds(), 2),
-                logs="\n".join(cbom_diff_result["summary"]),
-                started_at=dt_started,
-                completed_at=dt_completed
+                asset_id=sim.asset_id,
+                status=ValidationStatus.MIGRATION_FAILED,
+                error_msg=err_reason,
+                dt_started=dt_started
             )
+            return {
+                "id": val_run.id,
+                "project_id": project_id,
+                "source_scan_id": target_scan.id,
+                "after_scan_id": None,
+                "simulation_id": simulation_id,
+                "migration_plan_id": migration_plan_id,
+                "asset_id": sim.asset_id,
+                "check_type": "CBOM_DIFF",
+                "status": "MIGRATION_FAILED",
+                "framework": None,
+                "exit_code": None,
+                "duration": round((datetime.now(timezone.utc) - dt_started).total_seconds(), 2),
+                "cbom_diff": None,
+                "regression_result": {
+                    "status": "MIGRATION_FAILED",
+                    "regression_detected": False,
+                    "reasons": [err_reason]
+                },
+                "summary": [f"Migration failed: {err_reason}"],
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
 
+        sandbox_dir = sim.sandbox_path
+
+        # 6. Execute Canonical Scanner Pipeline against Migrated Sandbox to produce AFTER Scan & AFTER CBOM
+        after_scan = self.scan_repo.create(
+            project_id=project_id,
+            target_path=sandbox_dir,
+            scan_type="after_migration"
+        )
+
+        self.orchestrator.run_scan(after_scan.id, self.db)
+        self.db.refresh(after_scan)
+
+        after_cbom = after_scan.cbom_json
+        if not after_cbom:
+            raise RuntimeError("Scanner pipeline failed to generate AFTER CBOM for migrated sandbox.")
+
+        # 7. Validate AFTER CBOM
+        if not self.validator.validate(after_cbom):
+            val_run = self._create_failed_validation_run(
+                project_id=project_id,
+                scan_id=target_scan.id,
+                simulation_id=simulation_id,
+                plan_id=migration_plan_id,
+                asset_id=sim.asset_id,
+                status=ValidationStatus.ERROR,
+                error_msg="AFTER CBOM failed CycloneDX 1.6 validation rules.",
+                dt_started=dt_started
+            )
             return {
                 "id": val_run.id,
                 "project_id": project_id,
@@ -251,16 +192,76 @@ class CBOMDiffValidationService:
                 "after_scan_id": after_scan.id,
                 "simulation_id": simulation_id,
                 "migration_plan_id": migration_plan_id,
+                "asset_id": sim.asset_id,
                 "check_type": "CBOM_DIFF",
-                "status": val_status_str,
-                "cbom_diff": cbom_diff_result,
-                "regression_result": regression_analysis,
-                "summary": cbom_diff_result["summary"],
-                "created_at": dt_completed.isoformat()
+                "status": "INVALID_CBOM",
+                "framework": None,
+                "exit_code": None,
+                "duration": round((datetime.now(timezone.utc) - dt_started).total_seconds(), 2),
+                "cbom_diff": self.comparator.compare(before_cbom, None),
+                "regression_result": None,
+                "summary": ["AFTER CBOM failed validation."],
+                "created_at": datetime.now(timezone.utc).isoformat()
             }
-        finally:
-            if sandbox:
-                sandbox.cleanup()
+
+        # 8. Deterministic CBOM Comparison
+        cbom_diff_result = self.comparator.compare(before_cbom, after_cbom)
+
+        # 9. Execute Task #7 Regression Validation (Build & Test checks)
+        before_build = self.regression_service.execute_build_check(original_target_path, project_id, target_scan.id)
+        before_test = self.regression_service.execute_test_check(original_target_path, project_id, target_scan.id)
+        after_build = self.regression_service.execute_build_check(sandbox_dir, project_id, after_scan.id)
+        after_test = self.regression_service.execute_test_check(sandbox_dir, project_id, after_scan.id)
+
+        regression_analysis = self.regression_service.analyzer.analyze(before_build, before_test, after_build, after_test)
+
+        dt_completed = datetime.now(timezone.utc)
+        val_status_str = cbom_diff_result["status"]
+
+        val_run_status = ValidationStatus.NO_REGRESSION if regression_analysis["status"] == "NO_REGRESSION" else ValidationStatus.REGRESSION
+
+        # 10. Persist Traceable ValidationRun
+        val_run = self.val_repo.create_validation_run(
+            project_id=project_id,
+            scan_id=target_scan.id,
+            simulation_id=simulation_id,
+            plan_id=migration_plan_id,
+            asset_id=sim.asset_id,
+            check_type="CBOM_DIFF",
+            status=val_run_status,
+            output_summary=cbom_diff_result["summary"][0] if cbom_diff_result["summary"] else "",
+            evidence={
+                "before_scan_id": target_scan.id,
+                "after_scan_id": after_scan.id,
+                "cbom_diff": cbom_diff_result,
+                "regression_result": regression_analysis
+            },
+            duration=round((dt_completed - dt_started).total_seconds(), 2),
+            logs="\n".join(cbom_diff_result["summary"]),
+            started_at=dt_started,
+            completed_at=dt_completed
+        )
+
+        fw = after_build.get("framework") if after_build else (before_build.get("framework") if before_build else None)
+
+        return {
+            "id": val_run.id,
+            "project_id": project_id,
+            "source_scan_id": target_scan.id,
+            "after_scan_id": after_scan.id,
+            "simulation_id": simulation_id,
+            "migration_plan_id": migration_plan_id,
+            "asset_id": sim.asset_id,
+            "check_type": "CBOM_DIFF",
+            "status": val_status_str,
+            "framework": fw,
+            "exit_code": None,
+            "duration": round((dt_completed - dt_started).total_seconds(), 2),
+            "cbom_diff": cbom_diff_result,
+            "regression_result": regression_analysis,
+            "created_at": dt_completed.isoformat()
+        }
+
 
     def _create_failed_validation_run(
         self,
