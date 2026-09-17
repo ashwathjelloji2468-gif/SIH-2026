@@ -129,6 +129,94 @@ function getDemoSnippets(asset: TargetAssetCandidate | null): { original: string
   }
 }
 
+/** Derive authoritative Stage 4 transformation display labels from active simulation result */
+export function getSimulationDisplayDetails(
+  sim: SandboxSimulationResult | null,
+  fallbackAsset: TargetAssetCandidate | null
+): { sourceAlg: string; targetAlg: string; katLabel: string } {
+  if (!sim) {
+    const targetAlg = fallbackAsset?.recommendedTarget || 'NIST PQC Standard';
+    let katLabel = 'Standardized PQC Vectors';
+    if (targetAlg.toUpperCase().includes('ML-KEM') || targetAlg.toUpperCase().includes('FIPS 203')) {
+      katLabel = 'FIPS 203 Vectors';
+    } else if (targetAlg.toUpperCase().includes('ML-DSA') || targetAlg.toUpperCase().includes('FIPS 204')) {
+      katLabel = 'FIPS 204 Vectors';
+    } else if (targetAlg.toUpperCase().includes('SLH-DSA') || targetAlg.toUpperCase().includes('FIPS 205')) {
+      katLabel = 'FIPS 205 Vectors';
+    }
+    return {
+      sourceAlg: fallbackAsset?.currentAlgorithm || 'Classical Cryptography',
+      targetAlg,
+      katLabel,
+    };
+  }
+
+  const transAny = (sim.transformation || {}) as any;
+  const tType = (
+    transAny.transformation_type ||
+    transAny.pattern_applied ||
+    transAny.pattern ||
+    ''
+  ).toUpperCase();
+  const targetCandidate = (
+    transAny.target_pqc_candidate ||
+    transAny.recommended_target ||
+    ''
+  ).toUpperCase();
+
+  let sourceAlg = 'Classical Cryptography';
+  let targetAlg = 'NIST PQC Standard';
+  let katLabel = 'Standardized PQC Vectors';
+
+  if (
+    tType === 'ECDH_TO_ML_KEM_HYBRID' ||
+    tType.includes('ECDH') ||
+    tType.includes('ML_KEM') ||
+    targetCandidate.includes('ML-KEM') ||
+    targetCandidate.includes('KEM') ||
+    targetCandidate.includes('FIPS 203')
+  ) {
+    sourceAlg = 'ECDH-P256';
+    targetAlg = 'ML-KEM-768';
+    katLabel = 'FIPS 203 Vectors';
+  } else if (tType === 'ECDSA_TO_ML_DSA' || tType.includes('ECDSA')) {
+    sourceAlg = 'ECDSA-P256';
+    targetAlg = 'ML-DSA-65';
+    katLabel = 'FIPS 204 Vectors';
+  } else if (
+    tType === 'RSA_TO_ML_DSA' ||
+    tType.includes('RSA') ||
+    tType.includes('ML_DSA') ||
+    targetCandidate.includes('ML-DSA') ||
+    targetCandidate.includes('DSA') ||
+    targetCandidate.includes('FIPS 204')
+  ) {
+    sourceAlg = 'RSA-2048';
+    targetAlg = 'ML-DSA-65';
+    katLabel = 'FIPS 204 Vectors';
+  } else if (targetCandidate.includes('SLH-DSA') || targetCandidate.includes('FIPS 205')) {
+    sourceAlg = fallbackAsset?.currentAlgorithm || 'Classical Cryptography';
+    targetAlg = 'SLH-DSA';
+    katLabel = 'FIPS 205 Vectors';
+  } else if (tType.includes('AES')) {
+    sourceAlg = 'AES-128';
+    targetAlg = 'AES-256-GCM';
+    katLabel = 'NIST AES-256 Vectors';
+  } else {
+    sourceAlg = fallbackAsset?.currentAlgorithm || 'Classical Cryptography';
+    targetAlg = transAny.target_pqc_candidate || fallbackAsset?.recommendedTarget || 'NIST PQC Standard';
+    if (targetAlg.toUpperCase().includes('ML-KEM') || targetAlg.toUpperCase().includes('FIPS 203')) {
+      katLabel = 'FIPS 203 Vectors';
+    } else if (targetAlg.toUpperCase().includes('ML-DSA') || targetAlg.toUpperCase().includes('FIPS 204')) {
+      katLabel = 'FIPS 204 Vectors';
+    } else if (targetAlg.toUpperCase().includes('SLH-DSA') || targetAlg.toUpperCase().includes('FIPS 205')) {
+      katLabel = 'FIPS 205 Vectors';
+    }
+  }
+
+  return { sourceAlg, targetAlg, katLabel };
+}
+
 
 export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
   const { currentProject } = useProject();
@@ -1010,8 +1098,15 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
                     </div>
                     <h4 className="text-xl font-bold font-mono text-[#F8FAFC]">NIST FIPS 203/204 Migration Validated</h4>
                     <p className="text-xs text-[#94A3B8] max-w-md leading-relaxed">
-                      Transformation from classical <code className="text-rose-300">{selectedAsset?.currentAlgorithm || 'Classical Cryptography'}</code> to{' '}
-                      <code className="text-emerald-300">{selectedAsset?.recommendedTarget || 'NIST PQC Standard'}</code> passed all 4 build, KAT, and regression check gates.
+                      {(() => {
+                        const simDisplayDetails = getSimulationDisplayDetails(simulationResult, selectedAsset);
+                        return (
+                          <>
+                            Transformation from classical <code className="text-rose-300">{simDisplayDetails.sourceAlg}</code> to{' '}
+                            <code className="text-emerald-300">{simDisplayDetails.targetAlg}</code> passed all 4 build, KAT, and regression check gates.
+                          </>
+                        );
+                      })()}
                     </p>
                   </div>
                 </div>
@@ -1035,7 +1130,9 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId }) => {
                         ? (validationRun.crypto_tests_passed ? 'Pass' : 'Failed')
                         : 'Pending'}
                     </div>
-                    <div className="text-[10px] text-[#94A3B8]">FIPS 203 Vectors</div>
+                    <div className="text-[10px] text-[#94A3B8]">
+                      {getSimulationDisplayDetails(simulationResult, selectedAsset).katLabel}
+                    </div>
                   </div>
 
                   <div className="p-3.5 rounded-2xl bg-[#0B0F19]/80 border border-slate-800">
