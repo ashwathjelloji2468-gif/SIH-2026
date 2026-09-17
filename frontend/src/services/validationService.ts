@@ -13,15 +13,37 @@ export interface ValidationSummary {
 
 export const validationService = {
   /** Execute real build validation for a project/repository */
-  runBuildValidation: async (projectId: string, scanId?: string): Promise<ValidationRun> => {
-    const url = scanId ? `/projects/${projectId}/validation/build?scan_id=${scanId}` : `/projects/${projectId}/validation/build`;
-    return api.post<ValidationRun>(url);
+  runBuildValidation: async (
+    projectId: string,
+    params?: { scanId?: string; simulationId?: string; planId?: string } | string
+  ): Promise<ValidationRun> => {
+    const searchParams = new URLSearchParams();
+    if (typeof params === 'string') {
+      if (params) searchParams.append('scan_id', params);
+    } else if (params) {
+      if (params.scanId) searchParams.append('scan_id', params.scanId);
+      if (params.planId) searchParams.append('migration_plan_id', params.planId);
+      if (params.simulationId) searchParams.append('simulation_id', params.simulationId);
+    }
+    const queryStr = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    return api.post<ValidationRun>(`/projects/${projectId}/validation/build${queryStr}`);
   },
 
   /** Execute real unit-test validation for a project/repository */
-  runTestValidation: async (projectId: string, scanId?: string): Promise<ValidationRun> => {
-    const url = scanId ? `/projects/${projectId}/validation/tests?scan_id=${scanId}` : `/projects/${projectId}/validation/tests`;
-    return api.post<ValidationRun>(url);
+  runTestValidation: async (
+    projectId: string,
+    params?: { scanId?: string; simulationId?: string; planId?: string } | string
+  ): Promise<ValidationRun> => {
+    const searchParams = new URLSearchParams();
+    if (typeof params === 'string') {
+      if (params) searchParams.append('scan_id', params);
+    } else if (params) {
+      if (params.scanId) searchParams.append('scan_id', params.scanId);
+      if (params.planId) searchParams.append('migration_plan_id', params.planId);
+      if (params.simulationId) searchParams.append('simulation_id', params.simulationId);
+    }
+    const queryStr = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    return api.post<ValidationRun>(`/projects/${projectId}/validation/tests${queryStr}`);
   },
 
   /** Execute Before/After Regression Validation for a project/repository */

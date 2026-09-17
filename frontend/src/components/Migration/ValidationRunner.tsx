@@ -7,9 +7,10 @@ interface ValidationRunnerProps {
   planId?: string;
   projectId?: string;
   scanId?: string;
+  simulationId?: string;
 }
 
-export const ValidationRunner: React.FC<ValidationRunnerProps> = ({ planId, projectId, scanId }) => {
+export const ValidationRunner: React.FC<ValidationRunnerProps> = ({ planId, projectId, scanId, simulationId }) => {
   const [validationRun, setValidationRun] = useState<any | null>(null);
   const [loadingBuild, setLoadingBuild] = useState<boolean>(false);
   const [loadingTest, setLoadingTest] = useState<boolean>(false);
@@ -23,7 +24,7 @@ export const ValidationRunner: React.FC<ValidationRunnerProps> = ({ planId, proj
     try {
       let res: ValidationRun;
       if (projectId) {
-        res = await validationService.runBuildValidation(projectId, scanId);
+        res = await validationService.runBuildValidation(projectId, { scanId, simulationId, planId });
       } else if (planId) {
         res = await validationService.runValidation(planId);
       } else {
@@ -46,7 +47,7 @@ export const ValidationRunner: React.FC<ValidationRunnerProps> = ({ planId, proj
     setLoadingTest(true);
     setError(null);
     try {
-      const res = await validationService.runTestValidation(projectId, scanId);
+      const res = await validationService.runTestValidation(projectId, { scanId, simulationId, planId });
       setValidationRun(res);
     } catch (err: any) {
       setError(err.message || 'Unit-test validation execution failed.');
@@ -63,7 +64,7 @@ export const ValidationRunner: React.FC<ValidationRunnerProps> = ({ planId, proj
     setLoadingRegression(true);
     setError(null);
     try {
-      const res = await validationService.runRegressionValidation(projectId, { scanId, planId });
+      const res = await validationService.runRegressionValidation(projectId, { scanId, simulationId, planId });
       setValidationRun(res);
     } catch (err: any) {
       setError(err.message || 'Regression validation pipeline failed.');
@@ -80,7 +81,7 @@ export const ValidationRunner: React.FC<ValidationRunnerProps> = ({ planId, proj
     setLoadingCBOMDiff(true);
     setError(null);
     try {
-      const res = await validationService.runCBOMDiffValidation(projectId, { scanId, planId });
+      const res = await validationService.runCBOMDiffValidation(projectId, { scanId, simulationId, planId });
       setValidationRun(res);
     } catch (err: any) {
       setError(err.message || 'CBOM comparison validation pipeline failed.');

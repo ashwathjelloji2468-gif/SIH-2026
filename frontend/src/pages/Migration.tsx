@@ -24,6 +24,10 @@ export const Migration: React.FC = () => {
   const [maxUnlockedPhase, setMaxUnlockedPhase] = useState<number>(1);
   const [isReviewed, setIsReviewed] = useState<boolean>(false);
 
+  // Context propagation state for Phase 4 ValidationRunner
+  const [activeScanId, setActiveScanId] = useState<string | undefined>(undefined);
+  const [activeSimulationId, setActiveSimulationId] = useState<string | undefined>(undefined);
+
   const fetchPlans = async () => {
     if (!currentProject) {
       setPlans([]);
@@ -207,9 +211,15 @@ export const Migration: React.FC = () => {
                   {/* Step-by-Step Interactive Migration & Validation Wizard */}
                   <MigrationWizard
                     planId={selectedPlan.id}
-                    onProceedToPhase4={() => {
+                    onProceedToPhase4={(ctx) => {
+                      if (ctx?.scanId) setActiveScanId(ctx.scanId);
+                      if (ctx?.simulationId) setActiveSimulationId(ctx.simulationId);
                       setActivePhase(4);
                       setMaxUnlockedPhase((prev) => Math.max(prev, 4));
+                    }}
+                    onContextChange={(ctx) => {
+                      if (ctx.scanId) setActiveScanId(ctx.scanId);
+                      if (ctx.simulationId) setActiveSimulationId(ctx.simulationId);
                     }}
                   />
                 </>
@@ -253,6 +263,8 @@ export const Migration: React.FC = () => {
           <ValidationRunner
             planId={selectedPlan?.id}
             projectId={currentProject?.id}
+            scanId={activeScanId}
+            simulationId={activeSimulationId}
           />
 
           <div className="flex justify-between items-center pt-4 border-t border-slate-800 font-mono text-xs">

@@ -28,11 +28,13 @@ import { MigrationPlan, SandboxSimulationResult, ValidationRun } from '../../typ
 
 interface MigrationWizardProps {
   planId: string;
-  onProceedToPhase4?: () => void;
+  onProceedToPhase4?: (context?: { scanId?: string; simulationId?: string }) => void;
+  onContextChange?: (context: { scanId?: string; simulationId?: string }) => void;
 }
 
 interface TargetAssetCandidate {
   id: string;
+  scanId?: string;
   name: string;
   file: string;
   currentAlgorithm: string;
@@ -219,7 +221,7 @@ export function getSimulationDisplayDetails(
 }
 
 
-export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId, onProceedToPhase4 }) => {
+export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId, onProceedToPhase4, onContextChange }) => {
   const { currentProject } = useProject();
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [currentPlan, setCurrentPlan] = useState<MigrationPlan | null>(null);
@@ -313,6 +315,7 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId, onProc
 
             return {
               id: asset.id || `db-asset-${idx}`,
+              scanId: asset.scan_id,
               name: asset.name || `${asset.algorithm_name} Discovered Primitive`,
               file: asset.location || 'src/crypto/asset.py',
               currentAlgorithm: `${asset.algorithm_name}${asset.key_size ? ` (${asset.key_size}-bit)` : ''}`,
@@ -341,6 +344,16 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId, onProc
 
     fetchDbCandidates();
   }, [currentProject?.id, planId]);
+
+  // Notify parent component of active context (scanId, simulationId)
+  useEffect(() => {
+    if (onContextChange) {
+      onContextChange({
+        scanId: selectedAsset?.scanId,
+        simulationId: simulationResult?.simulation_id,
+      });
+    }
+  }, [selectedAsset?.scanId, simulationResult?.simulation_id]);
 
   // Reset all downstream results when plan changes
   useEffect(() => {
@@ -1208,7 +1221,7 @@ export const MigrationWizard: React.FC<MigrationWizardProps> = ({ planId, onProc
                 <div className="flex items-center gap-3">
                   {onProceedToPhase4 && (
                     <button
-                      onClick={onProceedToPhase4}
+                      onClick={() => onProceedToPhase4({ scanId: selectedAsset?.scanId, simulationId: simulationResult?.simulation_id })}
                       className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold font-mono text-xs shadow-lg shadow-emerald-950/50 cursor-pointer transition-all flex items-center gap-2"
                     >
                       <span>Proceed to CBOM Comparison (Phase 4) →</span>

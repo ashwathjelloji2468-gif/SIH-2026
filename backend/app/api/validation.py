@@ -109,6 +109,8 @@ def get_validation_summary(project_id: Optional[str] = Query(None), db: Session 
 def execute_project_build_validation(
     project_id: str,
     scan_id: Optional[str] = Query(None),
+    migration_plan_id: Optional[str] = Query(None),
+    simulation_id: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ):
     dt_started = datetime.now(timezone.utc)
@@ -202,6 +204,8 @@ def execute_project_build_validation(
     val_run = val_repo.create_validation_run(
         project_id=project_id,
         scan_id=target_scan.id,
+        simulation_id=simulation_id,
+        plan_id=migration_plan_id,
         check_type="BUILD",
         status=status_val,
         framework=framework,
@@ -226,6 +230,8 @@ def execute_project_build_validation(
 def execute_project_test_validation(
     project_id: str,
     scan_id: Optional[str] = Query(None),
+    migration_plan_id: Optional[str] = Query(None),
+    simulation_id: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ):
     dt_started = datetime.now(timezone.utc)
@@ -322,6 +328,8 @@ def execute_project_test_validation(
     val_run = val_repo.create_validation_run(
         project_id=project_id,
         scan_id=target_scan.id,
+        simulation_id=simulation_id,
+        plan_id=migration_plan_id,
         check_type="UNIT_TEST",
         status=status_val,
         framework=framework,
