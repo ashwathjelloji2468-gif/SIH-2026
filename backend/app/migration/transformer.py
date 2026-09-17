@@ -301,14 +301,14 @@ class MigrationTransformer:
                     replaced = True
                 elif "rsa.generate_private_key" in transformed_content:
                     transformed_content = re.sub(
-                        r"rsa\.generate_private_key\([^)]*\)",
+                        r"rsa\.generate_private_key\([^\n]*\)",
                         "ml_dsa_65.generate_keypair()",
                         transformed_content
                     )
                     replaced = True
                 elif "ec.generate_private_key" in transformed_content:
                     transformed_content = re.sub(
-                        r"ec\.generate_private_key\([^)]*\)",
+                        r"ec\.generate_private_key\([^\n]*\)",
                         "ml_dsa_65.generate_keypair()",
                         transformed_content
                     )
@@ -317,7 +317,7 @@ class MigrationTransformer:
                 # Replace signature call
                 if "private_key.sign(" in transformed_content:
                     transformed_content = re.sub(
-                        r"private_key\.sign\([^)]*\)",
+                        r"private_key\.sign\([^\n]*\)",
                         "ml_dsa_65.sign(secret_key, data)",
                         transformed_content
                     )

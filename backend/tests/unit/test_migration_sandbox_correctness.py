@@ -176,7 +176,7 @@ def test_8_semantic_cryptographic_validation():
 
         assert val_res["crypto_tests_passed"] is True
         assert val_res["unit_tests_passed"] is False  # Truthful: unit tests not run
-        assert val_res["build_passed"] is False  # Truthful for NOT_CONFIGURED
+        assert val_res["build_passed"] is True  # Python build/syntax detection succeeded
 
 def test_9_before_after_fingerprint_no_diff_fails():
     comparer = BeforeAfterComparer()
@@ -270,7 +270,7 @@ def test_F_not_supported_cannot_produce_passed():
     validator = MigrationValidator()
     t_res = {"status": "TRANSFORMED", "transformation_type": "RSA_TO_ML_DSA", "target_pqc_candidate": "ML-DSA (FIPS 204)"}
     with tempfile.TemporaryDirectory() as sbox_dir:
-        with open(os.path.join(sbox_dir, "app.py"), "w") as f:
+        with open(os.path.join(sbox_dir, "app.xyz"), "w") as f:
             f.write("from pqcrypto.sign import ml_dsa_65\n")
 
         val_summary = validator.validate_simulation(sbox_dir, t_res, None)

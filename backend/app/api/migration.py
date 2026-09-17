@@ -264,7 +264,7 @@ def simulate_migration_plan(
 
     simulator = MigrationSimulator()
     try:
-        sim_res = simulator.run_simulation(db, asset_id=target_asset.id, migration_plan_id=plan_id)
+        sim_res = simulator.run_simulation(db, asset_id=target_asset.id, migration_plan_id=plan_id, requested_pattern=pattern)
         if sim_res.get("status") == "BLOCKED":
             blocker = sim_res.get("blocker_reason") or "Migration source repository path does not exist on disk or is unavailable."
             raise HTTPException(status_code=409, detail=f"Migration cannot start: {blocker}")
