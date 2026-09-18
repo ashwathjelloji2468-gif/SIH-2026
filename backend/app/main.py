@@ -46,7 +46,7 @@ app = FastAPI(
 )
 
 # Set CORS Middleware with explicit origins for production Vercel & local development
-allowed_origins = [
+default_origins = [
     "https://frontend-phi-seven-18.vercel.app",
     "http://localhost:5173",
     "http://localhost:3000",
@@ -54,10 +54,19 @@ allowed_origins = [
     "http://127.0.0.1:3000",
 ]
 
+allowed_origins = []
+for orig in default_origins:
+    clean = orig.strip().rstrip("/")
+    if clean and clean not in allowed_origins:
+        allowed_origins.append(clean)
+
 cors_env = os.getenv("ALLOWED_ORIGINS") or os.getenv("BACKEND_CORS_ORIGINS")
 if cors_env:
-    extra_origins = [origin.strip() for origin in cors_env.split(",") if origin.strip()]
-    allowed_origins.extend(extra_origins)
+    raw_list = cors_env.replace(" ", "\n").replace(",", "\n").split("\n")
+    for item in raw_list:
+        clean = item.strip().rstrip("/")
+        if clean and clean != "*" and clean not in allowed_origins:
+            allowed_origins.append(clean)
 
 app.add_middleware(
     CORSMiddleware,
