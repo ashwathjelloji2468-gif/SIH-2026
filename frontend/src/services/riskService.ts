@@ -20,7 +20,7 @@ export const riskService = {
       user_y_scenario?: string;
     }
   ): Promise<RiskAssessment[]> => {
-    return await api.post<RiskAssessment[]>(`/projects/${projectId}/risk/assess`, params || {});
+    return await api.post<RiskAssessment[]>(`/projects/${projectId}/risk/assess`, params || {}, { timeoutMs: 240000 });
   },
 
   getAssetRisk: async (assetId: string): Promise<RiskAssessment> => {

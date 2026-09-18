@@ -1,7 +1,9 @@
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from app.core.database import get_db
+from app.core.logging import logger
 from app.repositories.asset_repository import AssetRepository
 from app.risk.service import RiskService
 from app.models.schemas import RiskAssessRequest
@@ -80,8 +82,8 @@ def assess_risk(
     """
     service = RiskService(db)
 
-    if req.asset_id:
-        try:
+    try:
+        if req.asset_id:
             return service.assess_asset(
                 asset_id=req.asset_id,
                 data_sensitivity_label=req.data_sensitivity_label or "UNKNOWN",
@@ -94,12 +96,45 @@ def assess_risk(
                 user_y_scenario=req.user_y_scenario,
                 force_reassessment=req.force_reassessment if req.force_reassessment is not None else True
             )
-        except ValueError as e:
-            raise HTTPException(status_code=404, detail=str(e))
+        elif req.project_id:
+            return service.assess_project(
+                project_id=req.project_id,
+                data_sensitivity_label=req.data_sensitivity_label or "UNKNOWN",
+                business_criticality_label=req.business_criticality_label or "UNKNOWN",
+                quantum_threat_horizon_year=req.quantum_threat_horizon_year,
+                user_x_years=req.user_x_years,
+                user_domain=req.user_domain,
+                user_y_scenario=req.user_y_scenario
+            )
+        else:
+            raise HTTPException(status_code=400, detail="Either 'asset_id' or 'project_id' must be provided in request.")
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Risk assessment execution failed: %s", str(e))
+        return JSONResponse(
+            status_code=500,
+            content={
+                "detail": "Risk assessment execution failed.",
+                "error_code": "RISK_ASSESSMENT_EXECUTION_ERROR"
+            }
+        )
 
-    elif req.project_id:
+# Backwards compatible alias routes
+@router.post("/projects/{project_id}/risk/assess")
+def assess_project_risk_legacy(
+    project_id: str,
+    req: Optional[RiskAssessRequest] = None,
+    db: Session = Depends(get_db)
+):
+    if req is None:
+        req = RiskAssessRequest()
+    service = RiskService(db)
+    try:
         return service.assess_project(
-            project_id=req.project_id,
+            project_id=project_id,
             data_sensitivity_label=req.data_sensitivity_label or "UNKNOWN",
             business_criticality_label=req.business_criticality_label or "UNKNOWN",
             quantum_threat_horizon_year=req.quantum_threat_horizon_year,
@@ -107,23 +142,19 @@ def assess_risk(
             user_domain=req.user_domain,
             user_y_scenario=req.user_y_scenario
         )
-
-    else:
-        raise HTTPException(status_code=400, detail="Either 'asset_id' or 'project_id' must be provided in request.")
-
-# Backwards compatible alias routes
-@router.post("/projects/{project_id}/risk/assess")
-def assess_project_risk_legacy(project_id: str, req: RiskAssessRequest, db: Session = Depends(get_db)):
-    service = RiskService(db)
-    return service.assess_project(
-        project_id=project_id,
-        data_sensitivity_label=req.data_sensitivity_label or "UNKNOWN",
-        business_criticality_label=req.business_criticality_label or "UNKNOWN",
-        quantum_threat_horizon_year=req.quantum_threat_horizon_year,
-        user_x_years=req.user_x_years,
-        user_domain=req.user_domain,
-        user_y_scenario=req.user_y_scenario
-    )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Risk assessment execution failed: %s", str(e))
+        return JSONResponse(
+            status_code=500,
+            content={
+                "detail": "Risk assessment execution failed.",
+                "error_code": "RISK_ASSESSMENT_EXECUTION_ERROR"
+            }
+        )
 
 @router.get("/projects/{project_id}/risk/summary")
 def get_risk_summary_legacy(project_id: str, db: Session = Depends(get_db)):
