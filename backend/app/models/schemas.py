@@ -165,6 +165,13 @@ class CryptoAssetResponse(BaseModel):
 
 class InventoryAssetResponse(CryptoAssetResponse):
     effective_x_years: float
+    effective_data_sensitivity: Optional[int] = None
+    effective_business_criticality: Optional[str] = None
+    effective_regulatory_impact: Optional[int] = None
+    effective_financial_impact: Optional[int] = None
+    effective_operational_impact: Optional[int] = None
+    effective_exposure: Optional[str] = None
+    effective_context_sources: Optional[Dict[str, str]] = None
     effective_y_years: float
     effective_y_scenario: str
     effective_z_value: Optional[float] = None

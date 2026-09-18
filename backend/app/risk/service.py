@@ -54,8 +54,18 @@ class RiskService:
                 return self._assessment_to_dict(existing, asset, threats)
 
         project = getattr(asset, "project", None) or (getattr(asset, "scan", None) and getattr(asset.scan, "project", None))
+        from app.context.effective_context import resolve_effective_artifact_context
+        eff_ctx = resolve_effective_artifact_context(asset, project, self.db)
+
+        if data_sensitivity_label == "UNKNOWN":
+            data_sensitivity_label = str(eff_ctx["data_sensitivity"])
+        if business_criticality_label == "UNKNOWN":
+            business_criticality_label = eff_ctx["business_criticality"]
+        if data_lifetime_years is None:
+            data_lifetime_years = eff_ctx["x_years"]
+
         if user_x_years is None and project:
-            user_x_years = getattr(project, "user_x_years", None)
+            user_x_years = eff_ctx["x_years"]
         if user_domain is None and project:
             user_domain = getattr(project, "user_domain", None)
         if user_y_scenario is None and project:
@@ -103,9 +113,8 @@ class RiskService:
             return []
 
         from app.models.db_models import Project
+        from app.context.effective_context import resolve_effective_artifact_context
         project = self.db.query(Project).filter(Project.id == project_id).first() if self.db else None
-        if user_x_years is None and project:
-            user_x_years = getattr(project, "user_x_years", None)
         if user_domain is None and project:
             user_domain = getattr(project, "user_domain", None)
         if user_y_scenario is None and project:
@@ -113,6 +122,11 @@ class RiskService:
 
         to_eval = []
         for asset in assets:
+            eff_ctx = resolve_effective_artifact_context(asset, project, self.db)
+            ds_label = str(eff_ctx["data_sensitivity"]) if data_sensitivity_label == "UNKNOWN" else data_sensitivity_label
+            bc_label = eff_ctx["business_criticality"] if business_criticality_label == "UNKNOWN" else business_criticality_label
+            eff_x_val = eff_ctx["x_years"]
+
             detector_names = [e.detector_name for e in (getattr(asset, "evidence_items", []) or [])]
             excerpts = [e.excerpt for e in (getattr(asset, "evidence_items", []) or []) if e.excerpt]
 
@@ -122,12 +136,12 @@ class RiskService:
                 purpose=asset.purpose,
                 asset_type=asset.asset_type.value if hasattr(asset.asset_type, "value") else str(asset.asset_type),
                 detector_names=detector_names,
-                data_sensitivity_label=data_sensitivity_label,
-                business_criticality_label=business_criticality_label,
-                data_lifetime_years=None,
+                data_sensitivity_label=ds_label,
+                business_criticality_label=bc_label,
+                data_lifetime_years=eff_x_val,
                 migration_time_years=None,
                 quantum_threat_horizon_year=quantum_threat_horizon_year,
-                user_x_years=user_x_years,
+                user_x_years=eff_x_val,
                 user_domain=user_domain,
                 user_y_scenario=user_y_scenario,
                 evidence_excerpts=excerpts
