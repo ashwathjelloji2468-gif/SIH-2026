@@ -146,6 +146,8 @@ export interface CryptoAsset {
   effective_z_planning_horizon_years?: number | null;
   effective_z_target_year?: number | null;
   xyz_source?: string;
+  exposure?: string | null;
+  exposure_classification?: string | null;
 }
 
 // Coverage

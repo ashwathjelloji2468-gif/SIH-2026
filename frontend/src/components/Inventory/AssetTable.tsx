@@ -1,10 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Search, ChevronLeft, ChevronRight, Eye, AlertCircle, FileCode, ShieldAlert, ShieldCheck, FileSpreadsheet, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Eye, AlertCircle, FileCode, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { CryptoAsset } from '../../types';
 import { ConfidenceBadge } from '../Common/ConfidenceBadge';
 import { AssetDetailDrawer } from './AssetDetailDrawer';
 import { UnknownReviewModal } from './UnknownReviewModal';
+import { useProject } from '../../context/ProjectContext';
 
 interface AssetTableProps {
   assets: CryptoAsset[];
@@ -16,11 +16,12 @@ type SortColumn = 'algorithm_name' | 'asset_type' | 'quantum_safety' | 'business
 type SortDirection = 'asc' | 'desc';
 
 export const AssetTable: React.FC<AssetTableProps> = ({ assets, loading, onRefresh }) => {
-  const navigate = useNavigate();
+  const { currentProject } = useProject();
   const [search, setSearch] = useState<string>('');
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
-  const [safetyFilter, setSafetyFilter] = useState<string>('ALL');
-  const [purposeFilter, setPurposeFilter] = useState<string>('ALL');
+  const [riskFilter, setRiskFilter] = useState<string>('ALL');
+  const [exposureFilter, setExposureFilter] = useState<string>('ALL');
+  const [algorithmFilter, setAlgorithmFilter] = useState<string>('ALL');
   const [onlyUnknowns, setOnlyUnknowns] = useState<boolean>(false);
   const [sortColumn, setSortColumn] = useState<SortColumn>('quantum_safety');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
@@ -34,55 +35,94 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, loading, onRefre
   const categoryCounts = useMemo(() => {
     const counts = {
       ALL: assets.length,
-      ALGORITHMS: 0,
       CERTIFICATES: 0,
-      KEYS: 0,
       PROTOCOLS: 0,
-      INFRASTRUCTURE: 0,
-      DEPENDENCIES: 0,
-      BINARIES: 0,
-      VENDOR: 0,
+      LIBRARIES: 0,
+      HARDWARE: 0,
+      SOFTWARE_MODULES: 0,
+      CLOUD_SERVICES: 0,
       UNKNOWN: 0
     };
 
     assets.forEach((a) => {
       if (a.is_unknown) counts.UNKNOWN++;
       const t = (a.asset_type || '').toUpperCase();
-      if (t === 'ALGORITHM' || t === 'API_CALL') counts.ALGORITHMS++;
-      else if (t === 'CERTIFICATE' || t === 'KEY_STORE') counts.CERTIFICATES++;
-      else if (t === 'KEY') counts.KEYS++;
+      if (t === 'CERTIFICATE' || t === 'KEY_STORE') counts.CERTIFICATES++;
       else if (t === 'PROTOCOL') counts.PROTOCOLS++;
-      else if (t === 'HSM' || t === 'TPM' || t === 'CLOUD_KMS') counts.INFRASTRUCTURE++;
-      else if (t === 'DEPENDENCY') counts.DEPENDENCIES++;
-      else if (t === 'BINARY') counts.BINARIES++;
-      else if (t === 'VENDOR_MANAGED') counts.VENDOR++;
+      else if (t === 'DEPENDENCY' || t === 'LIBRARY') counts.LIBRARIES++;
+      else if (t === 'HSM' || t === 'TPM' || t === 'HARDWARE') counts.HARDWARE++;
+      else if (t === 'CLOUD_KMS' || t === 'CLOUD_SERVICE' || t === 'CLOUD') counts.CLOUD_SERVICES++;
+      else counts.SOFTWARE_MODULES++;
     });
 
     return counts;
   }, [assets]);
 
-  // Filtered and Sorted list
+  // Filtered and Sorted list with AND logic
   const filteredAssets = useMemo(() => {
     let result = assets.filter((asset) => {
       if (onlyUnknowns && !asset.is_unknown) return false;
-      if (safetyFilter !== 'ALL' && asset.quantum_safety !== safetyFilter) return false;
-      if (purposeFilter !== 'ALL' && asset.purpose !== purposeFilter) return false;
 
-      // Category Type filter
-      if (typeFilter !== 'ALL') {
-        const t = (asset.asset_type || '').toUpperCase();
-        if (typeFilter === 'ALGORITHMS' && !(t === 'ALGORITHM' || t === 'API_CALL')) return false;
-        if (typeFilter === 'CERTIFICATES' && !(t === 'CERTIFICATE' || t === 'KEY_STORE')) return false;
-        if (typeFilter === 'KEYS' && t !== 'KEY') return false;
-        if (typeFilter === 'PROTOCOLS' && t !== 'PROTOCOL') return false;
-        if (typeFilter === 'INFRASTRUCTURE' && !(t === 'HSM' || t === 'TPM' || t === 'CLOUD_KMS')) return false;
-        if (typeFilter === 'DEPENDENCIES' && t !== 'DEPENDENCY') return false;
-        if (typeFilter === 'BINARIES' && t !== 'BINARY') return false;
-        if (typeFilter === 'VENDOR' && t !== 'VENDOR_MANAGED') return false;
-        if (typeFilter === 'UNKNOWN' && !asset.is_unknown) return false;
+      // 1. RISK FILTER (Critical, High, Medium, Low)
+      if (riskFilter !== 'ALL') {
+        const rawRisk = (
+          asset.business_criticality_label ||
+          (asset as any).risk_level ||
+          (asset as any).severity ||
+          (asset as any).risk ||
+          (asset.quantum_safety === 'VULNERABLE' || (asset.quantum_safety as string) === 'QUANTUM_VULNERABLE' ? 'HIGH' : 'LOW')
+        ).toUpperCase();
+
+        if (riskFilter === 'CRITICAL' && rawRisk !== 'CRITICAL') return false;
+        if (riskFilter === 'HIGH' && rawRisk !== 'HIGH') return false;
+        if (riskFilter === 'MEDIUM' && !(rawRisk === 'MEDIUM' || rawRisk === 'MODERATE')) return false;
+        if (riskFilter === 'LOW' && rawRisk !== 'LOW') return false;
       }
 
-      // Search matching across all real fields (including AWS, Azure, GCP, KMS, PKCS11, TPM, TLS, SSH)
+      // 2. TYPE FILTER (Certificates, Protocols, Libraries, Hardware, Software Modules, Cloud Services)
+      if (typeFilter !== 'ALL') {
+        const t = (asset.asset_type || '').toUpperCase();
+        if (typeFilter === 'CERTIFICATES' && !(t === 'CERTIFICATE' || t === 'KEY_STORE')) return false;
+        if (typeFilter === 'PROTOCOLS' && t !== 'PROTOCOL') return false;
+        if (typeFilter === 'LIBRARIES' && !(t === 'DEPENDENCY' || t === 'LIBRARY')) return false;
+        if (typeFilter === 'HARDWARE' && !(t === 'HSM' || t === 'TPM' || t === 'HARDWARE')) return false;
+        if (typeFilter === 'SOFTWARE_MODULES' && !(t === 'ALGORITHM' || t === 'API_CALL' || t === 'SOFTWARE_MODULE' || t === 'SOFTWARE' || t === 'KEY')) return false;
+        if (typeFilter === 'CLOUD_SERVICES' && !(t === 'CLOUD_KMS' || t === 'CLOUD_SERVICE' || t === 'CLOUD')) return false;
+      }
+
+      // 3. EXPOSURE FILTER (Internal, External-facing)
+      if (exposureFilter !== 'ALL') {
+        const expAttr = (
+          asset.exposure ||
+          asset.exposure_classification ||
+          (asset as any).network_exposure ||
+          ''
+        ).toUpperCase();
+
+        const isExternal =
+          expAttr.includes('EXT') ||
+          expAttr.includes('PUB') ||
+          ['CERTIFICATE', 'PROTOCOL'].includes((asset.asset_type || '').toUpperCase()) ||
+          ['tls', 'https', 'api', 'cert', 'public', 'external', 'ingress', 'gateway', 'ssh', 'endpoint'].some(k =>
+            (asset.location || '').toLowerCase().includes(k) || (asset.name || '').toLowerCase().includes(k)
+          );
+
+        if (exposureFilter === 'EXTERNAL' && !isExternal) return false;
+        if (exposureFilter === 'INTERNAL' && isExternal) return false;
+      }
+
+      // 4. ALGORITHM FILTER (RSA, AES, SHA, ECC/ECDSA, ECDH, DSA/DH)
+      if (algorithmFilter !== 'ALL') {
+        const alg = (asset.algorithm_name || asset.name || '').toUpperCase();
+        if (algorithmFilter === 'RSA' && !alg.includes('RSA')) return false;
+        if (algorithmFilter === 'AES' && !alg.includes('AES')) return false;
+        if (algorithmFilter === 'SHA' && !alg.includes('SHA')) return false;
+        if (algorithmFilter === 'ECC' && !(alg.includes('ECC') || alg.includes('ECDSA') || alg.includes('SECP') || alg.includes('ED25519') || alg.includes('CURVE'))) return false;
+        if (algorithmFilter === 'ECDH' && !(alg.includes('ECDH') || alg.includes('X25519') || alg.includes('X448'))) return false;
+        if (algorithmFilter === 'DSA' && !(alg.includes('DSA') || (alg.includes('DH') && !alg.includes('ECDH')))) return false;
+      }
+
+      // 5. SEARCH FILTER
       if (search.trim()) {
         const query = search.toLowerCase();
         const ev = asset.evidence_items?.[0];
@@ -137,7 +177,7 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, loading, onRefre
     });
 
     return result;
-  }, [assets, search, typeFilter, safetyFilter, purposeFilter, onlyUnknowns, sortColumn, sortDirection]);
+  }, [assets, search, typeFilter, riskFilter, exposureFilter, algorithmFilter, onlyUnknowns, sortColumn, sortDirection]);
 
   const totalPages = Math.ceil(filteredAssets.length / pageSize) || 1;
   const paginatedAssets = useMemo(() => {
@@ -172,66 +212,54 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, loading, onRefre
         >
           All ({categoryCounts.ALL})
         </button>
-        {categoryCounts.ALGORITHMS > 0 && (
-          <button
-            onClick={() => { setTypeFilter('ALGORITHMS'); setCurrentPage(1); }}
-            className={`px-2.5 py-1 rounded-lg border shrink-0 transition-colors cursor-pointer ${
-              typeFilter === 'ALGORITHMS' ? 'bg-cyan-950/80 border-cyan-500 text-cyan-300 font-semibold' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Algorithms ({categoryCounts.ALGORITHMS})
-          </button>
-        )}
-        {categoryCounts.CERTIFICATES > 0 && (
-          <button
-            onClick={() => { setTypeFilter('CERTIFICATES'); setCurrentPage(1); }}
-            className={`px-2.5 py-1 rounded-lg border shrink-0 transition-colors cursor-pointer ${
-              typeFilter === 'CERTIFICATES' ? 'bg-cyan-950/80 border-cyan-500 text-cyan-300 font-semibold' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Certificates ({categoryCounts.CERTIFICATES})
-          </button>
-        )}
-        {categoryCounts.KEYS > 0 && (
-          <button
-            onClick={() => { setTypeFilter('KEYS'); setCurrentPage(1); }}
-            className={`px-2.5 py-1 rounded-lg border shrink-0 transition-colors cursor-pointer ${
-              typeFilter === 'KEYS' ? 'bg-cyan-950/80 border-cyan-500 text-cyan-300 font-semibold' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Keys ({categoryCounts.KEYS})
-          </button>
-        )}
-        {categoryCounts.PROTOCOLS > 0 && (
-          <button
-            onClick={() => { setTypeFilter('PROTOCOLS'); setCurrentPage(1); }}
-            className={`px-2.5 py-1 rounded-lg border shrink-0 transition-colors cursor-pointer ${
-              typeFilter === 'PROTOCOLS' ? 'bg-cyan-950/80 border-cyan-500 text-cyan-300 font-semibold' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Protocols ({categoryCounts.PROTOCOLS})
-          </button>
-        )}
-        {categoryCounts.INFRASTRUCTURE > 0 && (
-          <button
-            onClick={() => { setTypeFilter('INFRASTRUCTURE'); setCurrentPage(1); }}
-            className={`px-2.5 py-1 rounded-lg border shrink-0 transition-colors cursor-pointer ${
-              typeFilter === 'INFRASTRUCTURE' ? 'bg-purple-950/80 border-purple-500 text-purple-300 font-semibold' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Infrastructure (HSM/TPM/KMS) ({categoryCounts.INFRASTRUCTURE})
-          </button>
-        )}
-        {categoryCounts.DEPENDENCIES > 0 && (
-          <button
-            onClick={() => { setTypeFilter('DEPENDENCIES'); setCurrentPage(1); }}
-            className={`px-2.5 py-1 rounded-lg border shrink-0 transition-colors cursor-pointer ${
-              typeFilter === 'DEPENDENCIES' ? 'bg-cyan-950/80 border-cyan-500 text-cyan-300 font-semibold' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Dependencies ({categoryCounts.DEPENDENCIES})
-          </button>
-        )}
+        <button
+          onClick={() => { setTypeFilter('CERTIFICATES'); setCurrentPage(1); }}
+          className={`px-2.5 py-1 rounded-lg border shrink-0 transition-colors cursor-pointer ${
+            typeFilter === 'CERTIFICATES' ? 'bg-cyan-950/80 border-cyan-500 text-cyan-300 font-semibold' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          Certificates ({categoryCounts.CERTIFICATES})
+        </button>
+        <button
+          onClick={() => { setTypeFilter('PROTOCOLS'); setCurrentPage(1); }}
+          className={`px-2.5 py-1 rounded-lg border shrink-0 transition-colors cursor-pointer ${
+            typeFilter === 'PROTOCOLS' ? 'bg-cyan-950/80 border-cyan-500 text-cyan-300 font-semibold' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          Protocols ({categoryCounts.PROTOCOLS})
+        </button>
+        <button
+          onClick={() => { setTypeFilter('LIBRARIES'); setCurrentPage(1); }}
+          className={`px-2.5 py-1 rounded-lg border shrink-0 transition-colors cursor-pointer ${
+            typeFilter === 'LIBRARIES' ? 'bg-cyan-950/80 border-cyan-500 text-cyan-300 font-semibold' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          Libraries ({categoryCounts.LIBRARIES})
+        </button>
+        <button
+          onClick={() => { setTypeFilter('HARDWARE'); setCurrentPage(1); }}
+          className={`px-2.5 py-1 rounded-lg border shrink-0 transition-colors cursor-pointer ${
+            typeFilter === 'HARDWARE' ? 'bg-purple-950/80 border-purple-500 text-purple-300 font-semibold' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          Hardware ({categoryCounts.HARDWARE})
+        </button>
+        <button
+          onClick={() => { setTypeFilter('SOFTWARE_MODULES'); setCurrentPage(1); }}
+          className={`px-2.5 py-1 rounded-lg border shrink-0 transition-colors cursor-pointer ${
+            typeFilter === 'SOFTWARE_MODULES' ? 'bg-cyan-950/80 border-cyan-500 text-cyan-300 font-semibold' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          Software Modules ({categoryCounts.SOFTWARE_MODULES})
+        </button>
+        <button
+          onClick={() => { setTypeFilter('CLOUD_SERVICES'); setCurrentPage(1); }}
+          className={`px-2.5 py-1 rounded-lg border shrink-0 transition-colors cursor-pointer ${
+            typeFilter === 'CLOUD_SERVICES' ? 'bg-cyan-950/80 border-cyan-500 text-cyan-300 font-semibold' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          Cloud Services ({categoryCounts.CLOUD_SERVICES})
+        </button>
         {categoryCounts.UNKNOWN > 0 && (
           <button
             onClick={() => { setTypeFilter('UNKNOWN'); setCurrentPage(1); }}
@@ -261,37 +289,70 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, loading, onRefre
         </div>
 
         <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
-          {/* Quantum Safety Filter */}
+          {/* 1. Risk Filter (replaces "All Quantum Safety") */}
           <select
-            value={safetyFilter}
+            value={riskFilter}
             onChange={(e) => {
-              setSafetyFilter(e.target.value);
+              setRiskFilter(e.target.value);
               setCurrentPage(1);
             }}
             className="px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 text-xs focus:outline-none focus:border-cyan-500"
           >
-            <option value="ALL">All Quantum Safety</option>
-            <option value="VULNERABLE">Vulnerable (RSA/ECC)</option>
-            <option value="SAFE">Quantum Safe</option>
-            <option value="TRANSITIONAL">Transitional</option>
-            <option value="UNKNOWN">Unknown</option>
+            <option value="ALL">Risk</option>
+            <option value="CRITICAL">Critical</option>
+            <option value="HIGH">High</option>
+            <option value="MEDIUM">Medium</option>
+            <option value="LOW">Low</option>
           </select>
 
-          {/* Purpose Filter */}
+          {/* 2. Type Filter */}
           <select
-            value={purposeFilter}
+            value={typeFilter}
             onChange={(e) => {
-              setPurposeFilter(e.target.value);
+              setTypeFilter(e.target.value);
               setCurrentPage(1);
             }}
             className="px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 text-xs focus:outline-none focus:border-cyan-500"
           >
-            <option value="ALL">All Purposes</option>
-            <option value="ENCRYPTION">Encryption</option>
-            <option value="SIGNATURE">Signature</option>
-            <option value="KEY_ESTABLISHMENT">Key Establishment</option>
-            <option value="HASHING">Hashing</option>
-            <option value="AUTHENTICATION">Authentication</option>
+            <option value="ALL">Type</option>
+            <option value="CERTIFICATES">Certificates</option>
+            <option value="PROTOCOLS">Protocols</option>
+            <option value="LIBRARIES">Libraries</option>
+            <option value="HARDWARE">Hardware</option>
+            <option value="SOFTWARE_MODULES">Software Modules</option>
+            <option value="CLOUD_SERVICES">Cloud Services</option>
+          </select>
+
+          {/* 5. Exposure Filter (replaces "PQC Recommendations") */}
+          <select
+            value={exposureFilter}
+            onChange={(e) => {
+              setExposureFilter(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 text-xs focus:outline-none focus:border-cyan-500"
+          >
+            <option value="ALL">Exposure</option>
+            <option value="INTERNAL">Internal</option>
+            <option value="EXTERNAL">External-facing</option>
+          </select>
+
+          {/* 6. Algorithm Filter (replaces "Export CBOM") */}
+          <select
+            value={algorithmFilter}
+            onChange={(e) => {
+              setAlgorithmFilter(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 text-xs focus:outline-none focus:border-cyan-500"
+          >
+            <option value="ALL">All Algorithms</option>
+            <option value="RSA">RSA</option>
+            <option value="AES">AES</option>
+            <option value="SHA">SHA</option>
+            <option value="ECC">ECC/ECDSA</option>
+            <option value="ECDH">ECDH</option>
+            <option value="DSA">DSA/DH</option>
           </select>
 
           {/* Unknown / Needs Review Toggle */}
@@ -308,30 +369,6 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, loading, onRefre
           >
             <AlertCircle className="w-3.5 h-3.5" />
             <span>Needs Review</span>
-          </button>
-
-          <button
-            onClick={() => navigate('/risk')}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-800/80 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 text-xs font-mono font-semibold transition-colors cursor-pointer"
-          >
-            <ShieldAlert className="w-3.5 h-3.5" />
-            <span>View Risk Assessment</span>
-          </button>
-
-          <button
-            onClick={() => navigate('/recommendations')}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-cyan-800/80 bg-cyan-950/40 hover:bg-cyan-900/60 text-cyan-300 text-xs font-mono font-semibold transition-colors cursor-pointer"
-          >
-            <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
-            <span>PQC Recommendations</span>
-          </button>
-
-          <button
-            onClick={() => navigate('/reports')}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-mono font-semibold transition-colors cursor-pointer"
-          >
-            <FileSpreadsheet className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Export CBOM</span>
           </button>
         </div>
       </div>
@@ -384,9 +421,9 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, loading, onRefre
                 paginatedAssets.map((asset) => {
                   const ev = asset.evidence_items && asset.evidence_items[0];
 
-                  // UNFABRICATED values: display canonical effective data or honest "Not assessed"
                   const confidence = ev?.confidence_score != null ? ev.confidence_score : null;
-                  const lifetimeYr = asset.effective_x_years != null ? `${asset.effective_x_years}y` : null;
+                  const projectX = asset.effective_x_years ?? asset.data_lifetime_years ?? (currentProject as any)?.user_x_years ?? (currentProject as any)?.data_lifetime_years;
+                  const lifetimeYr = projectX != null ? `${projectX}y` : null;
                   const lifetimeLbl = asset.lifetime_label || null;
                   const migrationYr = asset.effective_y_years != null ? `${asset.effective_y_years}y` : null;
                   const zVal = asset.effective_z_value ?? asset.effective_z_planning_horizon_years;
@@ -521,14 +558,6 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, loading, onRefre
                               Triage
                             </button>
                           )}
-                          <button
-                            onClick={() => navigate(`/risk?asset_id=${asset.id}`)}
-                            className="px-2 py-1 rounded bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 border border-rose-800/60 text-[11px] font-mono font-semibold transition-colors cursor-pointer flex items-center gap-1"
-                            title="View Risk Engine Assessment for this asset"
-                          >
-                            <ShieldAlert className="w-3 h-3" />
-                            Risk
-                          </button>
                           <button
                             onClick={() => setSelectedAsset(asset)}
                             className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-cyan-300 transition-colors cursor-pointer"
