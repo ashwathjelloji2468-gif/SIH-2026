@@ -221,12 +221,13 @@ export const Inventory: React.FC = () => {
               <p className="text-xs text-slate-400">Interactive node network map of detected primitives and cryptographic call graph</p>
             </div>
             <div className="flex items-center gap-4 text-xs font-mono">
-              <span className="flex items-center gap-1.5 text-rose-400"><span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span>Vulnerable (RSA/ECC)</span>
-              <span className="flex items-center gap-1.5 text-emerald-400"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>Quantum Safe (AES/ML-KEM)</span>
+              <span className="flex items-center gap-1.5 text-rose-400"><span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span>Quantum Vulnerable</span>
+              <span className="flex items-center gap-1.5 text-amber-400"><span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>Transitional</span>
+              <span className="flex items-center gap-1.5 text-emerald-400"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>Quantum Safe</span>
             </div>
           </div>
           <div className="h-[500px] w-full rounded-xl overflow-hidden bg-[#06080F]/80 border border-slate-800/60 relative">
-            <NetworkNodes3D className="w-full h-full" />
+            <NetworkNodes3D assets={displayAssets} className="w-full h-full" />
           </div>
         </div>
       ) : (

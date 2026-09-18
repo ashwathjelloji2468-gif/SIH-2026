@@ -2,31 +2,21 @@ import React, { useRef, useMemo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Float, Html } from '@react-three/drei';
 import * as THREE from 'three';
+import { CryptoAsset } from '../../types';
 
 interface NodeData {
   id: string;
   name: string;
   type: string;
-  safety: 'SAFE' | 'VULNERABLE' | 'TRANSITIONAL';
+  safety: 'SAFE' | 'VULNERABLE' | 'TRANSITIONAL' | 'UNKNOWN';
   position: [number, number, number];
 }
 
-const NODES: NodeData[] = [
-  { id: '1', name: 'RSA-2048', type: 'ENCRYPTION', safety: 'VULNERABLE', position: [-2, 1, 0] },
-  { id: '2', name: 'ECDSA-P256', type: 'SIGNATURE', safety: 'VULNERABLE', position: [-1, -1.5, 1] },
-  { id: '3', name: 'AES-256-GCM', type: 'SYMMETRIC', safety: 'SAFE', position: [1.5, 1.2, -0.5] },
-  { id: '4', name: 'ML-KEM-768', type: 'PQC_KEM', safety: 'SAFE', position: [2, -0.8, 0.5] },
-  { id: '5', name: 'SHA-256', type: 'HASH', safety: 'SAFE', position: [0, 2, -1] },
-  { id: '6', name: 'ML-DSA-65', type: 'PQC_SIG', safety: 'SAFE', position: [0.5, -2, -0.8] },
-  { id: '7', name: 'DH-2048', type: 'KEY_EXCHANGE', safety: 'VULNERABLE', position: [-2.5, -0.5, -1] },
-  { id: '8', name: 'SLH-DSA', type: 'PQC_SIG', safety: 'SAFE', position: [2.2, 0.2, -1.5] },
-];
+interface NodeMeshGroupProps {
+  nodes: NodeData[];
+}
 
-const CONNECTIONS: [number, number][] = [
-  [0, 1], [0, 2], [1, 3], [2, 3], [2, 4], [3, 5], [0, 6], [5, 7], [3, 7]
-];
-
-const NodeMeshGroup: React.FC = () => {
+const NodeMeshGroup: React.FC<NodeMeshGroupProps> = ({ nodes }) => {
   const groupRef = useRef<THREE.Group>(null);
 
   useFrame((_, delta) => {
@@ -36,37 +26,45 @@ const NodeMeshGroup: React.FC = () => {
   });
 
   const linePositions = useMemo(() => {
+    if (nodes.length < 2) return new Float32Array(0);
     const pos: number[] = [];
-    CONNECTIONS.forEach(([startIdx, endIdx]) => {
-      const start = NODES[startIdx].position;
-      const end = NODES[endIdx].position;
-      pos.push(...start, ...end);
-    });
+    for (let i = 0; i < nodes.length; i++) {
+      const nextIdx = (i + 1) % nodes.length;
+      pos.push(...nodes[i].position, ...nodes[nextIdx].position);
+      if (nodes.length > 3 && i % 2 === 0) {
+        const crossIdx = (i + Math.floor(nodes.length / 2)) % nodes.length;
+        pos.push(...nodes[i].position, ...nodes[crossIdx].position);
+      }
+    }
     return new Float32Array(pos);
-  }, []);
+  }, [nodes]);
 
   return (
     <Float speed={1.2} rotationIntensity={0.15} floatIntensity={0.2}>
       <group ref={groupRef}>
         {/* Connecting Lines */}
-        <lineSegments>
-          <bufferGeometry>
-            <bufferAttribute
-              attach="attributes-position"
-              args={[linePositions, 3]}
-            />
-          </bufferGeometry>
-          <lineBasicMaterial color="#06B6D4" transparent opacity={0.35} linewidth={1} />
-        </lineSegments>
+        {nodes.length > 1 && (
+          <lineSegments>
+            <bufferGeometry>
+              <bufferAttribute
+                attach="attributes-position"
+                args={[linePositions, 3]}
+              />
+            </bufferGeometry>
+            <lineBasicMaterial color="#06B6D4" transparent opacity={0.35} linewidth={1} />
+          </lineSegments>
+        )}
 
         {/* Sphere Nodes */}
-        {NODES.map((node) => {
+        {nodes.map((node) => {
           const color =
             node.safety === 'VULNERABLE'
               ? '#F43F5E'
               : node.safety === 'SAFE'
               ? '#10B981'
-              : '#F59E0B';
+              : node.safety === 'TRANSITIONAL'
+              ? '#F59E0B'
+              : '#94A3B8';
 
           return (
             <group key={node.id} position={node.position}>
@@ -100,17 +98,62 @@ const NodeMeshGroup: React.FC = () => {
 
 export interface NetworkNodes3DProps {
   className?: string;
+  assets?: CryptoAsset[];
 }
 
-export const NetworkNodes3D: React.FC<NetworkNodes3DProps> = ({ className }) => {
+export const NetworkNodes3D: React.FC<NetworkNodes3DProps> = ({ className, assets = [] }) => {
+  const nodes: NodeData[] = useMemo(() => {
+    if (!assets || assets.length === 0) return [];
+    const total = assets.length;
+    return assets.map((asset, i) => {
+      let position: [number, number, number];
+      if (total === 1) {
+        position = [0, 0, 0];
+      } else {
+        const phi = Math.acos(-1 + (2 * i + 1) / total);
+        const theta = Math.sqrt(total * Math.PI) * phi;
+        const radius = 2.2;
+        const x = radius * Math.cos(theta) * Math.sin(phi);
+        const y = radius * Math.sin(theta) * Math.sin(phi);
+        const z = radius * Math.cos(phi);
+        position = [Number(x.toFixed(2)), Number(y.toFixed(2)), Number(z.toFixed(2))];
+      }
+
+      const safety: 'SAFE' | 'VULNERABLE' | 'TRANSITIONAL' | 'UNKNOWN' =
+        asset.quantum_safety === 'SAFE'
+          ? 'SAFE'
+          : asset.quantum_safety === 'VULNERABLE'
+          ? 'VULNERABLE'
+          : asset.quantum_safety === 'TRANSITIONAL'
+          ? 'TRANSITIONAL'
+          : 'UNKNOWN';
+
+      return {
+        id: asset.id,
+        name: asset.algorithm_name || asset.name || 'Unknown',
+        type: asset.asset_type || 'ALGORITHM',
+        safety,
+        position
+      };
+    });
+  }, [assets]);
+
+  if (!assets || assets.length === 0) {
+    return (
+      <div className={`w-full h-full flex flex-col items-center justify-center p-8 text-center bg-[#06080F]/80 border border-slate-800/60 rounded-xl ${className || ''}`}>
+        <p className="text-sm font-mono text-slate-400">No discovered cryptographic assets for this scan.</p>
+      </div>
+    );
+  }
+
   return (
-    <div className={`w-full h-full ${className || ''}`}>
+    <div className={`w-full h-full relative ${className || ''}`}>
       <Canvas camera={{ position: [0, 0, 6], fov: 45 }}>
         <React.Suspense fallback={null}>
           <color attach="background" args={['transparent']} />
           <ambientLight intensity={0.7} />
           <pointLight position={[10, 10, 10]} intensity={1} />
-          <NodeMeshGroup />
+          <NodeMeshGroup nodes={nodes} />
           <OrbitControls enableZoom={false} autoRotate autoRotateSpeed={0.8} />
         </React.Suspense>
       </Canvas>
