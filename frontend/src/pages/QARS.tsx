@@ -290,17 +290,25 @@ export const QARS: React.FC = () => {
                     <div className="grid grid-cols-3 gap-2 pt-1 font-mono text-xs">
                       <div className="bg-slate-900/60 p-2 rounded-lg border border-slate-800/80">
                         <div className="text-[10px] text-slate-500">Core</div>
-                        <div className="text-slate-200 font-bold">{primaryAsset.base_score.toFixed(1)}</div>
+                        <div className="text-slate-200 font-bold">
+                          {primaryAsset.base_score !== null && primaryAsset.base_score !== undefined
+                            ? primaryAsset.base_score.toFixed(1)
+                            : '—'}
+                        </div>
                       </div>
                       <div className="bg-slate-900/60 p-2 rounded-lg border border-slate-800/80">
                         <div className="text-[10px] text-slate-500 font-sans">Adjustments</div>
                         <div className="text-cyan-400 font-bold">
-                          +{Object.values(primaryAsset.adjustments).reduce((a, b) => a + b, 0).toFixed(1)}
+                          +{Object.values(primaryAsset.adjustments || {}).reduce((a, b) => a + (b || 0), 0).toFixed(1)}
                         </div>
                       </div>
                       <div className="bg-slate-900/60 p-2 rounded-lg border border-slate-800/80">
                         <div className="text-[10px] text-slate-500">Final</div>
-                        <div className="text-white font-bold">{primaryAsset.final_score.toFixed(1)}</div>
+                        <div className="text-white font-bold">
+                          {primaryAsset.final_score !== null && primaryAsset.final_score !== undefined
+                            ? primaryAsset.final_score.toFixed(1)
+                            : '—'}
+                        </div>
                       </div>
                     </div>
                   )}
@@ -363,7 +371,7 @@ export const QARS: React.FC = () => {
                       {formatPercentage(primaryAsset.algorithm_risk?.aqr_score)}
                     </div>
                     <div className="text-[11px] text-slate-400 mt-1">
-                      AQR Contribution: <strong className="text-cyan-300 font-mono">+{primaryAsset.adjustments['algorithm_risk'] || 0.0}</strong>
+                      AQR Contribution: <strong className="text-cyan-300 font-mono">{primaryAsset.adjustments?.['algorithm_risk'] != null ? `+${primaryAsset.adjustments['algorithm_risk'].toFixed(1)}` : '—'}</strong>
                     </div>
                   </div>
                   <p className="text-[11px] text-slate-400 leading-normal line-clamp-2">
@@ -386,7 +394,7 @@ export const QARS: React.FC = () => {
                         : 'Not configured'}
                     </div>
                     <div className="text-[11px] text-slate-400 mt-1">
-                      AV Contribution: <strong className="text-cyan-300 font-mono">+{primaryAsset.adjustments['availability'] || 0.0}</strong>
+                      AV Contribution: <strong className="text-cyan-300 font-mono">{primaryAsset.adjustments?.['availability'] != null ? `+${primaryAsset.adjustments['availability'].toFixed(1)}` : '—'}</strong>
                     </div>
                   </div>
                   <p className="text-[11px] text-slate-400 leading-normal line-clamp-2">
@@ -410,7 +418,7 @@ export const QARS: React.FC = () => {
                       )}
                     </div>
                     <div className="text-[11px] text-slate-400 mt-1">
-                      CAR Risk Contribution: <strong className="text-cyan-300 font-mono">+{primaryAsset.adjustments['crypto_agility'] || 0.0}</strong>
+                      CAR Risk Contribution: <strong className="text-cyan-300 font-mono">{primaryAsset.adjustments?.['crypto_agility'] != null ? `+${primaryAsset.adjustments['crypto_agility'].toFixed(1)}` : '—'}</strong>
                     </div>
                   </div>
                   <p className="text-[11px] text-slate-400 leading-normal line-clamp-2">
@@ -434,7 +442,7 @@ export const QARS: React.FC = () => {
                       )}
                     </div>
                     <div className="text-[11px] text-slate-400 mt-1">
-                      MC Contribution: <strong className="text-cyan-300 font-mono">+{primaryAsset.adjustments['migration_complexity'] || 0.0}</strong>
+                      MC Contribution: <strong className="text-cyan-300 font-mono">{primaryAsset.adjustments?.['migration_complexity'] != null ? `+${primaryAsset.adjustments['migration_complexity'].toFixed(1)}` : '—'}</strong>
                     </div>
                   </div>
                   <p className="text-[11px] text-slate-400 leading-normal line-clamp-2">
@@ -463,15 +471,15 @@ export const QARS: React.FC = () => {
                 <div className="space-y-3 font-mono text-xs">
                   <div className="flex justify-between items-center bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/60">
                     <span className="text-slate-400">Data Shelf-Life (X)</span>
-                    <span className="text-cyan-300 font-bold">{primaryAsset.core_input.x_years} years</span>
+                    <span className="text-cyan-300 font-bold">{primaryAsset.core_input?.x_years != null ? `${primaryAsset.core_input.x_years} years` : '—'}</span>
                   </div>
                   <div className="flex justify-between items-center bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/60">
                     <span className="text-slate-400">Migration Duration (Y)</span>
-                    <span className="text-amber-300 font-bold">{primaryAsset.core_input.y_years} years</span>
+                    <span className="text-amber-300 font-bold">{primaryAsset.core_input?.y_years != null ? `${primaryAsset.core_input.y_years} years` : '—'}</span>
                   </div>
                   <div className="flex justify-between items-center bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/60">
                     <span className="text-slate-400">Quantum Deadline (Z Central)</span>
-                    <span className="text-rose-300 font-bold">{primaryAsset.core_input.z_years} years</span>
+                    <span className="text-rose-300 font-bold">{primaryAsset.core_input?.z_years != null ? `${primaryAsset.core_input.z_years} years` : '—'}</span>
                   </div>
                   <div className="flex justify-between items-center bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/60">
                     <span className="text-slate-400">ZEngine Confidence</span>
@@ -493,7 +501,7 @@ export const QARS: React.FC = () => {
                     <span>QARS Core Formula Breakdown</span>
                   </h3>
                   <span className="text-xs font-mono text-cyan-400 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800/60">
-                    Base: {primaryAsset.base_score.toFixed(2)}
+                    Base: {primaryAsset.base_score != null ? primaryAsset.base_score.toFixed(2) : '—'}
                   </span>
                 </div>
 
@@ -510,19 +518,19 @@ export const QARS: React.FC = () => {
                   <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800/60 text-center">
                     <div className="text-[10px] text-slate-500 uppercase font-sans">Timeline Pressure T</div>
                     <div className="text-base font-bold text-white mt-1">
-                      {primaryAsset.explanation.timeline_pressure.toFixed(3)}
+                      {primaryAsset.explanation?.timeline_pressure != null ? primaryAsset.explanation.timeline_pressure.toFixed(3) : '—'}
                     </div>
                   </div>
                   <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800/60 text-center">
-                    <div className="text-[10px] text-slate-500 uppercase font-sans">Sensitivity Sn (S={primaryAsset.core_input.data_sensitivity})</div>
+                    <div className="text-[10px] text-slate-500 uppercase font-sans">Sensitivity Sn (S={primaryAsset.core_input?.data_sensitivity ?? '—'})</div>
                     <div className="text-base font-bold text-white mt-1">
-                      {primaryAsset.explanation.sensitivity_normalized.toFixed(3)}
+                      {primaryAsset.explanation?.sensitivity_normalized != null ? primaryAsset.explanation.sensitivity_normalized.toFixed(3) : '—'}
                     </div>
                   </div>
                   <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800/60 text-center">
-                    <div className="text-[10px] text-slate-500 uppercase font-sans">Exposure En (E={primaryAsset.core_input.exposure})</div>
+                    <div className="text-[10px] text-slate-500 uppercase font-sans">Exposure En (E={primaryAsset.core_input?.exposure ?? '—'})</div>
                     <div className="text-base font-bold text-white mt-1">
-                      {primaryAsset.explanation.exposure_normalized.toFixed(3)}
+                      {primaryAsset.explanation?.exposure_normalized != null ? primaryAsset.explanation.exposure_normalized.toFixed(3) : '—'}
                     </div>
                   </div>
                 </div>
@@ -580,7 +588,7 @@ export const QARS: React.FC = () => {
                     <div className="p-4 rounded-xl bg-slate-900/50 border border-slate-800/80 space-y-1.5">
                       <div className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">WHAT</div>
                       <p className="text-xs text-slate-300 leading-relaxed">
-                        Evaluated base QARS Core score of <strong className="font-mono text-white">{primaryAsset.base_score.toFixed(1)}</strong> based on timeline pressure T = {primaryAsset.explanation.timeline_pressure.toFixed(2)}.
+                        Evaluated base QARS Core score of <strong className="font-mono text-white">{primaryAsset.base_score != null ? primaryAsset.base_score.toFixed(1) : '—'}</strong> based on timeline pressure T = {primaryAsset.explanation?.timeline_pressure != null ? primaryAsset.explanation.timeline_pressure.toFixed(2) : '—'}.
                       </p>
                     </div>
 
@@ -594,7 +602,7 @@ export const QARS: React.FC = () => {
                     <div className="p-4 rounded-xl bg-slate-900/50 border border-slate-800/80 space-y-1.5">
                       <div className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">WHY</div>
                       <p className="text-xs text-slate-300 leading-relaxed">
-                        Applied total bounded policy adjustment of <strong className="font-mono text-cyan-300">+{Object.values(primaryAsset.adjustments).reduce((a, b) => a + b, 0).toFixed(1)}</strong> across active component factors.
+                        Applied total bounded policy adjustment of <strong className="font-mono text-cyan-300">+{Object.values(primaryAsset.adjustments || {}).reduce((a, b) => a + (b || 0), 0).toFixed(1)}</strong> across active component factors.
                       </p>
                     </div>
 
@@ -666,15 +674,15 @@ export const QARS: React.FC = () => {
                         {asset.asset_id}
                       </td>
                       <td className="py-3.5 px-4 font-bold text-cyan-300">
-                        {asset.final_score.toFixed(1)}
+                        {asset.final_score != null ? asset.final_score.toFixed(1) : '—'}
                       </td>
                       <td className="py-3.5 px-4">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${getLevelBadgeClass(asset.level)}`}>
-                          {String(asset.level).toUpperCase()}
+                          {String(asset.level || 'UNCONFIGURED').toUpperCase()}
                         </span>
                       </td>
                       <td className="py-3.5 px-4 text-slate-300">
-                        {asset.base_score.toFixed(1)}
+                        {asset.base_score != null ? asset.base_score.toFixed(1) : '—'}
                       </td>
                       <td className="py-3.5 px-4">
                         {formatPercentage(asset.algorithm_risk?.aqr_score)}
@@ -741,10 +749,12 @@ export const QARS: React.FC = () => {
                 <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between">
                   <div>
                     <div className="text-[10px] text-slate-500 uppercase font-sans">Final QARS Score</div>
-                    <div className="text-2xl font-bold text-cyan-300 mt-0.5">{assetDetail.final_score.toFixed(1)}</div>
+                    <div className="text-2xl font-bold text-cyan-300 mt-0.5">
+                      {assetDetail.final_score != null ? assetDetail.final_score.toFixed(1) : '—'}
+                    </div>
                   </div>
                   <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getLevelBadgeClass(assetDetail.level)}`}>
-                    {String(assetDetail.level).toUpperCase()}
+                    {String(assetDetail.level || 'UNCONFIGURED').toUpperCase()}
                   </span>
                 </div>
 
@@ -754,11 +764,11 @@ export const QARS: React.FC = () => {
                     Timeline Inputs (X, Y, Z, S, E)
                   </div>
                   <div className="grid grid-cols-2 gap-2 bg-slate-900/50 p-3 rounded-xl border border-slate-800/80 text-slate-300">
-                    <div>X (Shelf-Life): <span className="text-white font-bold">{assetDetail.core_input.x_years} y</span></div>
-                    <div>Y (Migration): <span className="text-white font-bold">{assetDetail.core_input.y_years} y</span></div>
-                    <div>Z (Quantum): <span className="text-white font-bold">{assetDetail.core_input.z_years} y</span></div>
-                    <div>S (Sensitivity): <span className="text-white font-bold">{assetDetail.core_input.data_sensitivity}</span></div>
-                    <div>E (Exposure): <span className="text-white font-bold">{assetDetail.core_input.exposure}</span></div>
+                    <div>X (Shelf-Life): <span className="text-white font-bold">{assetDetail.core_input?.x_years != null ? `${assetDetail.core_input.x_years} y` : '—'}</span></div>
+                    <div>Y (Migration): <span className="text-white font-bold">{assetDetail.core_input?.y_years != null ? `${assetDetail.core_input.y_years} y` : '—'}</span></div>
+                    <div>Z (Quantum): <span className="text-white font-bold">{assetDetail.core_input?.z_years != null ? `${assetDetail.core_input.z_years} y` : '—'}</span></div>
+                    <div>S (Sensitivity): <span className="text-white font-bold">{assetDetail.core_input?.data_sensitivity != null ? assetDetail.core_input.data_sensitivity : '—'}</span></div>
+                    <div>E (Exposure): <span className="text-white font-bold">{assetDetail.core_input?.exposure != null ? assetDetail.core_input.exposure : '—'}</span></div>
                   </div>
                 </div>
 
@@ -797,10 +807,10 @@ export const QARS: React.FC = () => {
                     Policy Component Adjustments
                   </div>
                   <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800/80 space-y-1 text-slate-300">
-                    {Object.entries(assetDetail.adjustments).map(([k, v]) => (
+                    {Object.entries(assetDetail.adjustments || {}).map(([k, v]) => (
                       <div key={k} className="flex justify-between">
                         <span className="text-slate-400">{k}</span>
-                        <span className="text-cyan-300 font-bold">+{v.toFixed(1)}</span>
+                        <span className="text-cyan-300 font-bold">{v != null ? `+${v.toFixed(1)}` : '—'}</span>
                       </div>
                     ))}
                   </div>

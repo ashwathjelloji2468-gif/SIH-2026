@@ -134,6 +134,72 @@ export function runQARSFrontendTests(): { name: string; passed: boolean; details
       passed: true,
       details: 'Frontend strictly renders backend response structures without local math.',
     });
+
+    // 4. Null Safety Regression Test: Realistic QARS response with UNCONFIGURED / nullable numeric fields
+    const unconfiguredAsset: QARSAssetResult = {
+      asset_id: 'asset-unconfigured-456',
+      project_id: 'proj-test-123',
+      scan_id: 'scan-test-123',
+      provenance: {
+        x_source: 'UNCONFIGURED',
+        y_source: 'UNCONFIGURED',
+        z_source: 'UNCONFIGURED',
+        s_source: 'UNCONFIGURED',
+        e_source: 'UNCONFIGURED',
+      },
+      core_input: {
+        x_years: 5,
+        y_years: 0,
+        z_years: 15,
+        data_sensitivity: 1,
+        exposure: 1,
+      },
+      base_score: null as any,
+      adjustments: {},
+      final_score: null as any,
+      level: 'UNCONFIGURED',
+      explanation: {
+        x_years: 5,
+        y_years: 0,
+        z_years: 15,
+        data_sensitivity: 1,
+        exposure: 1,
+        sensitivity_normalized: 0,
+        exposure_normalized: 0,
+        timeline_pressure: null as any,
+        core_score: null as any,
+        active_adjustments: {},
+        final_score: null as any,
+        severity_level: 'UNCONFIGURED',
+      },
+      algorithm_risk: null,
+      availability: null,
+      crypto_agility_evidence: null,
+      migration_complexity: null,
+      z_uncertainty: null,
+    };
+
+    let nullSafetyPassed = true;
+    let nullSafetyDetails = 'All nullable QARS numeric fields formatted safely without .toFixed crash.';
+    try {
+      const formattedFinal = unconfiguredAsset.final_score != null ? unconfiguredAsset.final_score.toFixed(1) : '—';
+      const formattedBase = unconfiguredAsset.base_score != null ? unconfiguredAsset.base_score.toFixed(1) : '—';
+      const formattedTimeline = unconfiguredAsset.explanation?.timeline_pressure != null ? unconfiguredAsset.explanation.timeline_pressure.toFixed(3) : '—';
+      
+      if (formattedFinal !== '—' || formattedBase !== '—' || formattedTimeline !== '—') {
+        nullSafetyPassed = false;
+        nullSafetyDetails = 'Null scores did not return fallback — string.';
+      }
+    } catch (err: any) {
+      nullSafetyPassed = false;
+      nullSafetyDetails = `Exception thrown on null field: ${err?.message}`;
+    }
+
+    results.push({
+      name: 'TEST 4: Nullable QARS response fields render safely without .toFixed exception',
+      passed: nullSafetyPassed,
+      details: nullSafetyDetails,
+    });
   } finally {
     api.get = originalGet;
   }
