@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "version": "SENTRIQ QARS Prototype Heuristic Agility Calibration v1",
+    "source_type": "SENTRIQ_PROTOTYPE_HEURISTIC",
+    "confidence": "PROVISIONAL",
+    "description": "Provisional heuristic calibration weights for QARS Phase 4 Crypto-Agility Score calculation."
+  },
+  "factor_weights": {
+    "hard_coded_algorithm_ratio": 0.30,
+    "crypto_abstraction_layer_presence": 0.35,
+    "replaceable_library_interface_count": 0.20,
+    "vendor_kms_hsm_detected": 0.05,
+    "protocol_impact_detected": 0.10
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "version": "SENTRIQ QARS Prototype Heuristic Policy v1",
+    "source_type": "SENTRIQ_PROTOTYPE_HEURISTIC",
+    "confidence": "PROVISIONAL",
+    "description": "Provisional bounded policy adjustment thresholds and maximum contributions for QARS Phase 4 Policy Engine."
+  },
+  "max_adjustments": {
+    "algorithm_risk": 15.0,
+    "availability": 10.0,
+    "crypto_agility": 15.0,
+    "migration_complexity": 15.0
+  },
+  "total_max_adjustment_bound": 25.0
+}

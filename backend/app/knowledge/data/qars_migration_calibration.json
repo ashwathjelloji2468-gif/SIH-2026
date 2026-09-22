@@ -1,0 +1,30 @@
+{
+  "metadata": {
+    "version": "SENTRIQ QARS Prototype Heuristic Migration Calibration v1",
+    "source_type": "SENTRIQ_PROTOTYPE_HEURISTIC",
+    "confidence": "PROVISIONAL",
+    "description": "Provisional heuristic calibration factors for QARS Phase 4 Migration Complexity calculation."
+  },
+  "factor_weights": {
+    "affected_files_count": 0.10,
+    "affected_assets_count": 0.10,
+    "dependency_count": 0.10,
+    "protocol_impact_detected": 0.10,
+    "replaceable_library_interface_count": 0.05,
+    "vendor_kms_hsm_detected": 0.10,
+    "vendor_dependency_count": 0.05,
+    "pki_cert_dependency_count": 0.05,
+    "testing_requirement_level": 0.10,
+    "availability_impact": 0.05,
+    "blast_radius_affected_nodes": 0.10,
+    "business_criticality_score": 0.10
+  },
+  "max_bounds": {
+    "affected_files_count": 20,
+    "affected_assets_count": 10,
+    "dependency_count": 10,
+    "vendor_dependency_count": 5,
+    "pki_cert_dependency_count": 5,
+    "blast_radius_affected_nodes": 20
+  }
+}
