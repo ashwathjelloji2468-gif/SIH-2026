@@ -9,27 +9,53 @@ import { runPollingLabelTests } from './pollingLabel.test';
 import { runRegressionTimeoutTests } from './regressionTimeout.test';
 import { runCBOMDiffTelemetryTests } from './cbomDiffTelemetry.test';
 import { runNetworkNodes3DTests } from './networkNodes3D.test';
+import { runQARSFrontendTests } from './qarsFrontend.test';
+import { runPhase2PerformanceTests } from './phase2Performance.test';
 
-console.log('=== RUNNING FRONTEND ACTIVE SCAN, POLLING LABEL, REGRESSION TIMEOUT, CBOM TELEMETRY & 3D MESH TESTS ===');
+console.log('=== RUNNING FRONTEND ACTIVE SCAN, POLLING LABEL, QARS, PERF PHASE 2 & 3D MESH TESTS ===');
 
-const activeScanResults = runActiveScanTrackerTests();
-const pollingLabelResults = runPollingLabelTests();
-const regressionTimeoutResults = runRegressionTimeoutTests();
-const cbomTelemetryResults = runCBOMDiffTelemetryTests();
-const networkNodes3DResults = runNetworkNodes3DTests();
+async function main() {
+  const activeScanResults = runActiveScanTrackerTests();
+  const pollingLabelResults = runPollingLabelTests();
+  const regressionTimeoutResults = runRegressionTimeoutTests();
+  const cbomTelemetryResults = runCBOMDiffTelemetryTests();
+  const networkNodes3DResults = runNetworkNodes3DTests();
+  const qarsResults = runQARSFrontendTests();
+  const phase2PerfResults = await runPhase2PerformanceTests();
 
-const allResults = [...activeScanResults, ...pollingLabelResults, ...regressionTimeoutResults, ...cbomTelemetryResults, ...networkNodes3DResults];
-let passed = 0;
-let failed = 0;
+  const allResults = [
+    ...activeScanResults,
+    ...pollingLabelResults,
+    ...regressionTimeoutResults,
+    ...cbomTelemetryResults,
+    ...networkNodes3DResults,
+    ...qarsResults,
+    ...phase2PerfResults,
+  ];
+  let passed = 0;
+  let failed = 0;
 
-allResults.forEach((res) => {
-  if (res.passed) {
-    passed++;
-    console.log(`✓ [PASS] ${res.name} (${res.details})`);
-  } else {
-    failed++;
-    console.log(`✗ [FAIL] ${res.name} (${res.details})`);
+  allResults.forEach((res) => {
+    if (res.passed) {
+      passed++;
+      console.log(`✓ [PASS] ${res.name} (${res.details})`);
+    } else {
+      failed++;
+      console.log(`✗ [FAIL] ${res.name} (${res.details})`);
+    }
+  });
+
+  console.log(`\nSummary: ${passed} passed, ${failed} failed out of ${allResults.length} frontend tests.`);
+  const proc = (globalThis as any).process;
+  if (failed > 0 && proc && typeof proc.exit === 'function') {
+    proc.exit(1);
+  }
+}
+
+main().catch((err) => {
+  console.error('Test execution failed:', err);
+  const proc = (globalThis as any).process;
+  if (proc && typeof proc.exit === 'function') {
+    proc.exit(1);
   }
 });
-
-console.log(`\nSummary: ${passed} passed, ${failed} failed out of ${allResults.length} frontend tests.`);

@@ -25,6 +25,7 @@ export const Scan: React.FC = () => {
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
       setScans(sorted);
+      refreshLatestScan(sorted);
     } catch (err) {
       console.error('Failed to load project scans:', err);
     } finally {
@@ -47,7 +48,6 @@ export const Scan: React.FC = () => {
 
     const interval = setInterval(() => {
       fetchScans();
-      refreshLatestScan();
     }, 2500);
 
     return () => clearInterval(interval);

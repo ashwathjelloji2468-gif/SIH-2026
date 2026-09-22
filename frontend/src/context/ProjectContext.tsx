@@ -11,7 +11,7 @@ interface ProjectContextType {
   error: string | null;
   refreshProjects: () => Promise<void>;
   latestScan: Scan | null;
-  refreshLatestScan: () => Promise<void>;
+  refreshLatestScan: (existingScans?: Scan[]) => Promise<void>;
   activeScanId: string | null;
   setActiveScanId: (id: string | null) => void;
   isScanModalOpen: boolean;
@@ -88,9 +88,20 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  const fetchLatestScan = useCallback(async () => {
+  const fetchLatestScan = useCallback(async (existingScans?: Scan[]) => {
     if (!currentProject) {
       setLatestScan(null);
+      return;
+    }
+    if (existingScans) {
+      if (existingScans.length > 0) {
+        const sorted = [...existingScans].sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+        setLatestScan(sorted[0]);
+      } else {
+        setLatestScan(null);
+      }
       return;
     }
     try {

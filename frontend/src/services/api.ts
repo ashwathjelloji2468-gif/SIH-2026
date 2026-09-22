@@ -29,6 +29,28 @@ export class ApiError extends Error {
 const memoryCache = new Map<string, { data: any; timestamp: number }>();
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes TTL
 
+// In-Flight GET Request Deduplication Registry
+const inFlightGetRequests = new Map<string, Promise<any>>();
+
+// Cache Revalidation Subscribers
+type CacheSubscriber = (endpoint: string, freshData: any) => void;
+const cacheSubscribers = new Set<CacheSubscriber>();
+
+export function subscribeApiCache(subscriber: CacheSubscriber): () => void {
+  cacheSubscribers.add(subscriber);
+  return () => {
+    cacheSubscribers.delete(subscriber);
+  };
+}
+
+function notifySubscribers(endpoint: string, freshData: any): void {
+  cacheSubscribers.forEach((sub) => {
+    try {
+      sub(endpoint, freshData);
+    } catch (_) {}
+  });
+}
+
 function getCacheKey(endpoint: string): string {
   return `sentriq_cache_${endpoint}`;
 }
@@ -71,9 +93,14 @@ export function clearApiCache(endpointPrefix?: string): void {
   if (!endpointPrefix) {
     memoryCache.clear();
     try {
-      Object.keys(sessionStorage).forEach((k) => {
-        if (k.startsWith('sentriq_cache_')) sessionStorage.removeItem(k);
-      });
+      if (typeof sessionStorage !== 'undefined') {
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < sessionStorage.length; i++) {
+          const k = sessionStorage.key(i);
+          if (k && k.startsWith('sentriq_cache_')) keysToRemove.push(k);
+        }
+        keysToRemove.forEach((k) => sessionStorage.removeItem(k));
+      }
     } catch (_) {}
     return;
   }
@@ -83,10 +110,37 @@ export function clearApiCache(endpointPrefix?: string): void {
     if (k.includes(endpointPrefix)) memoryCache.delete(k);
   });
   try {
-    Object.keys(sessionStorage).forEach((k) => {
-      if (k.includes(endpointPrefix)) sessionStorage.removeItem(k);
-    });
+    if (typeof sessionStorage !== 'undefined') {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const k = sessionStorage.key(i);
+        if (k && k.includes(endpointPrefix)) keysToRemove.push(k);
+      }
+      keysToRemove.forEach((k) => sessionStorage.removeItem(k));
+    }
   } catch (_) {}
+}
+
+export function invalidateTargetedCache(endpoint: string): void {
+  const lower = endpoint.toLowerCase();
+  if (lower.includes('/scans')) {
+    clearApiCache('/scans');
+  } else if (lower.includes('/risk')) {
+    clearApiCache('/risk');
+  } else if (lower.includes('/migration')) {
+    clearApiCache('/migration');
+  } else if (lower.includes('/qars')) {
+    clearApiCache('/qars');
+  } else if (lower.includes('/assets') || lower.includes('/inventory')) {
+    clearApiCache('/inventory');
+    clearApiCache('/coverage');
+    clearApiCache('/unknowns');
+    clearApiCache('/assets');
+  } else if (lower.includes('/projects')) {
+    clearApiCache('/projects');
+  } else {
+    clearApiCache(endpoint.split('?')[0]);
+  }
 }
 
 async function request<T>(endpoint: string, options: RequestInit & { timeoutMs?: number } = {}, defaultTimeout = 60000): Promise<T> {
@@ -155,7 +209,7 @@ export type ApiRequestOptions = RequestInit & { skipCache?: boolean; timeoutMs?:
 
 export const api = {
   /**
-   * Fast SWR GET Request:
+   * Fast SWR GET Request with in-flight deduplication:
    * Returns cached snapshot immediately if available (0ms delay),
    * while revalidating in background.
    */
@@ -165,29 +219,53 @@ export const api = {
     if (!skipCache) {
       const cached = readCache<T>(endpoint);
       if (cached) {
-        request<T>(endpoint, { ...options, method: 'GET' })
-          .then((fresh) => writeCache(endpoint, fresh))
-          .catch(() => {});
+        if (!inFlightGetRequests.has(endpoint)) {
+          const revalPromise = request<T>(endpoint, { ...options, method: 'GET' })
+            .then((fresh) => {
+              writeCache(endpoint, fresh);
+              notifySubscribers(endpoint, fresh);
+              return fresh;
+            })
+            .catch(() => {})
+            .finally(() => {
+              inFlightGetRequests.delete(endpoint);
+            });
+          inFlightGetRequests.set(endpoint, revalPromise);
+        }
         return cached;
       }
     } else {
       clearApiCache(endpoint);
     }
 
+    if (inFlightGetRequests.has(endpoint)) {
+      return inFlightGetRequests.get(endpoint) as Promise<T>;
+    }
+
+    const fetchPromise = (async () => {
+      try {
+        const fresh = await request<T>(endpoint, { ...options, method: 'GET' });
+        writeCache(endpoint, fresh);
+        notifySubscribers(endpoint, fresh);
+        return fresh;
+      } catch (err) {
+        const staleKey = getCacheKey(endpoint);
+        const stale = memoryCache.get(staleKey);
+        if (stale) return stale.data as T;
+        throw err;
+      }
+    })();
+
+    inFlightGetRequests.set(endpoint, fetchPromise);
     try {
-      const fresh = await request<T>(endpoint, { ...options, method: 'GET' });
-      writeCache(endpoint, fresh);
-      return fresh;
-    } catch (err) {
-      const staleKey = getCacheKey(endpoint);
-      const stale = memoryCache.get(staleKey);
-      if (stale) return stale.data as T;
-      throw err;
+      return await fetchPromise;
+    } finally {
+      inFlightGetRequests.delete(endpoint);
     }
   },
 
   post: async <T>(endpoint: string, body?: any, options?: ApiRequestOptions): Promise<T> => {
-    clearApiCache();
+    invalidateTargetedCache(endpoint);
     return request<T>(endpoint, { 
       ...options, 
       method: 'POST', 
@@ -196,7 +274,7 @@ export const api = {
   },
 
   patch: async <T>(endpoint: string, body?: any, options?: ApiRequestOptions): Promise<T> => {
-    clearApiCache();
+    invalidateTargetedCache(endpoint);
     return request<T>(endpoint, { 
       ...options, 
       method: 'PATCH', 
@@ -205,7 +283,7 @@ export const api = {
   },
 
   put: async <T>(endpoint: string, body?: any, options?: ApiRequestOptions): Promise<T> => {
-    clearApiCache();
+    invalidateTargetedCache(endpoint);
     return request<T>(endpoint, { 
       ...options, 
       method: 'PUT', 
@@ -213,9 +291,8 @@ export const api = {
     });
   },
 
-
   delete: async <T>(endpoint: string, options?: ApiRequestOptions): Promise<T> => {
-    clearApiCache();
+    invalidateTargetedCache(endpoint);
     return request<T>(endpoint, { ...options, method: 'DELETE' });
   },
 
