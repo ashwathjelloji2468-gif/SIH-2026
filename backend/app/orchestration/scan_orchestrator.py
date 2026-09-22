@@ -241,6 +241,82 @@ class ScanOrchestrator:
             asset_repo = AssetRepository(db)
             created_assets = asset_repo.get_by_scan(scan_id)
             if created_assets and project_id:
+                from app.models.db_models import Project
+                scan_project = getattr(scan, "project", None) or db.query(Project).filter(Project.id == project_id).first()
+                start_project_updated_at = getattr(scan_project, "updated_at", None) if scan_project else None
+
+                precomputed_bc = None
+                if scan_project:
+                    try:
+                        from app.services.business_criticality_service import BusinessCriticalityService
+                        srv = BusinessCriticalityService(db)
+                        precomputed_bc = srv.get_project_business_criticality(scan_project.id)
+                    except Exception:
+                        precomputed_bc = None
+
+                from app.qars.service import evaluate_artifact_qars
+                from app.context.effective_context import resolve_effective_artifact_context
+                from app.engines.z_engine import ZEngine
+                from app.engines.y_engine import YEngine
+
+                z_engine = ZEngine()
+                user_y_scen = getattr(scan_project, "user_y_scenario", None) if scan_project else None
+                y_res = YEngine().evaluate_y(user_scenario=user_y_scen)
+                eff_y = float(y_res["value"])
+                eff_y_scen = str(y_res["scenario"])
+
+                computed_payloads = []
+                for asset in created_assets:
+                    if precomputed_bc is not None:
+                        eff_ctx = resolve_effective_artifact_context(asset, scan_project, db, precomputed_business_context=precomputed_bc)
+                    else:
+                        eff_ctx = resolve_effective_artifact_context(asset, scan_project, db)
+
+                    comp_dict = {
+                        "id": asset.id,
+                        "algorithm_name": asset.algorithm_name,
+                        "primitive": asset.algorithm_name,
+                        "purpose": asset.purpose.value if hasattr(asset.purpose, "value") else str(asset.purpose),
+                        "asset_type": asset.asset_type.value if hasattr(asset.asset_type, "value") else str(asset.asset_type),
+                        "location": asset.location,
+                        "key_size": getattr(asset, "key_size", None)
+                    }
+                    z_res = z_engine.evaluate_component(comp_dict)
+
+                    qars_dict = None
+                    try:
+                        qars_res = evaluate_artifact_qars(asset, scan_project, db, precomputed_business_context=precomputed_bc)
+                        qars_dict = qars_res.to_dict() if hasattr(qars_res, "to_dict") else (qars_res.dict() if hasattr(qars_res, "dict") else (qars_res.model_dump(mode="json") if hasattr(qars_res, "model_dump") else qars_res))
+                    except Exception as qars_err:
+                        logger.warning(f"Scan {scan_id}: QARS precomputation warning for asset {asset.id}: {qars_err}")
+
+                    computed_payloads.append((asset.id, eff_ctx, z_res, qars_dict))
+
+                # RACE PROTECTION: Check if project context changed during calculation
+                db.expire_all()
+                fresh_project = db.query(Project).filter(Project.id == project_id).first() if project_id else None
+                current_project_updated_at = getattr(fresh_project, "updated_at", None) if fresh_project else None
+
+                if start_project_updated_at and current_project_updated_at and current_project_updated_at > start_project_updated_at:
+                    logger.warning(f"Scan {scan_id}: Project context was updated during enrichment. Aborting stale precomputation write.")
+                else:
+                    for asset_id, eff_ctx, z_res, qars_dict in computed_payloads:
+                        updates = {
+                            "effective_context": eff_ctx,
+                            "effective_z": z_res,
+                            "effective_y": {"value": eff_y, "scenario": eff_y_scen}
+                        }
+                        if qars_dict:
+                            updates["qars_result"] = qars_dict
+                        asset_repo.update_extra_metadata(asset_id, updates)
+                    logger.info(f"Scan {scan_id}: Pre-computed QARS and effective context for {len(computed_payloads)} assets.")
+        except Exception as e:
+            logger.warning(f"Scan {scan_id}: Pre-computing QARS warning: {e}")
+
+        try:
+            asset_repo = AssetRepository(db)
+            created_assets = asset_repo.get_by_scan(scan_id)
+            if created_assets and project_id:
                 from app.migration.planner import MigrationPlanner
                 from app.repositories.migration_repository import MigrationRepository
                 mig_repo = MigrationRepository(db)
@@ -259,4 +335,5 @@ class ScanOrchestrator:
                     logger.info(f"Scan {scan_id}: Migration plan already exists for project {project_id}, skipping auto-creation.")
         except Exception as e:
             logger.warning(f"Scan {scan_id}: Pre-computing migration plan warning: {e}")
+
 

@@ -1,7 +1,11 @@
+import threading
 from typing import List, Optional
 from sqlalchemy.orm import Session, selectinload
 from app.models.db_models import CryptoAsset, Scan
 from app.models.enums import AssetType, CryptoPurpose, QuantumSafety, ReviewStatus, ScanStatus
+
+_extra_metadata_lock = threading.Lock()
+
 
 class AssetRepository:
     def __init__(self, db: Session):
@@ -143,3 +147,17 @@ class AssetRepository:
         self.db.commit()
         self.db.refresh(db_obj)
         return db_obj
+
+    def update_extra_metadata(self, asset_id: str, updates: dict) -> Optional[CryptoAsset]:
+        with _extra_metadata_lock:
+            db_obj = self.get(asset_id)
+            if not db_obj:
+                return None
+            self.db.refresh(db_obj, attribute_names=['extra_metadata'])
+            current = dict(db_obj.extra_metadata or {})
+            current.update(updates)
+            db_obj.extra_metadata = current
+            self.db.add(db_obj)
+            self.db.commit()
+            self.db.refresh(db_obj)
+            return db_obj

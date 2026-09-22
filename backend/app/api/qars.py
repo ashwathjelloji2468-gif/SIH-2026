@@ -6,7 +6,7 @@ from app.repositories.project_repository import ProjectRepository
 from app.repositories.asset_repository import AssetRepository
 from app.qars.service import evaluate_artifact_qars
 from app.qars.schemas import QARSProjectSummarySchema, QARSResponseSchema
-from app.qars.models import QARSValidationError
+from app.qars.models import QARSValidationError, QARSRuntimeResult
 
 router = APIRouter(tags=["QARS"])
 
@@ -38,8 +38,20 @@ def get_project_qars(
         except Exception:
             precomputed_bc = None
 
+    from app.qars.models import QARSRuntimeResult
+
     evaluated_assets = []
     for asset in assets:
+        extra = dict(getattr(asset, "extra_metadata", {}) or {}) if hasattr(asset, "extra_metadata") else (asset.get("extra_metadata", {}) if isinstance(asset, dict) else {})
+        cached_qars = extra.get("qars_result")
+        if cached_qars and isinstance(cached_qars, dict) and "level" in cached_qars:
+            try:
+                res = QARSRuntimeResult.model_validate(cached_qars)
+                evaluated_assets.append(res)
+                continue
+            except Exception:
+                pass
+
         try:
             res = evaluate_artifact_qars(asset, project, db, precomputed_business_context=precomputed_bc)
             evaluated_assets.append(res)
@@ -129,7 +141,15 @@ def get_asset_qars(project_id: str, asset_id: str, db: Session = Depends(get_db)
         )
 
     try:
-        qars_result = evaluate_artifact_qars(asset, project, db)
+        extra = dict(getattr(asset, "extra_metadata", {}) or {}) if hasattr(asset, "extra_metadata") else (asset.get("extra_metadata", {}) if isinstance(asset, dict) else {})
+        cached_qars = extra.get("qars_result")
+        if cached_qars and isinstance(cached_qars, dict) and "level" in cached_qars:
+            try:
+                qars_result = QARSRuntimeResult.model_validate(cached_qars)
+            except Exception:
+                qars_result = evaluate_artifact_qars(asset, project, db)
+        else:
+            qars_result = evaluate_artifact_qars(asset, project, db)
     except QARSValidationError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except HTTPException:

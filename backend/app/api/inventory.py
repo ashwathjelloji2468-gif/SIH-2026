@@ -40,30 +40,46 @@ def get_project_inventory(
         except Exception:
             precomputed_bc = None
 
-    user_y_scen = getattr(project, "user_y_scenario", None) if project else None
-    y_res = YEngine().evaluate_y(user_scenario=user_y_scen)
-
-    eff_y = float(y_res["value"])
-    eff_y_scen = str(y_res["scenario"])
-
-    z_engine = ZEngine()
+    y_res = None
+    z_engine = None
     results = []
-    for asset in assets:
-        if precomputed_bc is not None:
-            eff_ctx = resolve_effective_artifact_context(asset, project, db, precomputed_business_context=precomputed_bc)
-        else:
-            eff_ctx = resolve_effective_artifact_context(asset, project, db)
 
-        comp_dict = {
-            "id": asset.id,
-            "algorithm_name": asset.algorithm_name,
-            "primitive": asset.algorithm_name,
-            "purpose": asset.purpose.value if hasattr(asset.purpose, "value") else str(asset.purpose),
-            "asset_type": asset.asset_type.value if hasattr(asset.asset_type, "value") else str(asset.asset_type),
-            "location": asset.location,
-            "key_size": getattr(asset, "key_size", None)
-        }
-        z_res = z_engine.evaluate_component(comp_dict)
+    for asset in assets:
+        extra = dict(getattr(asset, "extra_metadata", {}) or {}) if hasattr(asset, "extra_metadata") else (asset.get("extra_metadata", {}) if isinstance(asset, dict) else {})
+        cached_eff_ctx = extra.get("effective_context")
+        cached_eff_z = extra.get("effective_z")
+        cached_eff_y = extra.get("effective_y")
+
+        if cached_eff_ctx and cached_eff_z and cached_eff_y and isinstance(cached_eff_ctx, dict) and isinstance(cached_eff_z, dict) and isinstance(cached_eff_y, dict):
+            eff_ctx = cached_eff_ctx
+            z_res = cached_eff_z
+            eff_y_val = float(cached_eff_y.get("value", 3.0))
+            eff_y_scen_val = str(cached_eff_y.get("scenario", "STANDARD"))
+        else:
+            if y_res is None:
+                user_y_scen = getattr(project, "user_y_scenario", None) if project else None
+                y_res = YEngine().evaluate_y(user_scenario=user_y_scen)
+            if z_engine is None:
+                z_engine = ZEngine()
+
+            eff_y_val = float(y_res["value"])
+            eff_y_scen_val = str(y_res["scenario"])
+
+            if precomputed_bc is not None:
+                eff_ctx = resolve_effective_artifact_context(asset, project, db, precomputed_business_context=precomputed_bc)
+            else:
+                eff_ctx = resolve_effective_artifact_context(asset, project, db)
+
+            comp_dict = {
+                "id": asset.id,
+                "algorithm_name": asset.algorithm_name,
+                "primitive": asset.algorithm_name,
+                "purpose": asset.purpose.value if hasattr(asset.purpose, "value") else str(asset.purpose),
+                "asset_type": asset.asset_type.value if hasattr(asset.asset_type, "value") else str(asset.asset_type),
+                "location": asset.location,
+                "key_size": getattr(asset, "key_size", None)
+            }
+            z_res = z_engine.evaluate_component(comp_dict)
 
         asset_dto = CryptoAssetResponse.model_validate(asset).model_dump()
         asset_dto.update({
@@ -75,8 +91,8 @@ def get_project_inventory(
             "effective_operational_impact": eff_ctx["operational_impact"],
             "effective_exposure": eff_ctx["exposure"],
             "effective_context_sources": eff_ctx["sources"],
-            "effective_y_years": eff_y,
-            "effective_y_scenario": eff_y_scen,
+            "effective_y_years": eff_y_val,
+            "effective_y_scenario": eff_y_scen_val,
             "effective_z_value": z_res.get("z_value"),
             "effective_z_planning_horizon_years": z_res.get("z_planning_horizon_years"),
             "effective_z_target_year": z_res.get("z_target_year"),

@@ -209,6 +209,8 @@ class BusinessCriticalityService:
             asset.extra_metadata = extra
             self.db.add(asset)
 
+        from app.context.invalidation import invalidate_project_precomputed_data
+        invalidate_project_precomputed_data(project_id, self.db)
         self.db.commit()
 
         # Re-assess risk for project assets using updated effective criticality

@@ -95,6 +95,9 @@ def update_project_x_context(project_id: str, body: XContextUpdateRequest, db: S
         clear_user_x=body.clear_user_x
     )
 
+    from app.context.invalidation import invalidate_project_precomputed_data
+    invalidate_project_precomputed_data(project_id, db)
+
     scan_repo = ScanRepository(db)
     scans = scan_repo.get_by_project(project_id)
     latest_scan = scans[-1] if scans else None

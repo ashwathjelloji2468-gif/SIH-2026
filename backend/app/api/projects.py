@@ -49,6 +49,9 @@ def update_project(project_id: str, project_in: ProjectUpdate, db: Session = Dep
             }
         )
 
+    if proj:
+        from app.context.invalidation import invalidate_project_precomputed_data
+        invalidate_project_precomputed_data(project_id, db)
     return proj
 
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)

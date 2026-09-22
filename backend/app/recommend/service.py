@@ -98,7 +98,7 @@ class RecommendationService:
             rec_eval["asset_name"] = asset.name
             return rec_eval
 
-    def recommend_project(self, project_id: str, force_regeneration: bool = True, profile: Optional[str] = None) -> List[Dict[str, Any]]:
+    def recommend_project(self, project_id: str, force_regeneration: bool = False, profile: Optional[str] = None) -> List[Dict[str, Any]]:
         if not self.asset_repo:
             raise RuntimeError("Database repository unavailable.")
         assets = self.asset_repo.get_by_project(project_id)

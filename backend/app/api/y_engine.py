@@ -52,6 +52,9 @@ def update_project_y_context(project_id: str, body: YContextUpdateRequest, db: S
         clear_user_y=body.clear_user_y
     )
 
+    from app.context.invalidation import invalidate_project_precomputed_data
+    invalidate_project_precomputed_data(project_id, db)
+
     engine = YEngine()
     y_result = engine.evaluate_y(user_scenario=updated_project.user_y_scenario)
 
