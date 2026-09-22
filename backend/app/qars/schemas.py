@@ -35,11 +35,10 @@ class QARSProjectSummarySchema(BaseModel):
     Ready for GET /projects/{project_id}/qars
     """
     project_id: str
-    total_assets_evaluated: int
-    highest_qars_score: float
-    average_qars_score: float
-    severity_breakdown: Dict[str, int]
-    assets: List[QARSAssetSummarySchema] = Field(default_factory=list)
+    project_name: str = "Project"
+    asset_count: int
+    summary: Dict[str, Any]
+    assets: List[Any] = Field(default_factory=list)
 
 
 class QARSResponseSchema(BaseModel):

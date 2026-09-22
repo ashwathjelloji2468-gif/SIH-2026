@@ -1,0 +1,131 @@
+from typing import Dict, Any, List
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from app.core.database import get_db
+from app.repositories.project_repository import ProjectRepository
+from app.repositories.asset_repository import AssetRepository
+from app.qars.service import evaluate_artifact_qars
+from app.qars.schemas import QARSProjectSummarySchema, QARSResponseSchema
+from app.qars.models import QARSValidationError
+
+router = APIRouter(tags=["QARS"])
+
+
+@router.get("/projects/{project_id}/qars", response_model=QARSProjectSummarySchema)
+def get_project_qars(project_id: str, db: Session = Depends(get_db)):
+    """
+    Evaluates artifact-level QARS across all assets in a project scope and returns structured summary metrics.
+    """
+    proj_repo = ProjectRepository(db)
+    project = proj_repo.get(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found")
+
+    asset_repo = AssetRepository(db)
+    assets = asset_repo.get_by_project(project_id)
+
+    evaluated_assets = []
+    for asset in assets:
+        try:
+            res = evaluate_artifact_qars(asset, project, db)
+            evaluated_assets.append(res)
+        except QARSValidationError as e:
+            raise HTTPException(status_code=422, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    asset_count = len(evaluated_assets)
+    project_name = getattr(project, "name", "Project") or "Project"
+
+    if asset_count == 0:
+        summary: Dict[str, Any] = {
+            "qars_average": None,
+            "qars_max": None,
+            "qars_min": None,
+            "critical_count": 0,
+            "high_count": 0,
+            "medium_count": 0,
+            "low_count": 0,
+            "unconfigured_count": 0,
+        }
+    else:
+        scores = [a.final_score for a in evaluated_assets]
+        summary = {
+            "qars_average": round(sum(scores) / asset_count, 2),
+            "qars_max": round(max(scores), 2),
+            "qars_min": round(min(scores), 2),
+            "critical_count": sum(
+                1 for a in evaluated_assets
+                if getattr(a.level, "value", str(a.level)) == "CRITICAL"
+            ),
+            "high_count": sum(
+                1 for a in evaluated_assets
+                if getattr(a.level, "value", str(a.level)) == "HIGH"
+            ),
+            "medium_count": sum(
+                1 for a in evaluated_assets
+                if getattr(a.level, "value", str(a.level)) == "MEDIUM"
+            ),
+            "low_count": sum(
+                1 for a in evaluated_assets
+                if getattr(a.level, "value", str(a.level)) == "LOW"
+            ),
+            "unconfigured_count": sum(
+                1 for a in evaluated_assets
+                if (
+                    getattr(a.level, "value", str(a.level)) == "UNCONFIGURED"
+                    or a.algorithm_risk is None
+                    or getattr(a.algorithm_risk, "calibration_status", None) == "UNCONFIGURED"
+                )
+            ),
+        }
+
+    return QARSProjectSummarySchema(
+        project_id=project_id,
+        project_name=project_name,
+        asset_count=asset_count,
+        summary=summary,
+        assets=evaluated_assets,
+    )
+
+
+@router.get("/projects/{project_id}/qars/assets/{asset_id}", response_model=QARSResponseSchema)
+def get_asset_qars(project_id: str, asset_id: str, db: Session = Depends(get_db)):
+    """
+    Evaluates QARS for a specific asset within a project. Returns HTTP 404 if asset belongs to another project.
+    """
+    proj_repo = ProjectRepository(db)
+    project = proj_repo.get(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found")
+
+    asset_repo = AssetRepository(db)
+    asset = asset_repo.get(asset_id)
+    if not asset:
+        raise HTTPException(status_code=404, detail=f"Asset '{asset_id}' not found")
+
+    # Confirm asset belongs to requested project
+    asset_proj_id = (
+        getattr(asset, "project_id", None)
+        or (asset.scan.project_id if hasattr(asset, "scan") and asset.scan else None)
+    )
+    if str(asset_proj_id) != str(project_id):
+        raise HTTPException(
+            status_code=404,
+            detail=f"Asset '{asset_id}' not found in project '{project_id}'"
+        )
+
+    try:
+        qars_result = evaluate_artifact_qars(asset, project, db)
+    except QARSValidationError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return QARSResponseSchema(
+        status="SUCCESS",
+        data=qars_result,
+        message="Asset QARS evaluation completed successfully."
+    )

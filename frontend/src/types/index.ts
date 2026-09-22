@@ -618,3 +618,172 @@ export interface TopBlastRadiusSummary {
   }>;
 }
 
+// ============================================================================
+// QARS (Quantum-Aware Risk Scoring) Subsystem Types
+// ============================================================================
+
+export type QARSLevel = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'UNCONFIGURED';
+
+export type QARSStatus =
+  | 'CONFIGURED'
+  | 'PARTIALLY_CONFIGURED'
+  | 'UNCONFIGURED'
+  | 'INACTIVE'
+  | 'POINT_ESTIMATE_ONLY';
+
+export interface QARSCore {
+  x_years: number;
+  y_years: number;
+  z_years: number;
+  data_sensitivity: number;
+  exposure: number;
+}
+
+export interface QARSAlgorithmRisk {
+  algorithm: string;
+  canonical_algorithm: string;
+  attack_family: string;
+  vulnerability_factor?: number | null;
+  security_strength_factor?: number | null;
+  aqr_score?: number | null;
+  calibration_status: QARSStatus | string;
+  confidence: string;
+  quantum_attack: string;
+  explanation: string;
+  security_objectives?: string[];
+  calibration_version?: string | null;
+  calibration_source?: string | null;
+  calibration_methodology?: string | null;
+  calibration_confidence?: string | null;
+}
+
+export interface QARSAvailability {
+  score: number;
+  raw_rating: number;
+  provenance: string;
+  status: QARSStatus | string;
+  missing_factors?: string[];
+  evidence?: Record<string, any>;
+  explanation: string;
+  availability_score?: number | null;
+}
+
+export interface QARSCryptoAgility {
+  status: QARSStatus | string;
+  factors?: Record<string, any>;
+  provenance?: Record<string, string>;
+  missing_factors?: string[];
+  hard_coded_algorithm_ratio?: number | null;
+  hard_coded_algorithm_ratio_status?: QARSStatus | string;
+  hard_coded_algorithm_ratio_confidence?: number | null;
+  crypto_abstraction_layer_presence?: boolean | null;
+  crypto_abstraction_layer_status?: QARSStatus | string;
+  crypto_abstraction_layer_confidence?: number | null;
+  replaceable_library_interface_count?: number | null;
+  replaceable_library_interface_status?: QARSStatus | string;
+  replaceable_library_interface_confidence?: number | null;
+  evidence_files?: string[];
+  agility_score?: number | null;
+  car_score?: number | null;
+  calibration_version?: string;
+}
+
+export interface QARSMigrationComplexity {
+  score?: number | null;
+  status: QARSStatus | string;
+  factors?: Record<string, any>;
+  provenance?: Record<string, string>;
+  missing_factors?: string[];
+  contributing_factors?: Record<string, number>;
+  confidence?: string;
+  calibration_version?: string;
+  explanation?: string;
+}
+
+export interface QARSZUncertainty {
+  z_low?: number | null;
+  z_central: number;
+  z_high?: number | null;
+  confidence: string;
+  status: 'POINT_ESTIMATE_ONLY' | QARSStatus | string;
+  source: string;
+  explanation: string;
+}
+
+export interface QARSAdjustment {
+  [key: string]: number;
+}
+
+export interface QARSProvenance {
+  x_source: string;
+  y_source: string;
+  z_source: string;
+  s_source: string;
+  e_source: string;
+}
+
+export interface QARSExplanation {
+  x_years: number;
+  y_years: number;
+  z_years: number;
+  data_sensitivity: number;
+  exposure: number;
+  sensitivity_normalized: number;
+  exposure_normalized: number;
+  timeline_pressure: number;
+  core_score: number;
+  active_adjustments: Record<string, number>;
+  final_score: number;
+  severity_level: QARSLevel | string;
+  algorithm_risk?: QARSAlgorithmRisk | null;
+  security_objectives?: string[] | null;
+  availability?: QARSAvailability | null;
+  crypto_agility_evidence?: QARSCryptoAgility | null;
+  migration_complexity?: QARSMigrationComplexity | null;
+  z_uncertainty?: QARSZUncertainty | null;
+}
+
+export interface QARSAssetResult {
+  asset_id: string;
+  project_id?: string | null;
+  scan_id?: string | null;
+  provenance: QARSProvenance;
+  core_input: QARSCore;
+  base_score: number;
+  adjustments: Record<string, number>;
+  final_score: number;
+  level: QARSLevel | string;
+  explanation: QARSExplanation;
+  algorithm_risk?: QARSAlgorithmRisk | null;
+  availability?: QARSAvailability | null;
+  crypto_agility_evidence?: QARSCryptoAgility | null;
+  migration_complexity?: QARSMigrationComplexity | null;
+  z_uncertainty?: QARSZUncertainty | null;
+}
+
+export interface QARSProjectSummary {
+  qars_average?: number | null;
+  qars_max?: number | null;
+  qars_min?: number | null;
+  critical_count: number;
+  high_count: number;
+  medium_count: number;
+  low_count: number;
+  unconfigured_count: number;
+}
+
+export interface QARSProjectResult {
+  project_id: string;
+  project_name: string;
+  asset_count: number;
+  summary: QARSProjectSummary;
+  assets: QARSAssetResult[];
+}
+
+export interface QARSAssetResponseWrapper {
+  status: string;
+  data: QARSAssetResult;
+  message: string;
+}
+
+

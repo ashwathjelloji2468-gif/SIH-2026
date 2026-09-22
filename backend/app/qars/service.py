@@ -153,8 +153,10 @@ def evaluate_artifact_qars(
 
     # 6. Evaluate Phase 2 Algorithm Risk if algorithm present
     alg_name = (
-        getattr(asset, "algorithm", None)
+        getattr(asset, "algorithm_name", None)
+        or getattr(asset, "algorithm", None)
         or getattr(asset, "algorithm_type", None)
+        or (asset.get("algorithm_name") if isinstance(asset, dict) else None)
         or (asset.get("algorithm") if isinstance(asset, dict) else None)
         or (asset.get("algorithm_type") if isinstance(asset, dict) else None)
     )

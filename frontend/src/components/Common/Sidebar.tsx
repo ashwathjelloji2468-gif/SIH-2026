@@ -33,6 +33,7 @@ export const Sidebar: React.FC = () => {
       title: 'Risk & Threat Science',
       items: [
         { name: 'Risk & Mosca Theorem', path: '/risk', icon: ShieldAlert },
+        { name: 'QARS Scoring', path: '/qars', icon: Binary },
       ],
     },
     {

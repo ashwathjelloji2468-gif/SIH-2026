@@ -16,6 +16,7 @@ import { Recommendations } from './pages/Recommendations';
 import { Reports } from './pages/Reports';
 import { BusinessCriticality } from './pages/BusinessCriticality';
 import { Settings } from './pages/Settings';
+import { QARS } from './pages/QARS';
 
 /** Internal app layout with Navbar + Sidebar */
 const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -62,6 +63,7 @@ export const App: React.FC = () => {
           <Route path="/scan" element={<AppLayout><Scan /></AppLayout>} />
           <Route path="/inventory" element={<AppLayout><Inventory /></AppLayout>} />
           <Route path="/risk" element={<AppLayout><Risk /></AppLayout>} />
+          <Route path="/qars" element={<AppLayout><QARS /></AppLayout>} />
           <Route path="/recommendations" element={<AppLayout><Recommendations /></AppLayout>} />
           <Route path="/migration" element={<AppLayout><Migration /></AppLayout>} />
           <Route path="/reports" element={<AppLayout><Reports /></AppLayout>} />
