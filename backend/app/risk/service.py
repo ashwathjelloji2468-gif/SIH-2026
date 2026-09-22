@@ -120,9 +120,21 @@ class RiskService:
         if user_y_scenario is None and project:
             user_y_scenario = getattr(project, "user_y_scenario", None)
 
+        precomputed_bc = None
+        if project and self.db:
+            try:
+                from app.services.business_criticality_service import BusinessCriticalityService
+                srv = BusinessCriticalityService(self.db)
+                precomputed_bc = srv.get_project_business_criticality(project.id)
+            except Exception:
+                precomputed_bc = None
+
         to_eval = []
         for asset in assets:
-            eff_ctx = resolve_effective_artifact_context(asset, project, self.db)
+            if precomputed_bc is not None:
+                eff_ctx = resolve_effective_artifact_context(asset, project, self.db, precomputed_business_context=precomputed_bc)
+            else:
+                eff_ctx = resolve_effective_artifact_context(asset, project, self.db)
             ds_label = str(eff_ctx["data_sensitivity"]) if data_sensitivity_label == "UNKNOWN" else data_sensitivity_label
             bc_label = eff_ctx["business_criticality"] if business_criticality_label == "UNKNOWN" else business_criticality_label
             eff_x_val = eff_ctx["x_years"]

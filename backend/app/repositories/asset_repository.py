@@ -1,7 +1,7 @@
 from typing import List, Optional
-from sqlalchemy.orm import Session, joinedload
-from app.models.db_models import CryptoAsset
-from app.models.enums import AssetType, CryptoPurpose, QuantumSafety, ReviewStatus
+from sqlalchemy.orm import Session, selectinload
+from app.models.db_models import CryptoAsset, Scan
+from app.models.enums import AssetType, CryptoPurpose, QuantumSafety, ReviewStatus, ScanStatus
 
 class AssetRepository:
     def __init__(self, db: Session):
@@ -45,21 +45,87 @@ class AssetRepository:
         return db_obj
 
     def get(self, asset_id: str) -> Optional[CryptoAsset]:
-        return self.db.query(CryptoAsset).options(joinedload(CryptoAsset.evidence_items)).filter(CryptoAsset.id == asset_id).first()
+        return self.db.query(CryptoAsset).options(selectinload(CryptoAsset.evidence_items)).filter(CryptoAsset.id == asset_id).first()
 
     def get_by_scan(self, scan_id: str) -> List[CryptoAsset]:
-        return self.db.query(CryptoAsset).options(joinedload(CryptoAsset.evidence_items)).filter(CryptoAsset.scan_id == scan_id).all()
+        return self.db.query(CryptoAsset).options(selectinload(CryptoAsset.evidence_items)).filter(CryptoAsset.scan_id == scan_id).all()
 
-    def get_by_project(self, project_id: str) -> List[CryptoAsset]:
-        return self.db.query(CryptoAsset).options(joinedload(CryptoAsset.evidence_items)).join(CryptoAsset.scan).filter(CryptoAsset.scan.has(project_id=project_id)).all()
+    def get_by_project(self, project_id: str, scan_id: Optional[str] = None, latest_only: bool = True) -> List[CryptoAsset]:
+        if scan_id:
+            return (
+                self.db.query(CryptoAsset)
+                .options(selectinload(CryptoAsset.evidence_items))
+                .join(Scan, CryptoAsset.scan_id == Scan.id)
+                .filter(CryptoAsset.scan_id == scan_id, Scan.project_id == project_id)
+                .all()
+            )
+        if latest_only:
+            latest_scan = (
+                self.db.query(Scan)
+                .filter(Scan.project_id == project_id, Scan.status == ScanStatus.COMPLETED)
+                .order_by(Scan.created_at.desc())
+                .first()
+            )
+            if not latest_scan:
+                return []
+            return (
+                self.db.query(CryptoAsset)
+                .options(selectinload(CryptoAsset.evidence_items))
+                .filter(CryptoAsset.scan_id == latest_scan.id)
+                .all()
+            )
+        return (
+            self.db.query(CryptoAsset)
+            .options(selectinload(CryptoAsset.evidence_items))
+            .join(Scan, CryptoAsset.scan_id == Scan.id)
+            .filter(Scan.project_id == project_id)
+            .all()
+        )
 
-
-    def get_unknowns_by_project(self, project_id: str) -> List[CryptoAsset]:
-        return self.db.query(CryptoAsset).join(CryptoAsset.scan).filter(
-            CryptoAsset.scan.has(project_id=project_id),
-            CryptoAsset.is_unknown == True,
-            CryptoAsset.review_status == ReviewStatus.PENDING_REVIEW
-        ).all()
+    def get_unknowns_by_project(self, project_id: str, scan_id: Optional[str] = None, latest_only: bool = True) -> List[CryptoAsset]:
+        if scan_id:
+            return (
+                self.db.query(CryptoAsset)
+                .options(selectinload(CryptoAsset.evidence_items))
+                .join(Scan, CryptoAsset.scan_id == Scan.id)
+                .filter(
+                    CryptoAsset.scan_id == scan_id,
+                    Scan.project_id == project_id,
+                    CryptoAsset.is_unknown == True,
+                    CryptoAsset.review_status == ReviewStatus.PENDING_REVIEW
+                )
+                .all()
+            )
+        if latest_only:
+            latest_scan = (
+                self.db.query(Scan)
+                .filter(Scan.project_id == project_id, Scan.status == ScanStatus.COMPLETED)
+                .order_by(Scan.created_at.desc())
+                .first()
+            )
+            if not latest_scan:
+                return []
+            return (
+                self.db.query(CryptoAsset)
+                .options(selectinload(CryptoAsset.evidence_items))
+                .filter(
+                    CryptoAsset.scan_id == latest_scan.id,
+                    CryptoAsset.is_unknown == True,
+                    CryptoAsset.review_status == ReviewStatus.PENDING_REVIEW
+                )
+                .all()
+            )
+        return (
+            self.db.query(CryptoAsset)
+            .options(selectinload(CryptoAsset.evidence_items))
+            .join(Scan, CryptoAsset.scan_id == Scan.id)
+            .filter(
+                Scan.project_id == project_id,
+                CryptoAsset.is_unknown == True,
+                CryptoAsset.review_status == ReviewStatus.PENDING_REVIEW
+            )
+            .all()
+        )
 
     def review_asset(self, asset_id: str, algorithm_name: Optional[str] = None, purpose: Optional[CryptoPurpose] = None, action: str = "RESOLVE") -> Optional[CryptoAsset]:
         db_obj = self.get(asset_id)

@@ -3,7 +3,12 @@ from typing import Dict, Any, Optional
 from app.engines.x_engine import XEngine
 from app.services.business_criticality_service import DEFAULT_RATINGS
 
-def resolve_effective_artifact_context(asset: Any, project: Optional[Any] = None, db: Optional[Any] = None) -> Dict[str, Any]:
+def resolve_effective_artifact_context(
+    asset: Any,
+    project: Optional[Any] = None,
+    db: Optional[Any] = None,
+    precomputed_business_context: Optional[Any] = None
+) -> Dict[str, Any]:
     """
     Canonical Context Resolver for Cryptographic Artifacts.
     
@@ -38,6 +43,18 @@ def resolve_effective_artifact_context(asset: Any, project: Optional[Any] = None
     if bctx.get("user_override") in ["LOW", "MEDIUM", "HIGH", "CRITICAL"]:
         app_bus_crit = bctx.get("user_override")
         bus_crit_source = "USER_OVERRIDE"
+    elif precomputed_business_context is not None:
+        if isinstance(precomputed_business_context, dict):
+            app_bus_crit = (
+                precomputed_business_context.get("effective_criticality")
+                or precomputed_business_context.get("user_override")
+                or getattr(asset, "business_criticality_label", None)
+                or "UNKNOWN"
+            )
+        elif isinstance(precomputed_business_context, str):
+            app_bus_crit = precomputed_business_context
+        else:
+            app_bus_crit = getattr(asset, "business_criticality_label", None) or "UNKNOWN"
     elif project and db:
         try:
             from app.services.business_criticality_service import BusinessCriticalityService

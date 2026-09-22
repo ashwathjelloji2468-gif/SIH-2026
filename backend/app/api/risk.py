@@ -31,11 +31,36 @@ def list_risk_assessments(
         minimum_score=minimum_score
     )
     
-    asset_repo = AssetRepository(db)
+    if not records:
+        return []
+
+    asset_ids = list({ra.asset_id for ra in records if ra.asset_id})
+
+    from app.models.db_models import CryptoAsset, ThreatScenario
+    from sqlalchemy.orm import selectinload
+
+    assets_list = (
+        db.query(CryptoAsset)
+        .options(selectinload(CryptoAsset.evidence_items))
+        .filter(CryptoAsset.id.in_(asset_ids))
+        .all()
+    ) if asset_ids else []
+    asset_map = {a.id: a for a in assets_list}
+
+    threats_list = (
+        db.query(ThreatScenario)
+        .filter(ThreatScenario.asset_id.in_(asset_ids))
+        .all()
+    ) if asset_ids else []
+
+    threats_map: Dict[str, List[ThreatScenario]] = {}
+    for t in threats_list:
+        threats_map.setdefault(t.asset_id, []).append(t)
+
     results = []
     for ra in records:
-        asset = asset_repo.get(ra.asset_id)
-        threats = service.risk_repo.get_threat_scenarios_for_asset(ra.asset_id)
+        asset = asset_map.get(ra.asset_id)
+        threats = threats_map.get(ra.asset_id, [])
         results.append(service._assessment_to_dict(ra, asset, threats))
 
     return results

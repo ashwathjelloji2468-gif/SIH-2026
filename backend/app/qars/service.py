@@ -25,6 +25,7 @@ def evaluate_artifact_qars(
     db: Optional[Any] = None,
     config: Optional[QARSConfig] = None,
     provider: Optional[ComponentProvider] = None,
+    precomputed_business_context: Optional[Any] = None,
 ) -> QARSRuntimeResult:
     """
     Orchestration service connecting QARS Core & Policy engine to real SENTRIQ runtime context.
@@ -57,7 +58,12 @@ def evaluate_artifact_qars(
     )
 
     # 2. Resolve Effective Artifact Context (X, S, E)
-    eff_ctx = resolve_effective_artifact_context(asset, project, db)
+    if precomputed_business_context is not None:
+        eff_ctx = resolve_effective_artifact_context(
+            asset, project, db, precomputed_business_context=precomputed_business_context
+        )
+    else:
+        eff_ctx = resolve_effective_artifact_context(asset, project, db)
 
     raw_x = eff_ctx.get("x_years")
     if raw_x is None or not isinstance(raw_x, (int, float)) or raw_x <= 0:

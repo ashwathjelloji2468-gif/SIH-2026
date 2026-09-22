@@ -1,5 +1,5 @@
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.repositories.asset_repository import AssetRepository
@@ -13,9 +13,14 @@ from app.models.schemas import (
 router = APIRouter(tags=["Inventory"])
 
 @router.get("/projects/{project_id}/inventory", response_model=List[InventoryAssetResponse])
-def get_project_inventory(project_id: str, db: Session = Depends(get_db)):
+def get_project_inventory(
+    project_id: str,
+    scan_id: Optional[str] = None,
+    latest_only: bool = True,
+    db: Session = Depends(get_db)
+):
     repo = AssetRepository(db)
-    assets = repo.get_by_project(project_id)
+    assets = repo.get_by_project(project_id, scan_id=scan_id, latest_only=latest_only)
     if not assets:
         return []
 
@@ -23,8 +28,17 @@ def get_project_inventory(project_id: str, db: Session = Depends(get_db)):
     from app.engines.y_engine import YEngine
     from app.engines.z_engine import ZEngine
     from app.context.effective_context import resolve_effective_artifact_context
+    from app.services.business_criticality_service import BusinessCriticalityService
 
     project = db.query(Project).filter(Project.id == project_id).first() if db else None
+
+    precomputed_bc = None
+    if project and db:
+        try:
+            srv = BusinessCriticalityService(db)
+            precomputed_bc = srv.get_project_business_criticality(project.id)
+        except Exception:
+            precomputed_bc = None
 
     user_y_scen = getattr(project, "user_y_scenario", None) if project else None
     y_res = YEngine().evaluate_y(user_scenario=user_y_scen)
@@ -35,7 +49,10 @@ def get_project_inventory(project_id: str, db: Session = Depends(get_db)):
     z_engine = ZEngine()
     results = []
     for asset in assets:
-        eff_ctx = resolve_effective_artifact_context(asset, project, db)
+        if precomputed_bc is not None:
+            eff_ctx = resolve_effective_artifact_context(asset, project, db, precomputed_business_context=precomputed_bc)
+        else:
+            eff_ctx = resolve_effective_artifact_context(asset, project, db)
 
         comp_dict = {
             "id": asset.id,
@@ -70,16 +87,26 @@ def get_project_inventory(project_id: str, db: Session = Depends(get_db)):
     return results
 
 @router.get("/projects/{project_id}/coverage", response_model=CoverageReportResponse)
-def get_project_coverage(project_id: str, db: Session = Depends(get_db)):
+def get_project_coverage(
+    project_id: str,
+    scan_id: Optional[str] = None,
+    latest_only: bool = True,
+    db: Session = Depends(get_db)
+):
     repo = AssetRepository(db)
-    assets = repo.get_by_project(project_id)
+    assets = repo.get_by_project(project_id, scan_id=scan_id, latest_only=latest_only)
     engine = CoverageEngine()
     return engine.calculate_project_coverage(project_id, assets)
 
 @router.get("/projects/{project_id}/unknowns", response_model=List[CryptoAssetResponse])
-def get_project_unknowns(project_id: str, db: Session = Depends(get_db)):
+def get_project_unknowns(
+    project_id: str,
+    scan_id: Optional[str] = None,
+    latest_only: bool = True,
+    db: Session = Depends(get_db)
+):
     repo = AssetRepository(db)
-    return repo.get_unknowns_by_project(project_id)
+    return repo.get_unknowns_by_project(project_id, scan_id=scan_id, latest_only=latest_only)
 
 @router.post("/assets/{asset_id}/review", response_model=CryptoAssetResponse)
 def review_unknown_asset(asset_id: str, req: ReviewAssetRequest, db: Session = Depends(get_db)):

@@ -1,5 +1,5 @@
-from typing import Dict, Any, List
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Dict, Any, List, Optional
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.repositories.project_repository import ProjectRepository
@@ -12,7 +12,12 @@ router = APIRouter(tags=["QARS"])
 
 
 @router.get("/projects/{project_id}/qars", response_model=QARSProjectSummarySchema)
-def get_project_qars(project_id: str, db: Session = Depends(get_db)):
+def get_project_qars(
+    project_id: str,
+    scan_id: Optional[str] = None,
+    latest_only: bool = True,
+    db: Session = Depends(get_db)
+):
     """
     Evaluates artifact-level QARS across all assets in a project scope and returns structured summary metrics.
     """
@@ -22,12 +27,21 @@ def get_project_qars(project_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found")
 
     asset_repo = AssetRepository(db)
-    assets = asset_repo.get_by_project(project_id)
+    assets = asset_repo.get_by_project(project_id, scan_id=scan_id, latest_only=latest_only)
+
+    precomputed_bc = None
+    if project and db:
+        try:
+            from app.services.business_criticality_service import BusinessCriticalityService
+            srv = BusinessCriticalityService(db)
+            precomputed_bc = srv.get_project_business_criticality(project.id)
+        except Exception:
+            precomputed_bc = None
 
     evaluated_assets = []
     for asset in assets:
         try:
-            res = evaluate_artifact_qars(asset, project, db)
+            res = evaluate_artifact_qars(asset, project, db, precomputed_business_context=precomputed_bc)
             evaluated_assets.append(res)
         except QARSValidationError as e:
             raise HTTPException(status_code=422, detail=str(e))

@@ -47,7 +47,8 @@ def list_all_migration_plans(project_id: Optional[str] = Query(None), db: Sessio
     if project_id:
         plans = repo.get_plans_by_project(project_id)
     else:
-        plans = db.query(MigrationPlan).order_by(MigrationPlan.created_at.desc()).all()
+        from sqlalchemy.orm import selectinload
+        plans = db.query(MigrationPlan).options(selectinload(MigrationPlan.tasks)).order_by(MigrationPlan.created_at.desc()).all()
     return plans
 
 @router.get("/migration/summary")
@@ -57,9 +58,10 @@ def get_migration_summary(project_id: Optional[str] = Query(None), db: Session =
 
     if project_id:
         plans = repo.get_plans_by_project(project_id)
-        assets = asset_repo.get_by_project(project_id)
+        assets = asset_repo.get_by_project(project_id, latest_only=True)
     else:
-        plans = db.query(MigrationPlan).all()
+        from sqlalchemy.orm import selectinload
+        plans = db.query(MigrationPlan).options(selectinload(MigrationPlan.tasks)).all()
         assets = db.query(CryptoAsset).all()
 
     total_plans = len(plans)

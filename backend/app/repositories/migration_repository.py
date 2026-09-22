@@ -1,5 +1,5 @@
 from typing import List, Optional, Dict, Any
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import desc
 from app.models.db_models import MigrationPlan, MigrationTask, ValidationRun
 from app.models.enums import ValidationStatus
@@ -35,10 +35,10 @@ class MigrationRepository:
         return db_obj
 
     def get_plan(self, plan_id: str) -> Optional[MigrationPlan]:
-        return self.db.query(MigrationPlan).filter(MigrationPlan.id == plan_id).first()
+        return self.db.query(MigrationPlan).options(selectinload(MigrationPlan.tasks)).filter(MigrationPlan.id == plan_id).first()
 
     def get_plans_by_project(self, project_id: str) -> List[MigrationPlan]:
-        return self.db.query(MigrationPlan).filter(MigrationPlan.project_id == project_id).order_by(desc(MigrationPlan.created_at)).all()
+        return self.db.query(MigrationPlan).options(selectinload(MigrationPlan.tasks)).filter(MigrationPlan.project_id == project_id).order_by(desc(MigrationPlan.created_at)).all()
 
     def get_tasks_for_asset(self, asset_id: str) -> List[MigrationTask]:
         return self.db.query(MigrationTask).filter(MigrationTask.asset_id == asset_id).order_by(MigrationTask.sequence_order).all()
