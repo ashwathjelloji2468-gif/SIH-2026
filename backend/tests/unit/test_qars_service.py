@@ -214,13 +214,17 @@ def test_qars_service_missing_y_fails(monkeypatch):
     assert "y_years" in str(excinfo.value)
 
 
-def test_qars_service_missing_z_fails():
+def test_qars_service_missing_z_returns_unconfigured():
     aes_asset = create_mock_asset(algorithm_name="AES-256-GCM")
     project = create_mock_project()
 
-    with pytest.raises(QARSValidationError) as excinfo:
-        evaluate_artifact_qars(aes_asset, project)
-    assert "z_years" in str(excinfo.value)
+    res = evaluate_artifact_qars(aes_asset, project)
+    assert res.level == QARSLevel.UNCONFIGURED
+    assert res.final_score is None
+    assert res.base_score is None
+    assert "z_years" in getattr(res.explanation, "missing_evidence", res.explanation.get("missing_evidence") if isinstance(res.explanation, dict) else [])
+    assert res.z_uncertainty is not None
+    assert res.z_uncertainty.z_central is None
 
 
 def test_qars_service_missing_s_fails(monkeypatch):
@@ -250,11 +254,12 @@ def test_qars_service_missing_e_fails(monkeypatch):
 
 
 def test_qars_service_no_demo_values_substituted():
-    asset = create_mock_asset(algorithm_name="AES-256-GCM")
+    aes_asset = create_mock_asset(algorithm_name="AES-256-GCM")
     project = create_mock_project()
 
-    with pytest.raises(QARSValidationError):
-        evaluate_artifact_qars(asset, project)
+    res = evaluate_artifact_qars(aes_asset, project)
+    assert res.final_score is None
+    assert res.level == QARSLevel.UNCONFIGURED
 
 
 def test_qars_service_artifact_identity_preserved():

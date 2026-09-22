@@ -13,6 +13,13 @@ class Settings(BaseSettings):
 
     DATABASE_URL: str = "sqlite:///./ecdat.db"
 
+    DB_POOL_SIZE: int = 3
+    DB_MAX_OVERFLOW: int = 2
+    DB_POOL_TIMEOUT: int = 30
+    DB_POOL_RECYCLE: int = 1800
+
+    SCAN_MAX_WORKERS: int = 2
+
     STORAGE_PATH: str = "./data_storage"
     SANDBOX_PATH: str = "./sandbox_storage"
 

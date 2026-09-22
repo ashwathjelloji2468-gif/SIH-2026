@@ -7,6 +7,7 @@ class QARSLevel(str, Enum):
     MEDIUM = "MEDIUM"
     HIGH = "HIGH"
     CRITICAL = "CRITICAL"
+    UNCONFIGURED = "UNCONFIGURED"
 
 
 @dataclass

@@ -49,11 +49,11 @@ def get_project_qars(project_id: str, db: Session = Depends(get_db)):
             "unconfigured_count": 0,
         }
     else:
-        scores = [a.final_score for a in evaluated_assets]
+        valid_scores = [a.final_score for a in evaluated_assets if a.final_score is not None]
         summary = {
-            "qars_average": round(sum(scores) / asset_count, 2),
-            "qars_max": round(max(scores), 2),
-            "qars_min": round(min(scores), 2),
+            "qars_average": round(sum(valid_scores) / len(valid_scores), 2) if valid_scores else None,
+            "qars_max": round(max(valid_scores), 2) if valid_scores else None,
+            "qars_min": round(min(valid_scores), 2) if valid_scores else None,
             "critical_count": sum(
                 1 for a in evaluated_assets
                 if getattr(a.level, "value", str(a.level)) == "CRITICAL"
@@ -73,9 +73,8 @@ def get_project_qars(project_id: str, db: Session = Depends(get_db)):
             "unconfigured_count": sum(
                 1 for a in evaluated_assets
                 if (
-                    getattr(a.level, "value", str(a.level)) == "UNCONFIGURED"
-                    or a.algorithm_risk is None
-                    or getattr(a.algorithm_risk, "calibration_status", None) == "UNCONFIGURED"
+                    a.final_score is None
+                    or getattr(a.level, "value", str(a.level)) == "UNCONFIGURED"
                 )
             ),
         }

@@ -146,16 +146,18 @@ class QARSExplanation(BaseModel):
     """
     x_years: float
     y_years: float
-    z_years: float
+    z_years: Optional[float] = None
     data_sensitivity: float
     exposure: float
     sensitivity_normalized: float
     exposure_normalized: float
-    timeline_pressure: float
-    core_score: float
-    active_adjustments: Dict[str, float]
-    final_score: float
+    timeline_pressure: Optional[float] = None
+    core_score: Optional[float] = None
+    active_adjustments: Dict[str, float] = Field(default_factory=dict)
+    final_score: Optional[float] = None
     severity_level: str
+    missing_evidence: List[str] = Field(default_factory=list)
+    explanation_text: Optional[str] = None
     algorithm_risk: Optional[QARSAlgorithmRisk] = None
     security_objectives: Optional[List[str]] = None
     availability: Optional[QARSAvailability] = None
@@ -168,11 +170,11 @@ class QARSResult(BaseModel):
     """
     Final result returned by QARS Policy Engine.
     """
-    base_score: float
-    adjustments: Dict[str, float]
-    final_score: float
+    base_score: Optional[float] = None
+    adjustments: Dict[str, float] = Field(default_factory=dict)
+    final_score: Optional[float] = None
     level: QARSLevel
-    explanation: QARSExplanation
+    explanation: Union[QARSExplanation, Dict[str, Any]]
     algorithm_risk: Optional[QARSAlgorithmRisk] = None
     availability: Optional[QARSAvailability] = None
     crypto_agility_evidence: Optional[QARSCryptoAgilityEvidence] = None
@@ -199,12 +201,12 @@ class QARSRuntimeResult(BaseModel):
     project_id: Optional[str] = None
     scan_id: Optional[str] = None
     provenance: QARSProvenance
-    core_input: QARSCoreInput
-    base_score: float
-    adjustments: Dict[str, float]
-    final_score: float
+    core_input: Optional[QARSCoreInput] = None
+    base_score: Optional[float] = None
+    adjustments: Dict[str, float] = Field(default_factory=dict)
+    final_score: Optional[float] = None
     level: QARSLevel
-    explanation: QARSExplanation
+    explanation: Union[QARSExplanation, Dict[str, Any]]
     algorithm_risk: Optional[QARSAlgorithmRisk] = None
     availability: Optional[QARSAvailability] = None
     crypto_agility_evidence: Optional[QARSCryptoAgilityEvidence] = None

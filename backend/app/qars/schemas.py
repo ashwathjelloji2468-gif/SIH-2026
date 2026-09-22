@@ -11,17 +11,17 @@ class QARSAssetSummarySchema(BaseModel):
     asset_id: str
     project_id: Optional[str] = None
     scan_id: Optional[str] = None
-    qars_score: float = Field(..., description="Final bounded QARS score [0, 100]")
-    base_score: float = Field(..., description="QARS Core base score [0, 100]")
+    qars_score: Optional[float] = Field(None, description="Final bounded QARS score [0, 100]")
+    base_score: Optional[float] = Field(None, description="QARS Core base score [0, 100]")
     severity_level: QARSLevel
-    timeline_pressure: float
+    timeline_pressure: Optional[float] = None
     x_years: float
     y_years: float
-    z_years: float
+    z_years: Optional[float] = None
     data_sensitivity: float
     exposure: float
-    adjustments: Dict[str, float]
-    provenance: Dict[str, str]
+    adjustments: Dict[str, float] = Field(default_factory=dict)
+    provenance: Dict[str, str] = Field(default_factory=dict)
     algorithm_risk: Optional[Dict[str, Any]] = None
     availability: Optional[Dict[str, Any]] = None
     crypto_agility: Optional[Dict[str, Any]] = None

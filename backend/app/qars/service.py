@@ -11,7 +11,7 @@ from app.qars.models import (
 )
 from app.qars.core import compute_qars_core
 from app.qars.policy import QARSPolicyEngine, ComponentProvider
-from app.qars.config import QARSConfig
+from app.qars.config import QARSConfig, QARSLevel
 from app.qars.algorithm import evaluate_algorithm_risk
 from app.qars.availability import evaluate_availability
 from app.qars.agility import collect_crypto_agility_evidence
@@ -131,15 +131,89 @@ def evaluate_artifact_qars(
     if raw_z is None:
         raw_z = z_res.get("value_years_remaining")
 
+    z_uncert = evaluate_z_uncertainty(z_res)
+
     if raw_z is None or not isinstance(raw_z, (int, float)) or float(raw_z) <= 0:
-        raise QARSValidationError(
-            f"Missing required runtime input 'z_years' (Z) for asset '{asset_id}' "
-            f"in project '{project_id}'. Expected source: ZEngine (z_value > 0)."
+        alg_name = (
+            getattr(asset, "algorithm_name", None)
+            or getattr(asset, "algorithm", None)
+            or getattr(asset, "algorithm_type", None)
+            or (asset.get("algorithm_name") if isinstance(asset, dict) else None)
+            or (asset.get("algorithm") if isinstance(asset, dict) else None)
+            or (asset.get("algorithm_type") if isinstance(asset, dict) else None)
         )
+        key_size = (
+            getattr(asset, "key_length", None)
+            or getattr(asset, "key_size", None)
+            or (asset.get("key_length") if isinstance(asset, dict) else None)
+            or (asset.get("key_size") if isinstance(asset, dict) else None)
+        )
+        purpose = (
+            getattr(asset, "purpose", None)
+            or (asset.get("purpose") if isinstance(asset, dict) else None)
+        )
+
+        alg_risk = None
+        if alg_name is not None and str(alg_name).strip():
+            parsed_key_size = int(key_size) if key_size is not None and str(key_size).isdigit() else None
+            alg_risk = evaluate_algorithm_risk(
+                algorithm_name=str(alg_name),
+                key_size=parsed_key_size,
+                purpose=str(purpose) if purpose else None,
+            )
+
+        avail_res = evaluate_availability(asset=asset, project=project, db=db)
+        agility_res = collect_crypto_agility_evidence(asset=asset, project=project, db=db)
+        mc_res = evaluate_migration_complexity(asset=asset, project=project, db=db)
+
+        provenance = QARSProvenance(
+            x_source=x_source,
+            y_source=y_source,
+            z_source="Z_ENGINE",
+            s_source=s_source,
+            e_source=e_source,
+        )
+
+        unconfig_explanation = {
+            "x_years": x_val,
+            "y_years": y_val,
+            "z_years": None,
+            "data_sensitivity": s_val,
+            "exposure": e_val,
+            "sensitivity_normalized": round((s_val - 1.0) / 4.0, 4),
+            "exposure_normalized": round((e_val - 1.0) / 4.0, 4),
+            "timeline_pressure": None,
+            "core_score": None,
+            "active_adjustments": {},
+            "final_score": None,
+            "severity_level": "UNCONFIGURED",
+            "missing_evidence": ["z_years"],
+            "explanation_text": (
+                f"QARS Core score cannot be evaluated for asset '{asset_id}' because ZEngine returned no numeric "
+                "quantum vulnerability deadline (z_value is None). Asset is classified as UNCONFIGURED for QARS risk scoring."
+            ),
+        }
+
+        return QARSRuntimeResult(
+            asset_id=asset_id,
+            project_id=project_id,
+            scan_id=scan_id,
+            provenance=provenance,
+            core_input=None,
+            base_score=None,
+            adjustments={},
+            final_score=None,
+            level=QARSLevel.UNCONFIGURED,
+            explanation=unconfig_explanation,
+            algorithm_risk=alg_risk,
+            availability=avail_res,
+            crypto_agility_evidence=agility_res,
+            migration_complexity=mc_res,
+            z_uncertainty=z_uncert,
+        )
+
     z_val = float(raw_z)
     z_source = "Z_ENGINE"
-
-    z_uncert = evaluate_z_uncertainty(z_res)
 
     # 5. Construct QARSCoreInput & Execute Core Calculation
     core_input = QARSCoreInput(

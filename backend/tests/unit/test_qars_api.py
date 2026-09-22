@@ -269,3 +269,36 @@ def test_18_unexpected_qars_failure_returns_500(client, db_session):
         response = client.get("/api/v1/projects/proj_500_err/qars/assets/asset_500_err")
         assert response.status_code == 500
         assert "Database unexpected crash" in response.json()["detail"]
+
+
+def test_19_non_deadline_asset_returns_unconfigured_in_summary(client, db_session):
+    proj = Project(id="proj_qars_aes", name="AES Proj")
+    scan = Scan(id="scan_qars_aes", project_id="proj_qars_aes", status=ScanStatus.COMPLETED, target_path="/tmp")
+    asset_rsa = CryptoAsset(
+        id="asset_rsa",
+        scan_id="scan_qars_aes",
+        name="RSA Asset",
+        asset_type=AssetType.ALGORITHM,
+        algorithm_name="RSA-2048",
+        purpose=CryptoPurpose.DIGITAL_SIGNATURE,
+        location="rsa.py"
+    )
+    asset_aes = CryptoAsset(
+        id="asset_aes",
+        scan_id="scan_qars_aes",
+        name="AES Asset",
+        asset_type=AssetType.ALGORITHM,
+        algorithm_name="AES-256",
+        purpose=CryptoPurpose.ENCRYPTION,
+        location="aes.py"
+    )
+    db_session.add_all([proj, scan, asset_rsa, asset_aes])
+    db_session.commit()
+
+    response = client.get("/api/v1/projects/proj_qars_aes/qars")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["asset_count"] == 2
+    summary = data["summary"]
+    assert summary["unconfigured_count"] == 1
+    assert summary["qars_average"] is not None
