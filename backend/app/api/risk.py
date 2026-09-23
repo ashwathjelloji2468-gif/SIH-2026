@@ -138,7 +138,7 @@ def assess_risk(
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception("Risk assessment execution failed: %s", str(e))
+        logger.exception("Risk assessment execution failed")
         return JSONResponse(
             status_code=500,
             content={
@@ -172,7 +172,7 @@ def assess_project_risk_legacy(
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception("Risk assessment execution failed: %s", str(e))
+        logger.exception("Risk assessment execution failed")
         return JSONResponse(
             status_code=500,
             content={
