@@ -23,12 +23,12 @@ class RecommendationService:
     """
     def __init__(self, db: Session):
         self.db = db
-        self.asset_repo = AssetRepository(db) if hasattr(AssetRepository, "__call__") else None
-        self.risk_repo = RiskRepository(db) if hasattr(RiskRepository, "__call__") else None
-        self.rec_repo = RecommendationRepository(db) if hasattr(RecommendationRepository, "__call__") else None
+        self.asset_repo = AssetRepository(db) if (db and hasattr(AssetRepository, "__call__")) else None
+        self.risk_repo = RiskRepository(db) if (db and hasattr(RiskRepository, "__call__")) else None
+        self.rec_repo = RecommendationRepository(db) if (db and hasattr(RecommendationRepository, "__call__")) else None
         self.engine = RecommendationEngine()
 
-    def recommend_asset(self, asset_id: str, force_regeneration: bool = True, profile: Optional[str] = None) -> Dict[str, Any]:
+    def recommend_asset(self, asset_id: str, force_regeneration: bool = False, profile: Optional[str] = None) -> Dict[str, Any]:
         if not self.asset_repo:
             raise RuntimeError("Database repository unavailable.")
 
@@ -37,14 +37,14 @@ class RecommendationService:
             raise ValueError(f"Asset '{asset_id}' not found.")
 
         eff_profile = profile
-        if not eff_profile and asset.scan and asset.scan.project:
+        if not eff_profile and hasattr(asset, "scan") and asset.scan and hasattr(asset.scan, "project") and asset.scan.project:
             eff_profile = getattr(asset.scan.project, "default_migration_profile", "BALANCED")
         if not eff_profile:
             eff_profile = "BALANCED"
 
-        # Load latest RiskAssessment and ThreatScenarios
-        ra = self.risk_repo.get_latest_for_asset(asset_id) if self.risk_repo else None
-        threats = self.risk_repo.get_threat_scenarios_for_asset(asset_id) if self.risk_repo else []
+        # Load latest RiskAssessment and ThreatScenarios if risk_repo is available
+        ra = self.risk_repo.get_latest_for_asset(asset_id) if (self.risk_repo and hasattr(self.risk_repo, "get_latest_for_asset")) else None
+        threats = self.risk_repo.get_threat_scenarios_for_asset(asset_id) if (self.risk_repo and hasattr(self.risk_repo, "get_threat_scenarios_for_asset")) else []
 
         threat_dict_list = [
             {
@@ -80,7 +80,10 @@ class RecommendationService:
             threat_scenarios=threat_dict_list,
             migration_complexity=comp_str,
             detector_names=detector_names,
-            profile=eff_profile
+            profile=eff_profile,
+            asset_location=getattr(asset, "location", None),
+            asset_line_number=getattr(asset, "line_number", None),
+            asset_name=getattr(asset, "name", None)
         )
 
         rec_record = self.rec_repo.store_recommendation(
@@ -124,7 +127,7 @@ class RecommendationService:
 
         risk_map = {}
         threats_map = {}
-        if self.risk_repo:
+        if self.db and self.risk_repo:
             from app.models.db_models import RiskAssessment, ThreatScenario
             all_ras = self.db.query(RiskAssessment).filter(RiskAssessment.asset_id.in_(asset_ids)).all()
             for ra in all_ras:
@@ -171,7 +174,10 @@ class RecommendationService:
                 threat_scenarios=threat_dict_list,
                 migration_complexity=comp_str,
                 detector_names=detector_names,
-                profile=eff_profile
+                profile=eff_profile,
+                asset_location=getattr(asset, "location", None),
+                asset_line_number=getattr(asset, "line_number", None),
+                asset_name=getattr(asset, "name", None)
             )
             to_store.append((asset.id, rec_eval, ra.id if ra else None, asset, ra, threat_dict_list))
 
@@ -261,36 +267,37 @@ class RecommendationService:
         }
 
     def _recommendation_to_dict(self, rec, asset, ra, threats) -> Dict[str, Any]:
+        tradeoffs = getattr(rec, "tradeoffs", None) or {}
         return {
-            "id": rec.id,
-            "asset_id": rec.asset_id,
+            "id": getattr(rec, "id", None),
+            "asset_id": getattr(rec, "asset_id", None),
             "asset_name": asset.name if asset else "Unknown Asset",
             "algorithm_name": asset.algorithm_name if asset else "Unknown",
             "location": asset.location if asset else "",
             "line_number": asset.line_number if asset else None,
             "crypto_purpose": asset.purpose.value if (asset and hasattr(asset.purpose, "value")) else "UNKNOWN",
             "quantum_status": asset.quantum_safety.value if (asset and hasattr(asset.quantum_safety, "value")) else "UNKNOWN",
-            "risk_assessment_id": rec.risk_assessment_id or (ra.id if ra else None),
+            "risk_assessment_id": getattr(rec, "risk_assessment_id", None) or (ra.id if ra else None),
             "risk_score": ra.risk_score if ra else 0.0,
             "risk_level": ra.risk_level.value if (ra and hasattr(ra.risk_level, "value")) else "LOW",
-            "target_pqc_candidate": rec.target_pqc_candidate,
-            "recommended_algorithm": rec.recommended_algorithm or rec.target_pqc_candidate,
-            "alternative_algorithm": rec.alternative_algorithm,
-            "category": rec.category.value if hasattr(rec.category, "value") else str(rec.category),
-            "priority": rec.priority or "LOW",
-            "standard_status": rec.standard_status.value if hasattr(rec.standard_status, "value") else str(rec.standard_status),
-            "rationale": rec.rationale,
-            "compatibility_notes": rec.compatibility_notes,
-            "performance_notes": rec.performance_notes,
-            "latency_impact": getattr(rec, "latency_impact", None) or (rec.tradeoffs or {}).get("latency_impact", "Minimal latency impact."),
-            "cost_impact": getattr(rec, "cost_impact", None) or (rec.tradeoffs or {}).get("cost_impact", "Standard migration cost."),
-            "latency_level": getattr(rec, "latency_level", None) or (rec.tradeoffs or {}).get("latency_level", "LOW"),
-            "cost_level": getattr(rec, "cost_level", None) or (rec.tradeoffs or {}).get("cost_level", "MEDIUM"),
-            "tradeoffs": rec.tradeoffs or {},
-            "threat_scenarios": threats or rec.threat_scenarios or [],
-            "migration_notes": rec.migration_notes,
-            "migration_complexity": rec.migration_complexity or "MEDIUM",
-            "confidence": rec.confidence,
-            "kb_version": rec.kb_version or "2026.3.0-NIST-PQC",
-            "created_at": rec.created_at.isoformat() if (rec.created_at and hasattr(rec.created_at, "isoformat")) else str(rec.created_at)
+            "target_pqc_candidate": getattr(rec, "target_pqc_candidate", "ML-KEM"),
+            "recommended_algorithm": getattr(rec, "recommended_algorithm", None) or getattr(rec, "target_pqc_candidate", "ML-KEM"),
+            "alternative_algorithm": getattr(rec, "alternative_algorithm", None),
+            "category": rec.category.value if hasattr(rec, "category") and hasattr(rec.category, "value") else str(getattr(rec, "category", "PQC_REPLACEMENT")),
+            "priority": getattr(rec, "priority", "LOW") or "LOW",
+            "standard_status": rec.standard_status.value if hasattr(rec, "standard_status") and hasattr(rec.standard_status, "value") else str(getattr(rec, "standard_status", "FINAL_STANDARD")),
+            "rationale": getattr(rec, "rationale", ""),
+            "compatibility_notes": getattr(rec, "compatibility_notes", None),
+            "performance_notes": getattr(rec, "performance_notes", None),
+            "latency_impact": getattr(rec, "latency_impact", None) or tradeoffs.get("latency_impact", "Minimal latency impact."),
+            "cost_impact": getattr(rec, "cost_impact", None) or tradeoffs.get("cost_impact", "Standard migration cost."),
+            "latency_level": getattr(rec, "latency_level", None) or tradeoffs.get("latency_level", "LOW"),
+            "cost_level": getattr(rec, "cost_level", None) or tradeoffs.get("cost_level", "MEDIUM"),
+            "tradeoffs": tradeoffs,
+            "threat_scenarios": threats or getattr(rec, "threat_scenarios", []) or [],
+            "migration_notes": getattr(rec, "migration_notes", None),
+            "migration_complexity": getattr(rec, "migration_complexity", "MEDIUM") or "MEDIUM",
+            "confidence": getattr(rec, "confidence", 1.0),
+            "kb_version": getattr(rec, "kb_version", "2026.3.0-NIST-PQC") or "2026.3.0-NIST-PQC",
+            "created_at": rec.created_at.isoformat() if (hasattr(rec, "created_at") and rec.created_at and hasattr(rec.created_at, "isoformat")) else str(getattr(rec, "created_at", ""))
         }
