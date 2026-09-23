@@ -5,6 +5,9 @@ import { Navbar } from './components/Common/Navbar';
 import { Sidebar } from './components/Common/Sidebar';
 import { ScanModal } from './components/Common/ScanModal';
 import { SentriqLoader } from './components/Common/SentriqLoader';
+import { SentriqWelcomeBanner } from './components/Guide/SentriqWelcomeBanner';
+import { ContextualHelpDrawer } from './components/Guide/ContextualHelpDrawer';
+import { GuidedTourOverlay } from './components/Guide/GuidedTourOverlay';
 import LandingPage from './pages/LandingPage';
 import { Home } from './pages/Home';
 import { Project } from './pages/Project';
@@ -17,27 +20,43 @@ import { Reports } from './pages/Reports';
 import { BusinessCriticality } from './pages/BusinessCriticality';
 import { Settings } from './pages/Settings';
 import { QARS } from './pages/QARS';
+import { Guide } from './pages/Guide';
 
-/** Internal app layout with Navbar + Sidebar */
-const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div className="min-h-screen bg-[#0B1120] bg-hex-pattern bg-radial-subtle text-slate-100 flex flex-col selection:bg-cyan-500/20 selection:text-cyan-300">
-    {/* Top Global Navigation */}
-    <Navbar />
+/** Internal app layout with Navbar + Sidebar + Global Help Overlays */
+const AppLayout: React.FC<{ children: React.ReactNode; onStartTour?: () => void }> = ({ children, onStartTour }) => {
+  const [isTourActive, setIsTourActive] = useState(false);
 
-    <div className="flex-1 flex w-full">
-      {/* Left Sidebar */}
-      <Sidebar />
+  const startTour = () => {
+    setIsTourActive(true);
+    if (onStartTour) onStartTour();
+  };
 
-      {/* Main Application Area */}
-      <main className="flex-1 overflow-x-hidden p-4 md:p-8 max-w-7xl mx-auto w-full">
-        {children}
-      </main>
+  return (
+    <div className="min-h-screen bg-[#0B1120] bg-hex-pattern bg-radial-subtle text-slate-100 flex flex-col selection:bg-cyan-500/20 selection:text-cyan-300">
+      {/* Top Global Navigation */}
+      <Navbar />
+
+      <div className="flex-1 flex w-full">
+        {/* Left Sidebar */}
+        <Sidebar />
+
+        {/* Main Application Area */}
+        <main className="flex-1 overflow-x-hidden p-4 md:p-8 max-w-7xl mx-auto w-full">
+          <SentriqWelcomeBanner onStartTour={startTour} />
+          {children}
+        </main>
+      </div>
+
+      {/* Page-Aware Contextual Help Drawer & Guided Tour Overlay */}
+      <ContextualHelpDrawer onStartTour={startTour} />
+      <GuidedTourOverlay isActive={isTourActive} onClose={() => setIsTourActive(false)} />
     </div>
-  </div>
-);
+  );
+};
 
 export const App: React.FC = () => {
   const [initializing, setInitializing] = useState<boolean>(true);
+  const [globalTourActive, setGlobalTourActive] = useState<boolean>(false);
 
   useEffect(() => {
     // Smooth 1.4s startup initialization sequence
@@ -69,10 +88,11 @@ export const App: React.FC = () => {
           <Route path="/reports" element={<AppLayout><Reports /></AppLayout>} />
           <Route path="/business-criticality" element={<AppLayout><BusinessCriticality /></AppLayout>} />
           <Route path="/settings" element={<AppLayout><Settings /></AppLayout>} />
+          <Route path="/guide" element={<AppLayout><Guide onStartTour={() => setGlobalTourActive(true)} /></AppLayout>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
 
-        {/* Global Trigger Scan Modal (Available across all routes & landing page) */}
+        {/* Global Trigger Scan Modal */}
         <ScanModal />
       </BrowserRouter>
     </ProjectProvider>

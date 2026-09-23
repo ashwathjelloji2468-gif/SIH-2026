@@ -11,8 +11,9 @@ import { runCBOMDiffTelemetryTests } from './cbomDiffTelemetry.test';
 import { runNetworkNodes3DTests } from './networkNodes3D.test';
 import { runQARSFrontendTests } from './qarsFrontend.test';
 import { runPhase2PerformanceTests } from './phase2Performance.test';
+import { runGuideFrontendTests } from './guideFrontend.test';
 
-console.log('=== RUNNING FRONTEND ACTIVE SCAN, POLLING LABEL, QARS, PERF PHASE 2 & 3D MESH TESTS ===');
+console.log('=== RUNNING FRONTEND ACTIVE SCAN, POLLING LABEL, QARS, PERF PHASE 2, GUIDE & 3D MESH TESTS ===');
 
 async function main() {
   const activeScanResults = runActiveScanTrackerTests();
@@ -21,6 +22,7 @@ async function main() {
   const cbomTelemetryResults = runCBOMDiffTelemetryTests();
   const networkNodes3DResults = runNetworkNodes3DTests();
   const qarsResults = runQARSFrontendTests();
+  const guideResults = runGuideFrontendTests();
   const phase2PerfResults = await runPhase2PerformanceTests();
 
   const allResults = [
@@ -30,6 +32,7 @@ async function main() {
     ...cbomTelemetryResults,
     ...networkNodes3DResults,
     ...qarsResults,
+    ...guideResults,
     ...phase2PerfResults,
   ];
   let passed = 0;

@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   ChevronRight,
   ExternalLink,
+  BookOpen,
 } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 
@@ -49,6 +50,7 @@ export const Sidebar: React.FC = () => {
         { name: 'CBOM & Reports', path: '/reports', icon: FileSpreadsheet },
         { name: 'Business Criticality Factors', path: '/business-criticality', icon: Sliders },
         { name: 'Telemetry & Audit', path: '/settings', icon: Sliders },
+        { name: 'Guide & Help', path: '/guide', icon: BookOpen },
       ],
     },
   ];

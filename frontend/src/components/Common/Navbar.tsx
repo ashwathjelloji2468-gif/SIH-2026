@@ -39,10 +39,13 @@ export const Navbar: React.FC = () => {
     '/scan': 'Scan Orchestrator',
     '/inventory': 'Cryptographic Inventory',
     '/risk': 'Mosca Urgency & Risk',
+    '/qars': 'QARS Scoring Engine',
     '/recommendations': 'PQC Recommendations',
     '/migration': 'PQC Migration Planner',
     '/reports': 'CBOM & Assessment',
+    '/business-criticality': 'Business Criticality',
     '/settings': 'Telemetry & Audit',
+    '/guide': 'User Guide & Help',
   };
 
   const currentSection = sectionNames[location.pathname] || 'Overview';
