@@ -2,6 +2,7 @@ import React from 'react';
 import { Recommendation } from '../../types';
 import { ShieldCheck, ArrowRight, Layers, FileText, Cpu } from 'lucide-react';
 import { PQCPerformanceEvidence } from './PQCPerformanceEvidence';
+import { TamperEvidentAuditEvidence } from '../Common/TamperEvidentAuditEvidence';
 
 interface PQCRecommendationCardProps {
   recommendation: Recommendation;
@@ -15,6 +16,7 @@ export const PQCRecommendationCard: React.FC<PQCRecommendationCardProps> = ({
   sourceLocation,
 }) => {
   const perfData = recommendation.tradeoffs?.performance;
+  const auditData = recommendation.audit || recommendation.tradeoffs?.audit;
 
   return (
     <div className="rounded-xl border border-slate-800 bg-[#0B0F19] p-5 shadow-lg space-y-4">
@@ -60,6 +62,11 @@ export const PQCRecommendationCard: React.FC<PQCRecommendationCardProps> = ({
       {/* Performance Model Evidence */}
       {perfData && (
         <PQCPerformanceEvidence performance={perfData} />
+      )}
+
+      {/* Tamper-Evident Audit Evidence */}
+      {auditData && (
+        <TamperEvidentAuditEvidence audit={auditData} />
       )}
 
       {/* Performance & Overhead Callout */}

@@ -35,12 +35,15 @@ def audit_cbom_snapshot(
             "spec_version": cbom_payload.get("specVersion", "1.6"),
             "bom_format": cbom_payload.get("bomFormat", "CycloneDX"),
         }
-        return srv.record_artifact(
+        res = srv.record_artifact(
             artifact_type=AuditArtifactType.CBOM_SNAPSHOT,
             artifact_id=artifact_id,
             payload=cbom_payload,
             metadata=metadata,
         )
+        if res and isinstance(cbom_payload, dict):
+            cbom_payload["audit"] = res.model_dump()
+        return res
     except Exception as e:
         logger.warning(f"CBOM audit non-blocking failure for scan {scan_id}: {e}")
         return None
@@ -63,12 +66,15 @@ def audit_risk_snapshot(
             "is_project": is_project,
             "risk_score": risk_payload.get("risk_score") or risk_payload.get("overall_risk_score"),
         }
-        return srv.record_artifact(
+        res = srv.record_artifact(
             artifact_type=AuditArtifactType.RISK_ASSESSMENT_SNAPSHOT,
             artifact_id=artifact_id,
             payload=risk_payload,
             metadata=metadata,
         )
+        if res and isinstance(risk_payload, dict):
+            risk_payload["audit"] = res.model_dump()
+        return res
     except Exception as e:
         logger.warning(f"Risk audit non-blocking failure for target {target_id}: {e}")
         return None
@@ -90,12 +96,18 @@ def audit_recommendation_snapshot(
             "profile": rec_payload.get("profile", "BALANCED"),
             "target_pqc_candidate": rec_payload.get("target_pqc_candidate"),
         }
-        return srv.record_artifact(
+        res = srv.record_artifact(
             artifact_type=AuditArtifactType.RECOMMENDATION_SNAPSHOT,
             artifact_id=artifact_id,
             payload=rec_payload,
             metadata=metadata,
         )
+        if res and isinstance(rec_payload, dict):
+            dump = res.model_dump()
+            rec_payload["audit"] = dump
+            if isinstance(rec_payload.get("tradeoffs"), dict):
+                rec_payload["tradeoffs"]["audit"] = dump
+        return res
     except Exception as e:
         logger.warning(f"Recommendation audit non-blocking failure for asset {asset_id}: {e}")
         return None
@@ -117,12 +129,15 @@ def audit_validation_result(
             "status": val_payload.get("status") or val_payload.get("overall_result"),
             "build_passed": val_payload.get("build_passed"),
         }
-        return srv.record_artifact(
+        res = srv.record_artifact(
             artifact_type=AuditArtifactType.MIGRATION_VALIDATION_RESULT,
             artifact_id=artifact_id,
             payload=val_payload,
             metadata=metadata,
         )
+        if res and isinstance(val_payload, dict):
+            val_payload["audit"] = res.model_dump()
+        return res
     except Exception as e:
         logger.warning(f"Validation audit non-blocking failure for validation {validation_id}: {e}")
         return None

@@ -295,6 +295,20 @@ export interface ThreatScenario {
   threat_scenario_version?: string;
 }
 
+// Audit Evidence
+export interface AuditEvidenceData {
+  status?: 'READY' | 'UNCONFIGURED' | 'ERROR' | string;
+  artifact_type: string;
+  artifact_id: string;
+  digest: string;
+  transaction_id?: string | null;
+  network?: string | null;
+  provider_name: string;
+  timestamp?: string | null;
+  evidence?: string[];
+  warnings?: string[];
+}
+
 // Recommendations
 export interface PerformancePredictionData {
   status?: 'READY' | 'UNCONFIGURED' | 'ERROR' | string;
@@ -334,8 +348,10 @@ export interface Recommendation {
   cost_impact?: string;
   latency_level?: 'LOW' | 'MODERATE' | 'HIGH' | 'UNKNOWN';
   cost_level?: 'LOW' | 'MEDIUM' | 'HIGH' | 'UNKNOWN';
+  audit?: AuditEvidenceData;
   tradeoffs?: {
     performance?: PerformancePredictionData;
+    audit?: AuditEvidenceData;
     [key: string]: any;
   };
   threat_scenarios?: Array<any>;

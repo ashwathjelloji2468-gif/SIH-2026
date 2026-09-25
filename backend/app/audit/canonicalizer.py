@@ -3,16 +3,21 @@ import json
 from typing import Any
 
 
-def _normalize(obj: Any) -> Any:
+def _normalize(obj: Any, is_root: bool = True) -> Any:
     """
     Recursively normalize payload objects for deterministic JSON serialization.
     - Dict keys are converted to strings if needed.
+    - Top-level 'audit' field is ignored so attached audit evidence does not alter digest.
     - Lists and tuples are normalized recursively.
     """
     if isinstance(obj, dict):
-        return {str(k): _normalize(v) for k, v in obj.items()}
+        return {
+            str(k): _normalize(v, is_root=False)
+            for k, v in obj.items()
+            if not (is_root and str(k) == "audit")
+        }
     elif isinstance(obj, (list, tuple)):
-        return [_normalize(item) for item in obj]
+        return [_normalize(item, is_root=False) for item in obj]
     return obj
 
 

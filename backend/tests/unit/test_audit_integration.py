@@ -222,14 +222,16 @@ def test_o_provider_error_non_blocking():
 
 
 def test_p_q_r_s_audit_does_not_alter_original_flow_data():
-    """TEST P, Q, R, S: Audit does not alter CBOM, Risk, Recommendation, or Validation output."""
+    """TEST P, Q, R, S: Audit does not alter CBOM, Risk, Recommendation, or Validation core output."""
     cbom_in = {"bomFormat": "CycloneDX", "specVersion": "1.6", "components": []}
     cbom_copy = dict(cbom_in)
 
     audit_cbom_snapshot(cbom_in, "s-orig")
 
-    # CBOM data is unmutated
-    assert cbom_in == cbom_copy
+    # Core CBOM data is unmutated; audit is additive only
+    cbom_core = {k: v for k, v in cbom_in.items() if k != "audit"}
+    assert cbom_core == cbom_copy
+    assert "audit" in cbom_in
 
 
 def test_t_independent_artifact_types():

@@ -13,8 +13,9 @@ import { runQARSFrontendTests } from './qarsFrontend.test';
 import { runPhase2PerformanceTests } from './phase2Performance.test';
 import { runGuideFrontendTests } from './guideFrontend.test';
 import { runPQCPerformanceFrontendTests } from './pqcPerformanceFrontend.test';
+import { runPQCAuditFrontendTests } from './pqcAuditFrontend.test';
 
-console.log('=== RUNNING FRONTEND ACTIVE SCAN, POLLING LABEL, QARS, PERF PHASE 2, GUIDE, 3D MESH & PQC PERF MODEL TESTS ===');
+console.log('=== RUNNING FRONTEND ACTIVE SCAN, POLLING LABEL, QARS, PERF PHASE 2, GUIDE, 3D MESH, PQC PERF MODEL & AUDIT EVIDENCE TESTS ===');
 
 async function main() {
   const activeScanResults = runActiveScanTrackerTests();
@@ -25,6 +26,7 @@ async function main() {
   const qarsResults = runQARSFrontendTests();
   const guideResults = runGuideFrontendTests();
   const pqcPerfResults = runPQCPerformanceFrontendTests();
+  const pqcAuditResults = runPQCAuditFrontendTests();
   const phase2PerfResults = await runPhase2PerformanceTests();
 
   const allResults = [
@@ -36,6 +38,7 @@ async function main() {
     ...qarsResults,
     ...guideResults,
     ...pqcPerfResults,
+    ...pqcAuditResults,
     ...phase2PerfResults,
   ];
   let passed = 0;

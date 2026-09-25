@@ -3,6 +3,7 @@ import { Recommendation } from '../../types';
 import { X, ArrowRight, ShieldCheck, Cpu, Zap, DollarSign, FileText, CheckCircle2, AlertTriangle, Layers, GitFork } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { PQCPerformanceEvidence } from './PQCPerformanceEvidence';
+import { TamperEvidentAuditEvidence } from '../Common/TamperEvidentAuditEvidence';
 
 interface RecommendationDetailModalProps {
   recommendation: Recommendation | null;
@@ -109,6 +110,11 @@ export const RecommendationDetailModal: React.FC<RecommendationDetailModalProps>
           {/* CatBoost PQC Performance Model Evidence */}
           {recommendation.tradeoffs?.performance && (
             <PQCPerformanceEvidence performance={recommendation.tradeoffs.performance} />
+          )}
+
+          {/* Tamper-Evident Audit Evidence */}
+          {(recommendation.audit || recommendation.tradeoffs?.audit) && (
+            <TamperEvidentAuditEvidence audit={recommendation.audit || recommendation.tradeoffs?.audit} />
           )}
 
           {/* Latency & Cost Impact Grid */}
