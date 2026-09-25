@@ -269,7 +269,7 @@ class MigrationValidator:
         logs.append(f"[CryptoVerification] Status: {'PASS' if (crypto_passed and old_op_removed) else 'FAIL'} for candidate {target_pqc}" + (f" (matched '{matched_marker}')" if matched_marker else ""))
         logs.append(f"[ValidationResult] Overall status: {overall_result}")
 
-        return {
+        val_dict = {
             "status": final_status,
             "overall_result": overall_result,
             "build_passed": effective_build_passed,
@@ -289,3 +289,12 @@ class MigrationValidator:
             "residual_risk_score": 15.0 if all_checks_passed else 65.0,
             "confidence": 0.92 if all_checks_passed else 0.40,
         }
+
+        try:
+            from app.audit.integration import audit_validation_result
+            val_id = str(getattr(asset, "id", "sim-result")) if asset else "sim-result"
+            audit_validation_result(val_dict, validation_id=val_id)
+        except Exception:
+            pass
+
+        return val_dict

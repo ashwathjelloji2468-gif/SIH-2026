@@ -60,6 +60,11 @@ class RecommendationService:
             if existing:
                 res_dict = self._recommendation_to_dict(existing, asset, ra, threat_dict_list)
                 res_dict["profile"] = eff_profile
+                try:
+                    from app.audit.integration import audit_recommendation_snapshot
+                    audit_recommendation_snapshot(res_dict, asset_id=str(asset_id))
+                except Exception:
+                    pass
                 return res_dict
 
         detector_names = [e.detector_name for e in (getattr(asset, "evidence_items", []) or [])]
@@ -95,11 +100,18 @@ class RecommendationService:
         if rec_record:
             res_dict = self._recommendation_to_dict(rec_record, asset, ra, threat_dict_list)
             res_dict["profile"] = eff_profile
-            return res_dict
         else:
             rec_eval["asset_id"] = asset_id
             rec_eval["asset_name"] = asset.name
-            return rec_eval
+            res_dict = rec_eval
+
+        try:
+            from app.audit.integration import audit_recommendation_snapshot
+            audit_recommendation_snapshot(res_dict, asset_id=str(asset_id))
+        except Exception:
+            pass
+
+        return res_dict
 
     def recommend_project(self, project_id: str, force_regeneration: bool = False, profile: Optional[str] = None) -> List[Dict[str, Any]]:
         if not self.asset_repo:

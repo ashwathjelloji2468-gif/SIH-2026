@@ -59,4 +59,14 @@ def generate_cbom_json(scan: Scan, assets: List[CryptoAsset]) -> Dict[str, Any]:
         "components": components
     }
 
+    try:
+        from app.audit.integration import audit_cbom_snapshot
+        audit_cbom_snapshot(
+            cbom_payload=cbom,
+            scan_id=str(getattr(scan, "id", "scan-unknown")),
+            project_id=str(getattr(scan, "project_id", "")) if getattr(scan, "project_id", None) else None,
+        )
+    except Exception:
+        pass
+
     return cbom

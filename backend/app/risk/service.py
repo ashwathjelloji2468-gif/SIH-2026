@@ -94,7 +94,15 @@ class RiskService:
 
         ra = self.risk_repo.store_assessment(asset_id, eval_result)
         threats = self.risk_repo.get_threat_scenarios_for_asset(asset_id)
-        return self._assessment_to_dict(ra, asset, threats)
+        res_dict = self._assessment_to_dict(ra, asset, threats)
+
+        try:
+            from app.audit.integration import audit_risk_snapshot
+            audit_risk_snapshot(res_dict, target_id=str(asset_id), is_project=False)
+        except Exception:
+            pass
+
+        return res_dict
 
     def assess_project(
         self,
@@ -182,6 +190,13 @@ class RiskService:
             else:
                 eval_result["asset_id"] = asset.id
                 results.append(eval_result)
+
+        try:
+            from app.audit.integration import audit_risk_snapshot
+            audit_risk_snapshot({"project_id": project_id, "assessments": results}, target_id=str(project_id), is_project=True)
+        except Exception:
+            pass
+
         return results
 
     def get_project_risk_summary(self, project_id: str) -> Dict[str, Any]:

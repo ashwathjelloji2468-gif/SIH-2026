@@ -1,4 +1,11 @@
 from app.audit.canonicalizer import canonicalize, digest_payload
+from app.audit.integration import (
+    audit_cbom_snapshot,
+    audit_recommendation_snapshot,
+    audit_risk_snapshot,
+    audit_validation_result,
+    get_shared_audit_service,
+)
 from app.audit.models import AuditArtifactType, AuditResult, AuditStatus
 from app.audit.provider import (
     BlockchainAuditProvider,
@@ -22,4 +29,9 @@ __all__ = [
     "get_audit_provider",
     "AuditService",
     "sanitize_metadata",
+    "audit_cbom_snapshot",
+    "audit_risk_snapshot",
+    "audit_recommendation_snapshot",
+    "audit_validation_result",
+    "get_shared_audit_service",
 ]
