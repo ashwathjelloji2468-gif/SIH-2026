@@ -398,12 +398,22 @@ export const Recommendations: React.FC = () => {
 
                       {/* Latency & Performance Impact */}
                       <td className="py-3.5 px-4 max-w-xs">
-                        <div className="flex items-center gap-1.5 text-[11px]">
-                          <Zap className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                          <span className="px-1.5 py-0.2 rounded bg-slate-900 border border-slate-800 text-amber-300 text-[10px]">
-                            {rec.latency_level || 'LOW'}
-                          </span>
-                          <span className="truncate text-slate-300 font-sans">{rec.latency_impact || 'Minimal latency impact'}</span>
+                        <div className="flex flex-col gap-1 text-[11px]">
+                          <div className="flex items-center gap-1.5">
+                            <Zap className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                            <span className="px-1.5 py-0.2 rounded bg-slate-900 border border-slate-800 text-amber-300 text-[10px]">
+                              {rec.latency_level || 'LOW'}
+                            </span>
+                            <span className="truncate text-slate-300 font-sans">{rec.latency_impact || 'Minimal latency impact'}</span>
+                          </div>
+                          {rec.tradeoffs?.performance?.status === 'READY' && rec.tradeoffs.performance.predicted_latency_us !== undefined && rec.tradeoffs.performance.predicted_latency_us !== null && (
+                            <div className="text-[10px] font-mono font-semibold text-cyan-300 flex items-center gap-1 mt-0.5">
+                              <span className="px-1 py-0.2 rounded bg-cyan-950 border border-cyan-800 text-cyan-400 font-bold text-[9px] uppercase">
+                                MODEL PREDICTION
+                              </span>
+                              <span>{rec.tradeoffs.performance.predicted_latency_us} µs</span>
+                            </div>
+                          )}
                         </div>
                       </td>
 

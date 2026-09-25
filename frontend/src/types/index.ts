@@ -296,6 +296,21 @@ export interface ThreatScenario {
 }
 
 // Recommendations
+export interface PerformancePredictionData {
+  status?: 'READY' | 'UNCONFIGURED' | 'ERROR' | string;
+  reason?: string | null;
+  candidate?: string;
+  predicted_latency_us?: number | null;
+  predicted_throughput_ops_s?: number | null;
+  model_version?: string | null;
+  dataset_version?: string | null;
+  provider_name?: string | null;
+  benchmark_source?: string | null;
+  evidence?: string[];
+  warnings?: string[];
+  missing_features?: string[];
+}
+
 export interface Recommendation {
   id?: string;
   asset_id: string;
@@ -319,7 +334,10 @@ export interface Recommendation {
   cost_impact?: string;
   latency_level?: 'LOW' | 'MODERATE' | 'HIGH' | 'UNKNOWN';
   cost_level?: 'LOW' | 'MEDIUM' | 'HIGH' | 'UNKNOWN';
-  tradeoffs?: Record<string, any>;
+  tradeoffs?: {
+    performance?: PerformancePredictionData;
+    [key: string]: any;
+  };
   threat_scenarios?: Array<any>;
   migration_notes?: string;
   migration_complexity: string;

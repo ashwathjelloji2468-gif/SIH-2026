@@ -1,6 +1,7 @@
 import React from 'react';
 import { Recommendation } from '../../types';
 import { ShieldCheck, ArrowRight, Layers, FileText, Cpu } from 'lucide-react';
+import { PQCPerformanceEvidence } from './PQCPerformanceEvidence';
 
 interface PQCRecommendationCardProps {
   recommendation: Recommendation;
@@ -13,6 +14,8 @@ export const PQCRecommendationCard: React.FC<PQCRecommendationCardProps> = ({
   assetName,
   sourceLocation,
 }) => {
+  const perfData = recommendation.tradeoffs?.performance;
+
   return (
     <div className="rounded-xl border border-slate-800 bg-[#0B0F19] p-5 shadow-lg space-y-4">
       {/* Header */}
@@ -53,6 +56,11 @@ export const PQCRecommendationCard: React.FC<PQCRecommendationCardProps> = ({
           {recommendation.rationale}
         </p>
       </div>
+
+      {/* Performance Model Evidence */}
+      {perfData && (
+        <PQCPerformanceEvidence performance={perfData} />
+      )}
 
       {/* Performance & Overhead Callout */}
       {(recommendation.performance_notes || recommendation.compatibility_notes) && (

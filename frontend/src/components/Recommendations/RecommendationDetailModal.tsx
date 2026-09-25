@@ -2,6 +2,7 @@ import React from 'react';
 import { Recommendation } from '../../types';
 import { X, ArrowRight, ShieldCheck, Cpu, Zap, DollarSign, FileText, CheckCircle2, AlertTriangle, Layers, GitFork } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { PQCPerformanceEvidence } from './PQCPerformanceEvidence';
 
 interface RecommendationDetailModalProps {
   recommendation: Recommendation | null;
@@ -104,6 +105,11 @@ export const RecommendationDetailModal: React.FC<RecommendationDetailModalProps>
               {recommendation.rationale}
             </p>
           </div>
+
+          {/* CatBoost PQC Performance Model Evidence */}
+          {recommendation.tradeoffs?.performance && (
+            <PQCPerformanceEvidence performance={recommendation.tradeoffs.performance} />
+          )}
 
           {/* Latency & Cost Impact Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
