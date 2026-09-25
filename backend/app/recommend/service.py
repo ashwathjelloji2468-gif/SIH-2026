@@ -28,7 +28,49 @@ class RecommendationService:
         self.rec_repo = RecommendationRepository(db) if (db and hasattr(RecommendationRepository, "__call__")) else None
         self.engine = RecommendationEngine()
 
-    def recommend_asset(self, asset_id: str, force_regeneration: bool = False, profile: Optional[str] = None) -> Dict[str, Any]:
+    def _extract_asset_context(self, asset: Any, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        ctx = dict(context) if context else {}
+        if not asset:
+            return ctx
+
+        if "text_length_bytes" in ctx or "payload_size_bytes" in ctx or "message_size_bytes" in ctx:
+            return ctx
+
+        extra = getattr(asset, "extra_metadata", None)
+        if isinstance(extra, dict):
+            for k in ["text_length_bytes", "text_size_kb", "payload_size_bytes", "message_size_bytes"]:
+                if k in extra and extra[k] is not None:
+                    ctx[k] = extra[k]
+
+        evidence_items = getattr(asset, "evidence_items", []) or []
+        for ev in evidence_items:
+            prov = getattr(ev, "provenance", None)
+            if isinstance(prov, dict):
+                for k in ["text_length_bytes", "text_size_kb", "payload_size_bytes", "message_size_bytes"]:
+                    if k in prov and prov[k] is not None and k not in ctx:
+                        ctx[k] = prov[k]
+
+            if "text_length_bytes" not in ctx and "payload_size_bytes" not in ctx:
+                matched = getattr(ev, "matched_text", None) or getattr(ev, "excerpt", None)
+                if matched and isinstance(matched, str) and len(matched.strip()) > 0:
+                    ctx["text_length_bytes"] = len(matched.encode("utf-8"))
+
+        scan = getattr(asset, "scan", None)
+        if scan:
+            project = getattr(scan, "project", None)
+            if project:
+                b_ctx = getattr(project, "business_context", None)
+                if isinstance(b_ctx, dict):
+                    for k in ["text_length_bytes", "payload_size_bytes", "message_size_bytes"]:
+                        if k in b_ctx and b_ctx[k] is not None and k not in ctx:
+                            ctx[k] = b_ctx[k]
+
+        if "text_length_bytes" not in ctx and "payload_size_bytes" not in ctx and "message_size_bytes" not in ctx:
+            ctx["text_length_bytes"] = 1024
+
+        return ctx
+
+    def recommend_asset(self, asset_id: str, force_regeneration: bool = False, profile: Optional[str] = None, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         if not self.asset_repo:
             raise RuntimeError("Database repository unavailable.")
 
@@ -76,6 +118,8 @@ class RecommendationService:
 
         comp_str = "HIGH" if complexity >= 75.0 else ("MEDIUM" if complexity >= 40.0 else "LOW")
 
+        eff_context = self._extract_asset_context(asset, context)
+
         rec_eval = self.engine.generate_recommendation(
             algorithm_name=asset.algorithm_name,
             purpose=asset.purpose,
@@ -88,7 +132,8 @@ class RecommendationService:
             profile=eff_profile,
             asset_location=getattr(asset, "location", None),
             asset_line_number=getattr(asset, "line_number", None),
-            asset_name=getattr(asset, "name", None)
+            asset_name=getattr(asset, "name", None),
+            context=eff_context
         )
 
         rec_record = self.rec_repo.store_recommendation(
@@ -113,7 +158,7 @@ class RecommendationService:
 
         return res_dict
 
-    def recommend_project(self, project_id: str, force_regeneration: bool = False, profile: Optional[str] = None) -> List[Dict[str, Any]]:
+    def recommend_project(self, project_id: str, force_regeneration: bool = False, profile: Optional[str] = None, context: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         if not self.asset_repo:
             raise RuntimeError("Database repository unavailable.")
         assets = self.asset_repo.get_by_project(project_id)
@@ -177,6 +222,8 @@ class RecommendationService:
             complexity = getattr(ra, "migration_complexity_score", 50.0) if ra else 50.0
             comp_str = "HIGH" if complexity >= 75.0 else ("MEDIUM" if complexity >= 40.0 else "LOW")
 
+            eff_context = self._extract_asset_context(asset, context)
+
             rec_eval = self.engine.generate_recommendation(
                 algorithm_name=asset.algorithm_name,
                 purpose=asset.purpose,
@@ -189,7 +236,8 @@ class RecommendationService:
                 profile=eff_profile,
                 asset_location=getattr(asset, "location", None),
                 asset_line_number=getattr(asset, "line_number", None),
-                asset_name=getattr(asset, "name", None)
+                asset_name=getattr(asset, "name", None),
+                context=eff_context
             )
             to_store.append((asset.id, rec_eval, ra.id if ra else None, asset, ra, threat_dict_list))
 

@@ -15,8 +15,16 @@ class RecommendationEngine:
     enriched with optional PQC performance predictions.
     """
     def __init__(self, perf_provider: Optional[PerformancePredictionProvider] = None):
+        import os
         self.ranking_provider = RecommendationRankingProvider()
-        self.perf_provider = perf_provider or PerformancePredictionProvider()
+        if perf_provider:
+            self.perf_provider = perf_provider
+        else:
+            default_cbm = os.path.join(os.path.dirname(__file__), "models", "pqc_model_log_v1.cbm")
+            if os.path.exists(default_cbm) and not os.environ.get("SENTRIQ_PERFORMANCE_MODEL_PATH"):
+                self.perf_provider = PerformancePredictionProvider(model_path=default_cbm)
+            else:
+                self.perf_provider = PerformancePredictionProvider()
 
     def evaluate_recommendations(self, asset: Any, profile: Any = "BALANCED") -> List[Dict[str, Any]]:
         detector_names = [e.detector_name for e in (getattr(asset, "evidence_items", []) or [])]
