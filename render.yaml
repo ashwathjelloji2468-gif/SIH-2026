@@ -16,3 +16,5 @@ services:
         generateValue: true
       - key: DEFAULT_QUANTUM_THREAT_HORIZON
         value: "2033"
+      - key: SENTRIQ_PERFORMANCE_MODEL_PATH
+        value: app/recommend/models/pqc_model_log_v1.cbm

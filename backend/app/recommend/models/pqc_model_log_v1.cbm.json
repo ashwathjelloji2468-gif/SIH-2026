@@ -1,0 +1,23 @@
+{
+  "model_version": "catboost-pqc-v1.0",
+  "dataset_version": "source-version-not-provided",
+  "benchmark_source": "PQC Algorithms Benchmark Data",
+  "training_target": "log1p(latency_us)",
+  "prediction_inverse_transform": "expm1",
+  "features": [
+    "algorithm",
+    "security_level",
+    "security_level_bits",
+    "text_size_kb",
+    "text_length_bytes",
+    "primitive",
+    "ciphertext_length",
+    "signature_length",
+    "overhead_bytes",
+    "shared_secret_length"
+  ],
+  "categorical_features": [
+    "algorithm",
+    "primitive"
+  ]
+}

@@ -252,6 +252,34 @@ def test_missing_metadata_error(tmp_path):
     assert "Companion metadata JSON file missing" in provider._load_reason
 
 
+def test_real_bundled_artifact_integration():
+    import os
+    bundled_path = "app/recommend/models/pqc_model_log_v1.cbm"
+    resolved_path = PerformancePredictionProvider()._resolve_path(bundled_path)
+    if not resolved_path or not os.path.exists(resolved_path):
+        pytest.skip("Real bundled model artifact not present in local test environment")
+
+    provider = PerformancePredictionProvider(model_path=bundled_path)
+    assert provider._load_status == "READY"
+    assert provider._metadata is not None
+    assert provider._metadata.get("training_target") == "log1p(latency_us)"
+    assert provider._metadata.get("prediction_inverse_transform") == "expm1"
+
+    cand = {
+        "algorithm": "ML-KEM-768",
+        "primitive": "KEY_ESTABLISHMENT",
+        "security_level": 3,
+        "ciphertext_size_bytes": 1088,
+        "shared_secret_bytes": 32,
+    }
+    res = provider.predict_performance(cand, {"text_length_bytes": 2048})
+    assert res["status"] == "READY"
+    assert res["predicted_latency_us"] is not None
+    assert isinstance(res["predicted_latency_us"], float)
+    assert res["predicted_latency_us"] > 0
+    assert res["predicted_throughput_ops_s"] is None
+
+
 def test_h_no_fabricated_prediction():
     provider = PerformancePredictionProvider(model_path=None)
     res = provider.predict_performance({"algorithm": "ML-KEM-768"})

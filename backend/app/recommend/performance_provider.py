@@ -125,15 +125,47 @@ class PerformancePredictionProvider:
     without fabricating prediction values.
     """
     def __init__(self, model_path: Optional[str] = None):
-        self.model_path = model_path or os.environ.get("SENTRIQ_PERFORMANCE_MODEL_PATH")
+        raw_path = model_path or os.environ.get("SENTRIQ_PERFORMANCE_MODEL_PATH")
+        self.model_path = self._resolve_path(raw_path)
         self.provider_name = "CatBoostPerformancePredictionProvider"
         self._model = None
         self._metadata = None
         self._load_status = "UNCONFIGURED"
         self._load_reason = "MODEL_ARTIFACT_NOT_CONFIGURED"
 
+        if raw_path and not self.model_path:
+            self._load_status = "UNCONFIGURED"
+            self._load_reason = "MODEL_ARTIFACT_NOT_CONFIGURED"
+
         if self.model_path:
             self._init_model()
+
+    def _resolve_path(self, path_str: Optional[str]) -> Optional[str]:
+        if not path_str:
+            return None
+
+        # 1. Directly check if existing file (absolute or CWD-relative)
+        if os.path.exists(path_str):
+            return os.path.abspath(path_str)
+
+        # 2. Check relative to repository root if executed from repo root
+        repo_rel = os.path.join("backend", path_str)
+        if os.path.exists(repo_rel):
+            return os.path.abspath(repo_rel)
+
+        # 3. Check relative to backend root if path started with backend/
+        if path_str.startswith("backend/"):
+            stripped = path_str[len("backend/"):]
+            if os.path.exists(stripped):
+                return os.path.abspath(stripped)
+
+        # 4. Fallback relative to performance_provider.py directory
+        module_dir = os.path.dirname(os.path.abspath(__file__))
+        models_dir_path = os.path.join(module_dir, "models", os.path.basename(path_str))
+        if os.path.exists(models_dir_path):
+            return os.path.abspath(models_dir_path)
+
+        return None
 
     def _init_model(self):
         if not self.model_path or not os.path.exists(self.model_path):
