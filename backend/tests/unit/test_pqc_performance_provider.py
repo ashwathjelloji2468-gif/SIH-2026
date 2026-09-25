@@ -1,7 +1,13 @@
+import math
+import json
 import pytest
 from app.models.enums import CryptoPurpose, QuantumSafety, RecommendationCategory
 from app.recommend.engine import RecommendationEngine
-from app.recommend.performance_provider import PerformancePredictionProvider, PerformanceCandidateAdapter
+from app.recommend.performance_provider import (
+    PerformancePredictionProvider,
+    PerformanceCandidateAdapter,
+    FEATURE_COLUMNS,
+)
 
 
 class MockReadyPerformanceProvider(PerformancePredictionProvider):
@@ -72,7 +78,7 @@ def test_b_missing_artifact_unconfigured():
 def test_c_invalid_artifact_error(tmp_path):
     invalid_file = tmp_path / "invalid_model.cbm"
     invalid_file.write_text("invalid content")
-    
+
     provider = PerformancePredictionProvider(model_path=str(invalid_file))
     assert provider._load_status == "ERROR"
     res = provider.predict_performance({"algorithm": "ML-KEM-768"})
@@ -90,10 +96,9 @@ def test_d_mocked_ready_provider():
 def test_e_rejected_candidate_never_reaches_provider():
     mock_provider = MockReadyPerformanceProvider()
     engine = RecommendationEngine(perf_provider=mock_provider)
-    
+
     rec = engine.generate_recommendation("ECDSA", CryptoPurpose.DIGITAL_SIGNATURE, QuantumSafety.QUANTUM_VULNERABLE)
-    
-    # ML-KEM candidates are rejected for signature assets
+
     called = mock_provider.called_candidates
     assert not any("ML-KEM" in c for c in called)
 
@@ -101,7 +106,7 @@ def test_e_rejected_candidate_never_reaches_provider():
 def test_f_eligible_candidate_reaches_provider():
     mock_provider = MockReadyPerformanceProvider()
     engine = RecommendationEngine(perf_provider=mock_provider)
-    
+
     rec = engine.generate_recommendation("ECDH", CryptoPurpose.KEY_ESTABLISHMENT, QuantumSafety.QUANTUM_VULNERABLE)
     called = mock_provider.called_candidates
     assert any("ML-KEM" in c for c in called)
@@ -114,43 +119,137 @@ def test_g_missing_feature_unconfigured():
     assert "security_level" in missing or "primitive" in missing
 
 
-def test_g_exact_feature_schema_construction():
-    # KEM feature schema check
+def test_exact_10_feature_kem_vector():
     kem_candidate = {
         "algorithm": "ML-KEM-768",
         "primitive": "KEY_ESTABLISHMENT",
         "security_level": 3,
-        "ciphertext_size_bytes": 1088
+        "ciphertext_size_bytes": 1088,
+        "shared_secret_bytes": 32,
     }
     kem_ctx = {"text_length_bytes": 2048}
     kem_feats, missing_kem = PerformanceCandidateAdapter.extract_features(kem_candidate, kem_ctx)
+
     assert missing_kem == []
+    assert list(kem_feats.keys()) == FEATURE_COLUMNS
     assert kem_feats["algorithm"] == "ML-KEM-768"
     assert kem_feats["security_level"] == 3
     assert kem_feats["security_level_bits"] == 192
     assert kem_feats["text_size_kb"] == 2.0
     assert kem_feats["text_length_bytes"] == 2048
+    assert kem_feats["primitive"] == "KEM"
     assert kem_feats["ciphertext_length"] == 1088
-    assert kem_feats["shared_secret_length"] == 32
+    assert math.isnan(kem_feats["signature_length"])
     assert kem_feats["overhead_bytes"] == 1088
+    assert kem_feats["shared_secret_length"] == 32
 
-    # Signature feature schema check
+
+def test_exact_10_feature_signature_vector():
     sig_candidate = {
         "algorithm": "ML-DSA-65",
         "primitive": "DIGITAL_SIGNATURE",
         "security_level": 3,
-        "signature_size_bytes": 3309
+        "signature_size_bytes": 3309,
     }
     sig_ctx = {"text_length_bytes": 1024}
     sig_feats, missing_sig = PerformanceCandidateAdapter.extract_features(sig_candidate, sig_ctx)
+
     assert missing_sig == []
+    assert list(sig_feats.keys()) == FEATURE_COLUMNS
     assert sig_feats["algorithm"] == "ML-DSA-65"
     assert sig_feats["security_level"] == 3
     assert sig_feats["security_level_bits"] == 192
     assert sig_feats["text_size_kb"] == 1.0
     assert sig_feats["text_length_bytes"] == 1024
+    assert sig_feats["primitive"] == "SIGNATURE"
+    assert math.isnan(sig_feats["ciphertext_length"])
     assert sig_feats["signature_length"] == 3309
     assert sig_feats["overhead_bytes"] == 3309
+    assert math.isnan(sig_feats["shared_secret_length"])
+
+
+def test_nan_handling_for_non_applicable_fields():
+    kem_candidate = {
+        "algorithm": "ML-KEM-768",
+        "primitive": "KEM",
+        "security_level": 3,
+        "ciphertext_size_bytes": 1088
+    }
+    kem_feats, _ = PerformanceCandidateAdapter.extract_features(kem_candidate, {"text_length_bytes": 1024})
+    assert math.isnan(kem_feats["signature_length"])
+
+    sig_candidate = {
+        "algorithm": "ML-DSA-65",
+        "primitive": "SIGNATURE",
+        "security_level": 3,
+        "signature_size_bytes": 3309
+    }
+    sig_feats, _ = PerformanceCandidateAdapter.extract_features(sig_candidate, {"text_length_bytes": 1024})
+    assert math.isnan(sig_feats["ciphertext_length"])
+    assert math.isnan(sig_feats["shared_secret_length"])
+
+
+def test_log1p_model_prediction_and_expm1_transform(tmp_path):
+    class MockCatBoostModel:
+        def predict(self, df):
+            return [math.log1p(150.0)]
+
+    model_file = tmp_path / "pqc_model_log_v1.cbm"
+    model_file.write_text("dummy binary")
+    meta_file = tmp_path / "pqc_model_log_v1.cbm.json"
+    meta_file.write_text(json.dumps({
+        "model_version": "catboost-pqc-v1.0",
+        "dataset_version": "nist-pqc-bench-v1.0",
+        "benchmark_source": "NIST benchmark",
+        "training_target": "log1p(latency_us)",
+        "prediction_inverse_transform": "expm1"
+    }))
+
+    provider = PerformancePredictionProvider(model_path=str(model_file))
+    provider._model = MockCatBoostModel()
+    provider._load_status = "READY"
+    provider._load_reason = None
+
+    cand = {"algorithm": "ML-KEM-768", "primitive": "KEM", "security_level": 3, "ciphertext_size_bytes": 1088}
+    res = provider.predict_performance(cand, {"text_length_bytes": 1024})
+    assert res["status"] == "READY"
+    assert res["predicted_latency_us"] == 150.0
+
+
+def test_raw_latency_model_backwards_compatibility(tmp_path):
+    class MockRawCatBoostModel:
+        def predict(self, df):
+            return [150.0]
+
+    model_file = tmp_path / "pqc_model_raw.cbm"
+    model_file.write_text("dummy binary")
+    meta_file = tmp_path / "pqc_model_raw.cbm.json"
+    meta_file.write_text(json.dumps({
+        "model_version": "catboost-pqc-v0.9",
+        "dataset_version": "openssl-bench-2026.1",
+        "benchmark_source": "OpenSSL bench",
+        "training_target": "latency_us",
+        "prediction_inverse_transform": "identity"
+    }))
+
+    provider = PerformancePredictionProvider(model_path=str(model_file))
+    provider._model = MockRawCatBoostModel()
+    provider._load_status = "READY"
+    provider._load_reason = None
+
+    cand = {"algorithm": "ML-KEM-768", "primitive": "KEM", "security_level": 3, "ciphertext_size_bytes": 1088}
+    res = provider.predict_performance(cand, {"text_length_bytes": 1024})
+    assert res["status"] == "READY"
+    assert res["predicted_latency_us"] == 150.0
+
+
+def test_missing_metadata_error(tmp_path):
+    model_file = tmp_path / "model_without_meta.cbm"
+    model_file.write_text("dummy content")
+
+    provider = PerformancePredictionProvider(model_path=str(model_file))
+    assert provider._load_status == "ERROR"
+    assert "Companion metadata JSON file missing" in provider._load_reason
 
 
 def test_h_no_fabricated_prediction():
@@ -169,7 +268,6 @@ def test_i_deterministic_output_when_provider_unavailable():
 
 
 def test_j_hard_latency_constraint_only_with_ready_prediction():
-    # 1. Unconfigured provider: candidate stays eligible
     unconfig_provider = PerformancePredictionProvider(model_path=None)
     engine1 = RecommendationEngine(perf_provider=unconfig_provider)
     rec1 = engine1.generate_recommendation(
@@ -178,7 +276,6 @@ def test_j_hard_latency_constraint_only_with_ready_prediction():
     )
     assert len(rec1["eligible_candidates"]) > 0
 
-    # 2. Mocked READY provider with high latency (310 µs > 50 µs limit) -> rejects candidate
     mock_slow = MockReadyPerformanceProvider({"ML-KEM-1024": 310.0, "ML-KEM-768": 200.0, "ML-KEM-512": 150.0})
     engine2 = RecommendationEngine(perf_provider=mock_slow)
     rec2 = engine2.generate_recommendation(
@@ -217,7 +314,7 @@ def test_m_get_does_not_regenerate():
     svc = RecommendationService(db=None)
     svc.asset_repo = DummyAssetRepo()
     svc.rec_repo = DummyRepo()
-    
+
     res = svc.recommend_asset("asset_123", force_regeneration=False)
     assert res["target_pqc_candidate"] == "STORED_ML_KEM"
     assert res["tradeoffs"]["performance"]["predicted_latency_us"] == 120.0
@@ -232,7 +329,7 @@ def test_n_explicit_evaluation_regenerates():
     svc = RecommendationService(db=None)
     svc.asset_repo = DummyAssetRepo()
     svc.rec_repo = None
-    
+
     res = svc.recommend_asset("asset_123", force_regeneration=True)
     assert "ML-KEM" in res["target_pqc_candidate"]
 
