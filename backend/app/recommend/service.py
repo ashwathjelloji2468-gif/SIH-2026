@@ -212,7 +212,13 @@ class RecommendationService:
 
             if not force_regeneration and asset.id in existing_map:
                 existing = existing_map[asset.id]
-                results.append(self._recommendation_to_dict(existing, asset, ra, threat_dict_list))
+                res_dict = self._recommendation_to_dict(existing, asset, ra, threat_dict_list)
+                try:
+                    from app.audit.integration import audit_recommendation_snapshot
+                    audit_recommendation_snapshot(res_dict, asset_id=str(asset.id))
+                except Exception:
+                    pass
+                results.append(res_dict)
                 continue
 
             detector_names = [e.detector_name for e in (getattr(asset, "evidence_items", []) or [])]
@@ -246,12 +252,23 @@ class RecommendationService:
             rec_records = self.rec_repo.store_recommendations_bulk(bulk_payload)
             for idx, rec_record in enumerate(rec_records):
                 item = to_store[idx]
-                results.append(self._recommendation_to_dict(rec_record, item[3], item[4], item[5]))
+                res_dict = self._recommendation_to_dict(rec_record, item[3], item[4], item[5])
+                try:
+                    from app.audit.integration import audit_recommendation_snapshot
+                    audit_recommendation_snapshot(res_dict, asset_id=str(item[0]))
+                except Exception:
+                    pass
+                results.append(res_dict)
         elif to_store:
             for item in to_store:
                 rec_eval = item[1]
                 rec_eval["asset_id"] = item[0]
                 rec_eval["asset_name"] = item[3].name
+                try:
+                    from app.audit.integration import audit_recommendation_snapshot
+                    audit_recommendation_snapshot(rec_eval, asset_id=str(item[0]))
+                except Exception:
+                    pass
                 results.append(rec_eval)
 
         return results
