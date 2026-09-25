@@ -9,6 +9,7 @@ from app.audit.integration import (
 from app.audit.models import AuditArtifactType, AuditResult, AuditStatus
 from app.audit.provider import (
     BlockchainAuditProvider,
+    BlockchainRPCAuditProvider,
     ErrorBlockchainAuditProvider,
     MockBlockchainAuditProvider,
     UnconfiguredBlockchainAuditProvider,
@@ -23,6 +24,7 @@ __all__ = [
     "AuditResult",
     "AuditStatus",
     "BlockchainAuditProvider",
+    "BlockchainRPCAuditProvider",
     "MockBlockchainAuditProvider",
     "UnconfiguredBlockchainAuditProvider",
     "ErrorBlockchainAuditProvider",
