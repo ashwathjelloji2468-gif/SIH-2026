@@ -5,15 +5,18 @@ from app.models.enums import (
 )
 from app.knowledge.pqc_catalog import PQC_CATALOG, CATALOG_VERSION, get_candidate, get_all_candidates_for_primitive
 from app.recommend.ml_interface import RecommendationRankingProvider
+from app.recommend.performance_provider import PerformancePredictionProvider
 
 
 class RecommendationEngine:
     """
-    Authoritative Deterministic Recommendation Engine (Part 4A).
-    Purpose-first, risk-aware, threat-aware candidate eligibility and filtering layer.
+    Authoritative Deterministic Recommendation Engine (Part 4A & Part 4A.1).
+    Purpose-first, risk-aware, threat-aware candidate eligibility and filtering layer
+    enriched with optional PQC performance predictions.
     """
-    def __init__(self):
+    def __init__(self, perf_provider: Optional[PerformancePredictionProvider] = None):
         self.ranking_provider = RecommendationRankingProvider()
+        self.perf_provider = perf_provider or PerformancePredictionProvider()
 
     def evaluate_recommendations(self, asset: Any, profile: Any = "BALANCED") -> List[Dict[str, Any]]:
         detector_names = [e.detector_name for e in (getattr(asset, "evidence_items", []) or [])]
@@ -47,10 +50,13 @@ class RecommendationEngine:
         target_library: Optional[str] = None,
         target_protocol: Optional[str] = None,
         max_size_bytes: Optional[int] = None,
+        max_latency_us: Optional[float] = None,
         required_security_level: Optional[int] = None,
         asset_location: Optional[str] = None,
         asset_line_number: Optional[int] = None,
-        asset_name: Optional[str] = None
+        asset_name: Optional[str] = None,
+        perf_provider_override: Optional[PerformancePredictionProvider] = None,
+        context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
 
         alg_upper = (algorithm_name or "").strip().upper()
@@ -75,8 +81,11 @@ class RecommendationEngine:
             target_library=target_library,
             target_protocol=target_protocol,
             max_size_bytes=max_size_bytes,
+            max_latency_us=max_latency_us,
             profile=prof_str,
-            quantum_safety=quantum_safety
+            quantum_safety=quantum_safety,
+            perf_provider_override=perf_provider_override,
+            context=context
         )
 
         eligible_candidates = eval_result["eligible_candidates"]
@@ -88,6 +97,7 @@ class RecommendationEngine:
         std_status = eval_result["standard_status"]
         tradeoffs = eval_result["tradeoffs"]
         base_rationale = eval_result["base_rationale"]
+        primary_perf_evidence = eval_result["primary_perf_evidence"]
 
         # Formulate legacy algorithm response format if needed for contract match
         if primary_cand == "MANUAL_REVIEW_REQUIRED":
@@ -189,6 +199,24 @@ class RecommendationEngine:
         why_str = f"Asset relies on {alg_upper} ({eff_purpose.value if hasattr(eff_purpose, 'value') else eff_purpose}) vulnerable to {attack_type}. Satisfies {', '.join(security_objectives)}."
         what_next_str = "Deploy PQC algorithm in staging environment and run validation test suite." if category == RecommendationCategory.PQC_REPLACEMENT else "Maintain crypto-agility monitoring."
 
+        # Performance payload for primary candidate
+        performance_payload = primary_perf_evidence or {
+            "status": "UNCONFIGURED",
+            "candidate": primary_cand,
+            "predicted_latency_us": None,
+            "predicted_throughput_ops_s": None,
+            "model_version": None,
+            "dataset_version": None,
+            "provider_name": "CatBoostPerformancePredictionProvider",
+            "benchmark_source": None,
+            "evidence": [],
+            "warnings": ["MODEL_ARTIFACT_NOT_CONFIGURED"],
+            "missing_features": []
+        }
+
+        # Embed performance payload safely inside tradeoffs for database persistence compatibility
+        tradeoffs["performance"] = performance_payload
+
         return {
             "target_pqc_candidate": rec_algo_display,
             "recommended_algorithm": rec_algo_display,
@@ -212,7 +240,7 @@ class RecommendationEngine:
             "confidence": confidence,
             "kb_version": CATALOG_VERSION,
 
-            # Part 4A Authoritative Additions
+            # Part 4A & 4A.1 Authoritative Additions
             "primary_candidate_variant": primary_cand,
             "current_algorithm": alg_upper,
             "current_primitive": classification["primitive"],
@@ -227,6 +255,7 @@ class RecommendationEngine:
             "evidence": eval_result["evidence"],
             "missing_evidence": eval_result["missing_evidence"],
             "expected_latency": eval_result["expected_latency"],
+            "performance": performance_payload,
             "crypto_agility": {
                 "algorithm_switchable": True,
                 "hybrid_capable": any(c.get("hybrid_support") for c in eligible_candidates),
@@ -309,8 +338,11 @@ class RecommendationEngine:
         target_library: Optional[str],
         target_protocol: Optional[str],
         max_size_bytes: Optional[int],
+        max_latency_us: Optional[float],
         profile: str,
-        quantum_safety: QuantumSafety
+        quantum_safety: QuantumSafety,
+        perf_provider_override: Optional[PerformancePredictionProvider] = None,
+        context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
 
         if purpose == CryptoPurpose.UNKNOWN:
@@ -326,7 +358,8 @@ class RecommendationEngine:
                 "base_rationale": f"The cryptographic asset '{algorithm_name}' could not be deterministically mapped to a standardized PQC candidate. Manual review required.",
                 "evidence": [],
                 "missing_evidence": ["Unrecognized algorithm and purpose."],
-                "expected_latency": None
+                "expected_latency": None,
+                "primary_perf_evidence": None
             }
 
         # Handle Retention categories
@@ -340,6 +373,8 @@ class RecommendationEngine:
         rejected = []
         evidence = []
         missing_evidence = []
+
+        active_perf_provider = perf_provider_override or self.perf_provider
 
         all_candidates = list(PQC_CATALOG.values())
 
@@ -415,7 +450,27 @@ class RecommendationEngine:
                 eligible.append(eval_entry)
                 evidence.append(f"Candidate {cand_name} passed all deterministic eligibility filters.")
             else:
+                # Rejected candidates remain rejected and are NEVER passed to performance provider
                 rejected.append(eval_entry)
+
+        # Part 4A.1: Pass ONLY eligible candidates to performance provider
+        for cand_eval in eligible:
+            cand_dict = get_candidate(cand_eval["candidate"]) or {"algorithm": cand_eval["candidate"], "security_level": cand_eval["security_level"]}
+            perf_pred = active_perf_provider.predict_performance(cand_dict, context=context)
+            cand_eval["performance"] = perf_pred
+
+            # Evaluate hard latency constraint ONLY IF max_latency_us is provided AND performance prediction is READY
+            if max_latency_us is not None:
+                if perf_pred.get("status") == "READY" and perf_pred.get("predicted_latency_us") is not None:
+                    if perf_pred["predicted_latency_us"] > max_latency_us:
+                        cand_eval["eligible"] = False
+                        cand_eval["reasons"].append(f"Application latency constraint violated: predicted CPU latency {perf_pred['predicted_latency_us']} µs > limit {max_latency_us} µs.")
+
+        # Re-partition candidates if any were rejected by hard latency constraint
+        really_eligible = [c for c in eligible if c["eligible"]]
+        newly_rejected = [c for c in eligible if not c["eligible"]]
+        eligible = really_eligible
+        rejected.extend(newly_rejected)
 
         if not eligible:
             return {
@@ -430,7 +485,8 @@ class RecommendationEngine:
                 "base_rationale": f"No PQC candidates deterministically satisfied all operational constraints for '{algorithm_name}'. Manual review required.",
                 "evidence": evidence,
                 "missing_evidence": missing_evidence,
-                "expected_latency": None
+                "expected_latency": None,
+                "primary_perf_evidence": None
             }
 
         # Select primary and alternative candidates without arbitrary weights
@@ -488,6 +544,9 @@ class RecommendationEngine:
             }
             base_rationale = f"ML-DSA (FIPS 204) is the primary NIST lattice-based signature replacement for '{algorithm_name}'."
 
+        primary_eval = [c for c in eligible if c["candidate"] == primary]
+        primary_perf_ev = primary_eval[0].get("performance") if primary_eval else None
+
         measured_lat = {
             "status": cand_obj.get("measurement_status", "MEASURED"),
             "provenance": cand_obj.get("provenance", "NIST FIPS"),
@@ -507,7 +566,8 @@ class RecommendationEngine:
             "base_rationale": base_rationale,
             "evidence": evidence,
             "missing_evidence": missing_evidence,
-            "expected_latency": measured_lat
+            "expected_latency": measured_lat,
+            "primary_perf_evidence": primary_perf_ev
         }
 
     def _handle_retention_category(self, algorithm_name: str, purpose: CryptoPurpose) -> Dict[str, Any]:
@@ -579,7 +639,8 @@ class RecommendationEngine:
             "base_rationale": rationale,
             "evidence": ["Retain existing symmetric/hashing configuration."],
             "missing_evidence": [],
-            "expected_latency": {"status": "MEASURED", "provenance": "Hardware AES-NI", "latency_cpu_ms": 0.001}
+            "expected_latency": {"status": "MEASURED", "provenance": "Hardware AES-NI", "latency_cpu_ms": 0.001},
+            "primary_perf_evidence": None
         }
 
     def _calculate_confidence(self, alg_upper: str, purpose: CryptoPurpose, detector_names: List[str]) -> float:
